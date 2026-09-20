@@ -1,0 +1,23 @@
+.skin-admin { padding-bottom: 88px; }
+.skin-admin-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.skin-admin-head h2 { margin: 0 0 6px; font-size: 16px; }
+.skin-card { margin-bottom: 16px; }
+.skin-card .ant-card-head-title { font-weight: 650; }
+.skin-form-row { display: grid; grid-template-columns: 140px minmax(0, 560px); gap: 12px 18px; align-items: start; margin-bottom: 18px; }
+.skin-form-row > label { padding-top: 6px; color: #1f2329; font-weight: 600; }
+.skin-form-row > label em { color: #f5222d; margin-right: 4px; font-style: normal; }
+.skin-asset-field { max-width: 560px; }
+.skin-field-label { font-weight: 600; margin-bottom: 8px; }
+.skin-field-label em { color: #f5222d; margin-right: 4px; font-style: normal; }
+.skin-upload-box { width: 280px; min-height: 160px; border: 1px dashed #c5cdd6; border-radius: 8px; background: #fafbfc; overflow: hidden; }
+.skin-upload-plus { width: 280px; height: 160px; border: 0; background: transparent; color: #86909c; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; }
+.skin-upload-plus .anticon { font-size: 28px; color: #b5bdc8; }
+.skin-upload-preview { position: relative; }
+.skin-upload-preview img, .skin-upload-preview video { display: block; width: 280px; height: 160px; object-fit: cover; }
+.skin-upload-actions { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.skin-asset-hint, .skin-asset-field .ant-typography { display: block; margin-top: 4px; font-size: 12px; }
+.skin-field-error { color: #f5222d; font-size: 12px; margin-top: 4px; }
+.skin-asset-list { display: flex; flex-direction: column; gap: 16px; }
+.skin-footer { position: sticky; bottom: 0; z-index: 4; margin: 8px -20px -20px; padding: 14px 24px; background: #fff; border-top: 1px solid #edf0f5; display: flex; justify-content: flex-end; gap: 8px; }
+.skin-preview-link { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #174ea6; word-break: break-all; }
+.skin-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

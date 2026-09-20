@@ -18,6 +18,7 @@ import {
   HistoryOutlined,
   DashboardOutlined,
   ExperimentOutlined,
+  SkinOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -42,6 +43,7 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/marketing-center/skus': 'marketingV2_skus',
   '/marketing-center/offers': 'marketingV2_offers',
   '/marketing-center/landing': 'marketingV2_landing',
+  '/marketing-center/skins': 'marketingV2_landing',
   '/marketing-backup': 'marketing',
   '/users-v2': 'usersV2',
   '/orders': 'orders',
@@ -106,6 +108,7 @@ export default function AppLayout() {
     { key: '/marketing-center/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
     { key: '/marketing-center/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
+    { key: '/marketing-center/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing Page Skins' : '活动页皮肤管理' },
   ].filter((n) => visible(n.key))
 
   // 销售中心（二期）
@@ -160,6 +163,7 @@ export default function AppLayout() {
     '/marketing-center/skus': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center/skins': lang === 'en' ? 'Landing Page Skins' : '活动页皮肤管理',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/orders': t('app.nav.orders'),

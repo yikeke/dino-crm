@@ -20,7 +20,12 @@ import OrderDetail from './pages/OrderDetail'
 import CoursePackagePage from './pages/CoursePackage'
 import CouponPage from './pages/Coupon'
 import LandingPageManagement from './pages/LandingPage'
+import LandingSkinManagement from './pages/LandingSkinManagement'
+import LandingSkinPreview from './pages/LandingSkinPreview'
 import SystemConfig from './pages/SystemConfig'
+import { loadLandingSkinStore } from './landingSkin'
+
+loadLandingSkinStore()
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const session = useSession()
@@ -71,6 +76,7 @@ export default function App() {
           path="/login"
           element={session ? <Navigate to="/" replace /> : <Login />}
         />
+        <Route path="/website/promotion/landingpage" element={<LandingSkinPreview />} />
         <Route
           path="/"
           element={
@@ -94,6 +100,7 @@ export default function App() {
           <Route path="marketing-center/skus" element={<Guard module="marketingV2_skus"><MarketingCenterPrototype page="skus" /></Guard>} />
           <Route path="marketing-center/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
           <Route path="marketing-center/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
+          <Route path="marketing-center/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
           <Route path="users-v2/:studentId" element={<Guard module="usersV2"><UserDetail /></Guard>} />
