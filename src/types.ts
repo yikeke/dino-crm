@@ -162,6 +162,21 @@ export type Student = {
   landingEnglishLevel?: string
   landingLearningGoal?: string
   landingCurrentLearningMethod?: string
+  /** 越南银行转账待开通：财务确认后由用户中心专人开通 */
+  bankTransfer?: BankTransferGrant
+}
+
+export type BankTransferGrant = {
+  remark: string
+  amountVnd: number
+  financeConfirmed: boolean
+  opened: boolean
+  openedAt?: string
+  openedBy?: string
+  grantMode?: 'days' | 'sku'
+  grantDays?: number
+  skuId?: string
+  skuName?: string
 }
 
 // 销售跟进进度（线索在销售中心的状态；转「已体验/已付费」时改写 status 并离开销售中心）

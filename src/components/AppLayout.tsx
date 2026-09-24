@@ -46,6 +46,7 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/marketing-center/skins': 'marketingV2_landing',
   '/marketing-backup': 'marketing',
   '/users-v2': 'usersV2',
+  '/users-v6': 'usersV2',
   '/orders': 'orders',
   '/orders-v3': 'ordersV3',
   '/packages': 'packages',
@@ -124,6 +125,9 @@ export default function AppLayout() {
   const usersV2Nav = [
     { key: '/users-v2', icon: <TeamOutlined />, label: phase3Label(t('app.nav.users')) },
   ].filter((n) => visible(n.key))
+  const usersV6Nav = [
+    { key: '/users-v6', icon: <TeamOutlined />, label: phaseLabel(t('app.nav.users'), t('app.phase6'), 'magenta') },
+  ].filter((n) => visible(n.key))
   // 系统配置（二期）
   const systemNav = [
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
@@ -134,6 +138,7 @@ export default function AppLayout() {
     ...salesNav,
     ...systemNav,
     ...usersV2Nav,
+    ...usersV6Nav,
     ...ordersV3Nav,
     ...salesV3Nav,
     ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
@@ -166,6 +171,7 @@ export default function AppLayout() {
     '/marketing-center/skins': lang === 'en' ? 'Landing Page Skins' : '活动页皮肤管理',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
+    '/users-v6': t('app.nav.usersV6'),
     '/orders': t('app.nav.orders'),
     '/orders-v3': t('app.nav.orders'),
     '/packages': t('app.nav.packages'),
