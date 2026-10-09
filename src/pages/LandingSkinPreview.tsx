@@ -60,6 +60,8 @@ const labels: Record<string, { kicker: string; phone: string; otp: string; getCo
   vi: { kicker: 'Đối tác AI tiếng Anh đầu tiên của bé, Dino AI', phone: 'Số điện thoại', otp: 'Mã xác minh', getCode: 'Gửi mã', cta: 'Bắt đầu ngay', pay: 'Mua ngay', terms: 'Điều khoản', agree: 'Bạn đồng ý với' },
   ar: { kicker: 'شريك طفلك الأول لتعلم الإنجليزية بالذكاء الاصطناعي', phone: 'رقم الجوال', otp: 'رمز التحقق', getCode: 'إرسال', cta: 'ابدأ الآن', pay: 'اشترِ الآن', terms: 'الشروط', agree: 'بالموافقة فإنك تقبل' },
   ms: { kicker: 'Rakan AI bahasa Inggeris pertama anak anda, Dino AI', phone: 'Nombor telefon', otp: 'Kod SMS', getCode: 'Hantar', cta: 'Mula sekarang', pay: 'Beli sekarang', terms: 'Terma', agree: 'Anda bersetuju dengan' },
+  th: { kicker: 'เพื่อนคู่คิด AI ภาษาอังกฤษคนแรกของลูก Dino AI', phone: 'เบอร์โทรศัพท์', otp: 'รหัสยืนยัน', getCode: 'ส่งรหัส', cta: 'เริ่มเลย', pay: 'ซื้อเลย', terms: 'ข้อกำหนด', agree: 'คุณยอมรับ' },
+  id: { kicker: 'Teman AI bahasa Inggris pertama anak, Dino AI', phone: 'Nomor telepon', otp: 'Kode SMS', getCode: 'Kirim', cta: 'Mulai sekarang', pay: 'Beli sekarang', terms: 'Ketentuan', agree: 'Anda menyetujui' },
   ja: { kicker: '子どもの最初のAI英語パートナー、Dino AI', phone: '電話番号', otp: '認証コード', getCode: '送信', cta: '今すぐ始める', pay: '購入する', terms: '利用規約', agree: 'に同意します' },
   'zh-Hant': { kicker: '孩子的第一個 AI 英語夥伴，Dino AI', phone: '手機號碼', otp: '驗證碼', getCode: '取得驗證碼', cta: '立即開始', pay: '立即購買', terms: '使用條款', agree: '即表示你同意' },
   en: { kicker: 'Your child’s first AI English partner, Dino AI', phone: 'Phone number', otp: 'SMS code', getCode: 'Get code', cta: 'Log in', pay: 'Buy now', terms: 'Terms of Use', agree: 'You agree to our' },
