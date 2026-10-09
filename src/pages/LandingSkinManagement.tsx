@@ -494,6 +494,11 @@ export default function LandingSkinManagement() {
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
               </Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                {en
+                  ? 'Button clicks are fixed, not configurable. With a sign-up form, image and sticky buttons scroll back to the form, and submitting it opens the next interaction. Without a sign-up form, every button opens the next interaction directly.'
+                  : '按钮点击去向固定，不用配置：有注册表单时，图上按钮和吸底按钮定位回注册表单，提交注册后进入后续交互页面；无注册时，点任一按钮都直接进入后续交互页面。'}
+              </Text>
             </div>
           </div>
         </Card>
