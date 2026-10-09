@@ -439,9 +439,6 @@ export default function LandingSkinManagement() {
                   editing.afterRegisterAction,
                   line,
                 ),
-                extraFields: creating && line === '马来' && !(editing.extraFields?.length)
-                  ? [emptyRegisterField('Name')]
-                  : editing.extraFields,
               })}
             />
           </div>
