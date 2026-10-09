@@ -46,6 +46,7 @@ import {
   normalizeRegisterAreaBgColor,
   normalizeRegisterAreaBgKind,
   normalizeRegisterMode,
+  registerModeForPage,
   pageTypeLabel,
   previewHref,
   pushSkinHistory,
@@ -172,6 +173,10 @@ export default function LandingSkinManagement() {
     }
     // Full checks only on submit; temporary save only needs line + name.
     if (!publish) return true
+    if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
+      message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
+      return false
+    }
     if (!hasRequiredSceneContent(editing)) {
       message.error(en
         ? 'Add at least one before-register or after-register image'
@@ -465,6 +470,7 @@ export default function LandingSkinManagement() {
                     ...editing,
                     pageType: next,
                     afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line),
+                    registerMode: registerModeForPage(next, editing.registerMode),
                   })
                 }}
                 options={PAGE_TYPE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
@@ -512,18 +518,24 @@ export default function LandingSkinManagement() {
             <div>
               <Radio.Group
                 disabled={!editing.line}
-                value={normalizeRegisterMode(editing.registerMode)}
+                value={registerModeForPage(pageType, editing.registerMode)}
                 onChange={(e) => setEditing({
                   ...editing,
-                  registerMode: e.target.value,
+                  registerMode: registerModeForPage(pageType, e.target.value),
                   verifyEnabled: e.target.value === 'none' ? false : editing.verifyEnabled,
                 })}
-                options={REGISTER_MODE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
+                options={REGISTER_MODE_OPTIONS.map((x) => ({
+                  value: x.value,
+                  label: en ? x.en : x.zh,
+                  disabled: pageType === 'pay' && x.value === 'none',
+                }))}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                {en
-                  ? 'No register hides the form. Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
-                  : '无注册则不展示表单。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。'}
+                {pageType === 'pay'
+                  ? (en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册。')
+                  : (en
+                    ? 'No register hides the form. Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
+                    : '无注册则不展示表单。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
               </Text>
             </div>
           </div>

@@ -510,6 +510,12 @@ export function normalizeRegisterMode(mode?: string): RegisterMode {
   return 'full'
 }
 
+/** Payment landings always create a phone account. Acquisition pages may stay register-free. */
+export function registerModeForPage(pageType: LandingPageKind, mode?: string): RegisterMode {
+  if (pageType === 'pay') return 'full'
+  return normalizeRegisterMode(mode)
+}
+
 export const DEFAULT_REGISTER_BG_COLOR = '#ffffff'
 
 export function normalizeRegisterBgKind(kind?: string): RegisterBgKind {
@@ -784,7 +790,7 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
       extraFields: (skin.extraFields || []).map(normalizeRegisterField),
       thirdPartyLogins: normalizeThirdPartyLogins(skin.thirdPartyLogins),
       pageType,
-      registerMode: normalizeRegisterMode(skin.registerMode),
+      registerMode: registerModeForPage(pageType, skin.registerMode),
       afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line),
       registerBgKind: normalizeRegisterBgKind(skin.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(skin.registerBgColor),
@@ -935,7 +941,7 @@ export function seedLandingSkins(): LandingSkinStore {
         line: '韩国',
         pageType: 'pay',
         language: 'ko',
-        registerMode: 'none',
+        registerMode: 'full',
         verifyEnabled: false,
         extraFields: [],
         thirdPartyLogins: ['kakao', 'apple'],
