@@ -908,8 +908,8 @@ export default function LandingSkinManagement() {
         >
           <Text type="secondary" className="skin-track-note">
             {en
-              ? 'Reference only. Each button gets a button ID automatically. You cannot type or edit it. Changing the label, color, or position keeps the same ID. Turning a button off stops that ID. The register click is not the sign-up result. Firebase auto events stay on the SDK.'
-              : '仅供对照，不用在这里填写。每个按钮自动分配 button ID，不能手填，也不能改。改文案、颜色、位置都不换 ID。关掉按钮后不再上报。点注册按钮只记点击。Firebase 自动采集仍由 SDK 上报。'}
+              ? 'Reference only, and only the buttons on the login page. Download-popup and extra-info buttons are not listed. Each button gets a button ID automatically. You cannot type or edit it. Changing the label, color, or position keeps the same ID. Turning a button off stops that ID. The register click is not the sign-up result. Firebase auto events stay on the SDK.'
+              : '仅供对照，不用在这里填写。这里只列登录页上的按钮。下载弹窗、补充资料这些后续页面的按钮不在这里展示。每个按钮自动分配 button ID，不能手填，也不能改。改文案、颜色、位置都不换 ID。关掉按钮后不再上报。点注册按钮只记点击。Firebase 自动采集仍由 SDK 上报。'}
           </Text>
           <table className="skin-track">
             <thead>

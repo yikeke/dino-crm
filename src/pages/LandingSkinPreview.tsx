@@ -714,7 +714,7 @@ function ConfigPanel({
 
       <section className="lpw-card is-ref">
         <h3>埋点 · 参考</h3>
-        <p className="lpw-note" style={{ margin: '0 0 8px' }}>仅供对照。按钮 ID 自动分配。其他字段的填写值只进落地页单独的表，不进埋点。</p>
+        <p className="lpw-note" style={{ margin: '0 0 8px' }}>仅供对照，只列登录页上的按钮。后续页面的按钮不在这里。按钮 ID 自动分配。其他字段的填写值只进落地页单独的表，不进埋点。</p>
         {skinTrackButtons(skin).map((row) => (
           <Row key={row.key} label={row.zh} onFocus={onFocus}><code>{row.eventId}</code></Row>
         ))}

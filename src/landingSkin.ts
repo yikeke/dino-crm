@@ -717,10 +717,11 @@ export type SkinTrackButton = {
 const SCENE_BUTTON_ON = (item: SkinAsset) => !!item.ctaMode && item.ctaMode !== 'none'
 
 /**
- * Every button this skin will render gets a stable click event_id.
+ * Login-page buttons only. Follow-up pages (download popup, extra-info skip / confirm / done)
+ * keep their own event ids, but they are not listed in this reference.
  * Index follows the current list (1-based). Copy, color, and position do not change the id.
  */
-export function skinTrackButtons(skin: Pick<LandingSkin, 'registerMode' | 'thirdPartyLogins' | 'registerBefore' | 'registerAfter' | 'stickyButtonEnabled' | 'afterRegisterAction' | 'pageType'>): SkinTrackButton[] {
+export function skinTrackButtons(skin: Pick<LandingSkin, 'thirdPartyLogins' | 'registerBefore' | 'registerAfter' | 'stickyButtonEnabled'>): SkinTrackButton[] {
   const rows: SkinTrackButton[] = []
   rows.push({ key: 'form', zh: '注册按钮', en: 'Register button', eventId: 'h5_lead_submit' })
   for (const provider of skin.thirdPartyLogins || []) {
@@ -743,16 +744,6 @@ export function skinTrackButtons(skin: Pick<LandingSkin, 'registerMode' | 'third
   })
   if (skin.stickyButtonEnabled) {
     rows.push({ key: 'sticky', zh: '吸底按钮', en: 'Sticky button', eventId: 'h5_lp_sticky_cta' })
-  }
-  if (skin.pageType === 'lead') {
-    rows.push({ key: 'download', zh: '下载 App 弹窗按钮', en: 'Download-app popup button', eventId: 'h5_lead_download_app' })
-  }
-  if (skin.afterRegisterAction === 'lead_my' || skin.afterRegisterAction === 'lead_vn') {
-    rows.push(
-      { key: 'extra-skip', zh: '补充资料页 · 跳过', en: 'Extra-info page · skip', eventId: 'h5_lead_extra_skip' },
-      { key: 'extra-confirm', zh: '补充资料页 · 确认', en: 'Extra-info page · confirm', eventId: 'h5_lead_extra_confirm' },
-      { key: 'extra-done', zh: '补充资料完成', en: 'Extra-info done', eventId: 'h5_lead_extra_done' },
-    )
   }
   return rows
 }
