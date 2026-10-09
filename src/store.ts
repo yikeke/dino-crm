@@ -640,8 +640,9 @@ function seed(): AppState {
       birthday: '2016-08-11', ageGroup: '9-12', loginMethod: '手机号', account: '+84 912 668 221', phone: '+84 912 668 221',
       businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
       countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
-      registerTime: now.subtract(40, 'minute').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验',
-      courseLevel: 'L1', trialStatusStr: '未体验', paymentStatusStr: '未付费', paymentPlatform: 'Web 银行转账',
+      registerTime: now.subtract(40, 'minute').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
+      membershipLevel: 'pro', expireTime: now.add(42, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      courseLevel: 'L1', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
       campaign: 'Official_Website', campaignId: 'VnBk8A3',
       bankTransfer: { remark: 'DINO8A3K2', amountVnd: 5999000, financeConfirmed: true, opened: false },
     },
@@ -661,7 +662,7 @@ function seed(): AppState {
       businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
       countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
       registerTime: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
-      expireTime: now.add(365, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      membershipLevel: 'pro', expireTime: now.add(365, 'day').format('YYYY-MM-DD HH:mm:ss'),
       courseLevel: 'L2', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
       campaign: 'Official_Website', campaignId: 'VnBk8A3', lastModifier: 'ops.vn@dinoai.ai',
       bankTransfer: {
@@ -669,6 +670,17 @@ function seed(): AppState {
         openedAt: now.subtract(20, 'hour').format('YYYY-MM-DD HH:mm:ss'), openedBy: 'ops.vn@dinoai.ai',
         grantMode: 'sku', grantDays: 365, skuId: 'pro_yearly_vn', skuName: 'Pro 年卡',
       },
+    },
+    {
+      studentId: '2090031938694049796', name: 'Tran Thi D', localName: 'Trần Thị D', userType: '正式用户', gender: '女',
+      birthday: '2016-04-07', ageGroup: '9-12', loginMethod: '手机号', account: '+84 903 771 602', phone: '+84 903 771 602',
+      businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
+      countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
+      registerTime: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
+      membershipLevel: 'max', expireTime: now.add(128, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      courseLevel: 'L3', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
+      campaign: 'Official_Website', campaignId: 'VnBk8A3',
+      bankTransfer: { remark: 'DINO9M8X2', amountVnd: 8999000, financeConfirmed: true, opened: false },
     },
   ]
 

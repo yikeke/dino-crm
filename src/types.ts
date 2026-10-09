@@ -140,6 +140,7 @@ export type Student = {
   ccName?: string // 付费关单CC
   registerTime: string // UTC
   status: UserStatus
+  membershipLevel?: 'pro' | 'max' // 当前会员等级；历史付费数据未标记时按 Pro 展示
   expireTime?: string // 到期时间
   lastModifier?: string // 最近修改人
   editHistory?: StudentEditLog[] // 修改历史（时间 / 行为 / 修改人）

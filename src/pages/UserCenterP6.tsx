@@ -22,7 +22,6 @@ import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { setState, useStore } from '../store'
 import type { CoursePackage, Student } from '../types'
-import { USER_STATUSES } from '../types'
 import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { resolveUserStatus } from '../lessons'
@@ -31,6 +30,31 @@ import { maskPhone } from '../export'
 import LocalTime from '../components/LocalTime'
 
 const { Text } = Typography
+
+type MembershipLevel = 'pro' | 'max'
+
+function packageLevel(pkg?: CoursePackage): MembershipLevel | undefined {
+  if (!pkg) return undefined
+  const value = `${pkg.id} ${pkg.name}`.toLowerCase()
+  if (value.includes('max')) return 'max'
+  if (value.includes('pro')) return 'pro'
+  return undefined
+}
+
+function membershipOf(student?: Student) {
+  if (!student) return { level: undefined, active: false, expired: false, days: 0 }
+  const level =
+    student.membershipLevel ??
+    (student.status === '付费' || student.status === '付费逾期' ? 'pro' : undefined)
+  if (!level || !student.expireTime) return { level, active: false, expired: false, days: 0 }
+  const minutes = dayjs(student.expireTime).diff(dayjs(), 'minute')
+  return {
+    level,
+    active: minutes > 0,
+    expired: minutes <= 0,
+    days: Math.max(1, Math.ceil(Math.abs(minutes) / (24 * 60))),
+  }
+}
 
 function skuDays(pkg?: CoursePackage) {
   if (!pkg) return 30
@@ -66,16 +90,26 @@ export default function UserCenterP6() {
   const [adding, setAdding] = useState<Student | null>(null)
   const [form] = Form.useForm()
   const grantMode = Form.useWatch('mode', form)
+  const currentMembership = membershipOf(adding ?? undefined)
 
   const skuOptions = useMemo(() => {
     const line = adding?.businessLine
     const listed = packages.filter((p) => p.status === '上架')
     const preferred = line ? listed.filter((p) => p.businessLine === line) : listed
     const source = preferred.length ? preferred : listed
-    return source.map((p) => ({
-      label: `${p.id} · ${p.name}（${p.currency} ${p.price.toLocaleString()} · ${skuDays(p)}天）`,
-      value: p.id,
-    }))
+    return source.map((p) => {
+      const level = packageLevel(p)
+      const disabled =
+        !!currentMembership.active &&
+        !!currentMembership.level &&
+        !!level &&
+        level !== currentMembership.level
+      return {
+        label: `${p.id} · ${p.name}（${p.currency} ${p.price.toLocaleString()} · ${skuDays(p)}天）${disabled ? ' · 暂不支持升降级' : ''}`,
+        value: p.id,
+        disabled,
+      }
+    })
   }, [packages, adding])
 
   const bankUsers = useMemo(
@@ -93,7 +127,11 @@ export default function UserCenterP6() {
           s.studentId.toLowerCase().includes(kw) ||
           (s.localName ?? s.name).toLowerCase().includes(kw) ||
           s.account.toLowerCase().includes(kw)
-        const matchStatus = !statusFilter || resolveUserStatus(s, lessons) === statusFilter
+        const membership = membershipOf(s)
+        const membershipStatus = membership.level
+          ? `${membership.level}_${membership.active ? 'active' : 'expired'}`
+          : resolveUserStatus(s, lessons)
+        const matchStatus = !statusFilter || membershipStatus === statusFilter
         return matchKw && matchStatus
       }),
     [students, lessons, keyword, statusFilter],
@@ -124,7 +162,7 @@ export default function UserCenterP6() {
   const openAdd = (s: Student) => {
     setAdding(s)
     form.resetFields()
-    form.setFieldsValue({ mode: 'days', days: 30 })
+    form.setFieldsValue({ mode: 'sku', days: 30 })
   }
 
   const submitGrant = async () => {
@@ -140,6 +178,19 @@ export default function UserCenterP6() {
     }
     const v = await form.validateFields()
     const pkg = v.mode === 'sku' ? packages.find((p) => p.id === v.skuId) : undefined
+    const membership = membershipOf(adding)
+    const targetLevel =
+      v.mode === 'sku'
+        ? packageLevel(pkg)
+        : membership.active && membership.level
+          ? membership.level
+          : 'pro'
+    if (membership.active && membership.level && targetLevel && targetLevel !== membership.level) {
+      message.warning(
+        t('user.addMembership.sameTierOnly', { level: membership.level === 'max' ? 'Max' : 'Pro' }),
+      )
+      return
+    }
     const days = v.mode === 'sku' ? skuDays(pkg) : v.days
     if (typeof days !== 'number' || days <= 0) return
     const expireTime = grantExpiry(adding, days)
@@ -162,6 +213,7 @@ export default function UserCenterP6() {
           : student.bankTransfer
         return {
           ...student,
+          membershipLevel: targetLevel,
           expireTime,
           lastModifier: actor,
           status: '付费' as const,
@@ -175,6 +227,33 @@ export default function UserCenterP6() {
   }
 
   const bankBlocked = !!adding?.bankTransfer && (!adding.bankTransfer.financeConfirmed || adding.bankTransfer.opened)
+
+  const renderMembership = (student: Student) => {
+    const membership = membershipOf(student)
+    if (!membership.level) return <Tag>{t('user.membership.none')}</Tag>
+    const level = membership.level === 'max' ? 'Max' : 'Pro'
+    const label = membership.active
+      ? level
+      : t(membership.level === 'max' ? 'user.membership.maxExpired' : 'user.membership.proExpired')
+    return <Tag color={membership.active ? (membership.level === 'max' ? 'purple' : 'blue') : 'default'}>{label}</Tag>
+  }
+
+  const renderValidity = (student: Student) => {
+    const membership = membershipOf(student)
+    if (!membership.level || !student.expireTime) return <Text type="secondary">—</Text>
+    return (
+      <Space direction="vertical" size={0}>
+        <Text type={membership.active ? undefined : 'secondary'}>
+          {t(membership.active ? 'user.membership.remainingDays' : 'user.membership.expiredDays', {
+            days: membership.days,
+          })}
+        </Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          <LocalTime time={student.expireTime} country={student.country || student.businessLine} />
+        </Text>
+      </Space>
+    )
+  }
 
   const allColumns: ColumnsType<Student> = [
     {
@@ -195,14 +274,14 @@ export default function UserCenterP6() {
     {
       title: t('user.col.status'),
       dataIndex: 'status',
-      width: 130,
-      render: (_, r) => resolveUserStatus(r, lessons),
+      width: 140,
+      render: (_, r) => renderMembership(r),
     },
     {
-      title: t('user.col.expireTime'),
+      title: t('user.membership.validity'),
       dataIndex: 'expireTime',
-      width: 180,
-      render: (v, r) => (v ? <LocalTime time={v} country={r.country || r.businessLine} /> : <Text type="secondary">—</Text>),
+      width: 190,
+      render: (_, r) => renderValidity(r),
     },
     {
       title: t('common.action'),
@@ -234,6 +313,16 @@ export default function UserCenterP6() {
       dataIndex: 'phone',
       width: 150,
       render: (v?: string) => (canViewPhone ? v || '—' : maskPhone(v)),
+    },
+    {
+      title: t('user.membership.level'),
+      width: 120,
+      render: (_, r) => renderMembership(r),
+    },
+    {
+      title: t('user.membership.validity'),
+      width: 190,
+      render: (_, r) => renderValidity(r),
     },
     { title: t('user.bank.remark'), width: 120, render: (_, r) => <Text code>{r.bankTransfer?.remark}</Text> },
     {
@@ -344,7 +433,15 @@ export default function UserCenterP6() {
             style={{ width: 150 }}
             value={statusFilter}
             onChange={setStatusFilter}
-            options={USER_STATUSES.map((l) => ({ label: t(`enum.status.${l}`), value: l }))}
+            options={[
+              { label: t('enum.status.未付费-未体验'), value: '未付费-未体验' },
+              { label: t('enum.status.未付费-体验中'), value: '未付费-体验中' },
+              { label: t('enum.status.未付费-已体验'), value: '未付费-已体验' },
+              { label: t('user.membership.pro'), value: 'pro_active' },
+              { label: t('user.membership.proExpired'), value: 'pro_expired' },
+              { label: t('user.membership.max'), value: 'max_active' },
+              { label: t('user.membership.maxExpired'), value: 'max_expired' },
+            ]}
           />
         )}
       </Space>
@@ -372,7 +469,25 @@ export default function UserCenterP6() {
         {adding?.bankTransfer?.opened && (
           <Alert type="warning" showIcon style={{ marginBottom: 12 }} message={t('user.addMembership.alreadyOpen')} />
         )}
-        <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }} initialValues={{ mode: 'days', days: 30 }}>
+        {adding && currentMembership.level && (
+          <Alert
+            type={currentMembership.active ? 'info' : 'warning'}
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={t('user.addMembership.currentMembership', {
+              level: currentMembership.level === 'max' ? 'Max' : 'Pro',
+              expiry: adding.expireTime ?? '—',
+            })}
+            description={
+              currentMembership.active
+                ? t('user.addMembership.sameTierOnly', {
+                    level: currentMembership.level === 'max' ? 'Max' : 'Pro',
+                  })
+                : undefined
+            }
+          />
+        )}
+        <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }} initialValues={{ mode: 'sku', days: 30 }}>
           <Form.Item name="mode" label={t('user.addMembership.mode')} rules={[{ required: true }]}>
             <Radio.Group>
               <Radio.Button value="days">{t('user.addMembership.mode.days')}</Radio.Button>
