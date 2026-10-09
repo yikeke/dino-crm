@@ -496,8 +496,8 @@ export default function LandingSkinManagement() {
               </Text>
               <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
                 {en
-                  ? 'Button clicks are fixed, not configurable. With a sign-up form, image and sticky buttons scroll back to the form, and submitting it opens the next interaction. Without a sign-up form, every button opens the next interaction directly.'
-                  : '按钮点击去向固定，不用配置：有注册表单时，图上按钮和吸底按钮定位回注册表单，提交注册后进入后续交互页面；无注册时，点任一按钮都直接进入后续交互页面。'}
+                  ? 'Where buttons go is fixed on the landing page (C-end), not configured here. CRM only sets button copy, style and position.'
+                  : '按钮点了去哪是 C 端落地页的固定逻辑，不在这里配。CRM 只配按钮文案、样式和位置。'}
               </Text>
             </div>
           </div>
