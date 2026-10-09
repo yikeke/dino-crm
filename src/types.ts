@@ -140,6 +140,7 @@ export type Student = {
   ccName?: string // 付费关单CC
   registerTime: string // UTC
   status: UserStatus
+  membershipLevel?: 'pro' | 'max' // 当前会员等级；历史付费数据未标记时按 Pro 展示
   expireTime?: string // 到期时间
   lastModifier?: string // 最近修改人
   editHistory?: StudentEditLog[] // 修改历史（时间 / 行为 / 修改人）
@@ -162,6 +163,21 @@ export type Student = {
   landingEnglishLevel?: string
   landingLearningGoal?: string
   landingCurrentLearningMethod?: string
+  /** 越南银行转账待开通：财务确认后由用户中心专人开通 */
+  bankTransfer?: BankTransferGrant
+}
+
+export type BankTransferGrant = {
+  remark: string
+  amountVnd: number
+  financeConfirmed: boolean
+  opened: boolean
+  openedAt?: string
+  openedBy?: string
+  grantMode?: 'days' | 'sku'
+  grantDays?: number
+  skuId?: string
+  skuName?: string
 }
 
 // 销售跟进进度（线索在销售中心的状态；转「已体验/已付费」时改写 status 并离开销售中心）

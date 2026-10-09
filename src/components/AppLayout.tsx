@@ -43,9 +43,14 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/marketing-center/skus': 'marketingV2_skus',
   '/marketing-center/offers': 'marketingV2_offers',
   '/marketing-center/landing': 'marketingV2_landing',
-  '/marketing-center/skins': 'marketingV2_landing',
+  '/marketing-center-v5/channels': 'marketingV2_channels',
+  '/marketing-center-v5/skus': 'marketingV2_skus',
+  '/marketing-center-v5/offers': 'marketingV2_offers',
+  '/marketing-center-v5/landing': 'marketingV2_landing',
+  '/marketing-center-v5/skins': 'marketingV2_landing',
   '/marketing-backup': 'marketing',
   '/users-v2': 'usersV2',
+  '/users-v6': 'usersV2',
   '/orders': 'orders',
   '/orders-v3': 'ordersV3',
   '/packages': 'packages',
@@ -60,7 +65,7 @@ export default function AppLayout() {
   const location = useLocation()
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
-  const selectedPath = location.pathname.startsWith('/marketing-center/') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
+  const selectedPath = location.pathname.startsWith('/marketing-center') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
   const session = useSession()
   const { t, lang, setLang } = useI18n()
   const { can } = usePerm()
@@ -108,7 +113,14 @@ export default function AppLayout() {
     { key: '/marketing-center/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
     { key: '/marketing-center/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
-    { key: '/marketing-center/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing Page Skins' : '活动页皮肤管理' },
+  ].filter((n) => visible(n.key))
+
+  const marketingV5Children = [
+    { key: '/marketing-center-v5/channels', icon: <ApartmentOutlined />, label: lang === 'en' ? 'Channel Management' : '渠道管理' },
+    { key: '/marketing-center-v5/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
+    { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
+    { key: '/marketing-center-v5/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
+    { key: '/marketing-center-v5/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
   ].filter((n) => visible(n.key))
 
   // 销售中心（二期）
@@ -124,6 +136,9 @@ export default function AppLayout() {
   const usersV2Nav = [
     { key: '/users-v2', icon: <TeamOutlined />, label: phase3Label(t('app.nav.users')) },
   ].filter((n) => visible(n.key))
+  const usersV6Nav = [
+    { key: '/users-v6', icon: <TeamOutlined />, label: phaseLabel(t('app.nav.users'), t('app.phase6'), 'magenta') },
+  ].filter((n) => visible(n.key))
   // 系统配置（二期）
   const systemNav = [
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
@@ -134,9 +149,11 @@ export default function AppLayout() {
     ...salesNav,
     ...systemNav,
     ...usersV2Nav,
+    ...usersV6Nav,
     ...ordersV3Nav,
     ...salesV3Nav,
     ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
+    ...(marketingV5Children.length ? [{ key: 'marketing-v5', icon: <ShopOutlined />, label: appABPhaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV5Children }] : []),
     ...(marketingBackupChildren.length
       ? [
           {
@@ -163,9 +180,14 @@ export default function AppLayout() {
     '/marketing-center/skus': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
-    '/marketing-center/skins': lang === 'en' ? 'Landing Page Skins' : '活动页皮肤管理',
+    '/marketing-center-v5/channels': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center-v5/skus': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center-v5/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center-v5/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center-v5/skins': lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
+    '/users-v6': t('app.nav.usersV6'),
     '/orders': t('app.nav.orders'),
     '/orders-v3': t('app.nav.orders'),
     '/packages': t('app.nav.packages'),
@@ -223,7 +245,7 @@ export default function AppLayout() {
           onOpenChange={(keys) => setOpenKeys(keys as string[])}
           items={NAV}
           onClick={({ key }) => {
-            if (key !== 'marketing') navigate(key)
+            if (String(key).startsWith('/')) navigate(key)
           }}
         />
       </Sider>

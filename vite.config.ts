@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  // GitHub Pages 项目站点通过 /<仓库名>/ 提供服务。
-  base: '/dino-crm/',
+  // GitHub Pages 用 /dino-crm/；Vercel 部署在站点根路径。
+  base: process.env.VERCEL ? '/' : '/dino-crm/',
   plugins: [react()],
   server: { port: 5180 },
 })

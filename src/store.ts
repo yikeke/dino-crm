@@ -218,7 +218,16 @@ function load(): AppState {
       const withCallbackDemo = normalized.students.some((student) => student.studentId === callbackDemo.studentId)
         ? normalized
         : { ...normalized, students: [callbackDemo, ...normalized.students] }
-      const migrated = autoAllocate(withManagementDemo(withCallbackDemo))
+      const bankDemos = seeded.students.filter((student) => student.bankTransfer)
+      const missingBank = bankDemos.filter((demo) => !withCallbackDemo.students.some((s) => s.studentId === demo.studentId))
+      const withBankDemo = missingBank.length
+        ? { ...withCallbackDemo, students: [...missingBank, ...withCallbackDemo.students] }
+        : withCallbackDemo
+      const missingPkgs = seeded.packages.filter((pkg) => !withBankDemo.packages.some((p) => p.id === pkg.id))
+      const withPkgs = missingPkgs.length
+        ? { ...withBankDemo, packages: [...withBankDemo.packages, ...missingPkgs] }
+        : withBankDemo
+      const migrated = autoAllocate(withManagementDemo(withPkgs))
       localStorage.setItem(KEY, JSON.stringify(migrated))
       return migrated
     }
@@ -626,6 +635,53 @@ function seed(): AppState {
       landingEnglishLevel: '初级（可进行简单日常交流）', landingLearningGoal: '提升日常英语表达', landingCurrentLearningMethod: '线下英语班',
       salesHistory: [{ progress: '跟进中', note: '【Landing Page】用户已填写预约外呼时间', time: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'), owner: '系统' }],
     },
+    {
+      studentId: '2090031938694049793', name: 'Nguyen Van A', localName: 'Nguyễn Văn A', userType: '正式用户', gender: '男',
+      birthday: '2016-08-11', ageGroup: '9-12', loginMethod: '手机号', account: '+84 912 668 221', phone: '+84 912 668 221',
+      businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
+      countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
+      registerTime: now.subtract(40, 'minute').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
+      membershipLevel: 'pro', expireTime: now.add(42, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      courseLevel: 'L1', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
+      campaign: 'Official_Website', campaignId: 'VnBk8A3',
+      bankTransfer: { remark: 'DINO8A3K2', amountVnd: 5999000, financeConfirmed: true, opened: false },
+    },
+    {
+      studentId: '2090031938694049794', name: 'Le Thi B', localName: 'Lê Thị B', userType: '正式用户', gender: '女',
+      birthday: '2017-02-02', ageGroup: '6-8', loginMethod: '手机号', account: '+84 965 960 118', phone: '+84 965 960 118',
+      businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
+      countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
+      registerTime: now.subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验',
+      courseLevel: 'L1', trialStatusStr: '未体验', paymentStatusStr: '未付费', paymentPlatform: 'Web 银行转账',
+      campaign: 'Official_Website', campaignId: 'VnBk8A3',
+      bankTransfer: { remark: 'DINO8B1K9', amountVnd: 1499000, financeConfirmed: false, opened: false },
+    },
+    {
+      studentId: '2090031938694049795', name: 'Pham Van C', localName: 'Phạm Văn C', userType: '正式用户', gender: '男',
+      birthday: '2015-11-19', ageGroup: '9-12', loginMethod: '手机号', account: '+84 868 427 441', phone: '+84 868 427 441',
+      businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
+      countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
+      registerTime: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
+      membershipLevel: 'pro', expireTime: now.add(365, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      courseLevel: 'L2', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
+      campaign: 'Official_Website', campaignId: 'VnBk8A3', lastModifier: 'ops.vn@dinoai.ai',
+      bankTransfer: {
+        remark: 'DINO7C4M1', amountVnd: 5999000, financeConfirmed: true, opened: true,
+        openedAt: now.subtract(20, 'hour').format('YYYY-MM-DD HH:mm:ss'), openedBy: 'ops.vn@dinoai.ai',
+        grantMode: 'sku', grantDays: 365, skuId: 'pro_yearly_vn', skuName: 'Pro 年卡',
+      },
+    },
+    {
+      studentId: '2090031938694049796', name: 'Tran Thi D', localName: 'Trần Thị D', userType: '正式用户', gender: '女',
+      birthday: '2016-04-07', ageGroup: '9-12', loginMethod: '手机号', account: '+84 903 771 602', phone: '+84 903 771 602',
+      businessLine: '越南', registerChannel: 'Landing Page / 银行转账', channelSource: 'VN_BANK_LP', adChannel: 'Landing Page',
+      countryCode: '+84', channelCode: 'VnBk8A3', country: '越南', appChannel: 'Google Play',
+      registerTime: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm:ss'), status: '付费',
+      membershipLevel: 'max', expireTime: now.add(128, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      courseLevel: 'L3', trialStatusStr: '未体验', paymentStatusStr: '已付费', paymentPlatform: 'Web 银行转账',
+      campaign: 'Official_Website', campaignId: 'VnBk8A3',
+      bankTransfer: { remark: 'DINO9M8X2', amountVnd: 8999000, financeConfirmed: true, opened: false },
+    },
   ]
 
   const orders: Order[] = [
@@ -682,6 +738,30 @@ function seed(): AppState {
       id: 'PKG1003', businessLine: '越南', name: 'Dino English 年度畅学商品包', currency: LINE_CURRENCY['越南'].code,
       price: 2990000, validStart: now.subtract(15, 'day').format('YYYY-MM-DD HH:mm:ss'), validEnd: now.add(350, 'day').format('YYYY-MM-DD HH:mm:ss'),
       creator: 'admin@dinoai.ai', status: '下架', createdAt: now.subtract(15, 'day').format('YYYY-MM-DD HH:mm:ss'), bestValue: true,
+    },
+    {
+      id: 'pro_monthly_vn', businessLine: '越南', name: 'Pro 月卡', currency: 'VND',
+      price: 599000, validDays: 30, validityMode: 'relative',
+      validStart: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), validEnd: now.add(400, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      creator: 'admin@dinoai.ai', status: '上架', createdAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'),
+    },
+    {
+      id: 'pro_quarterly_vn', businessLine: '越南', name: 'Pro 季卡', currency: 'VND',
+      price: 1499000, validDays: 90, validityMode: 'relative',
+      validStart: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), validEnd: now.add(400, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      creator: 'admin@dinoai.ai', status: '上架', createdAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'),
+    },
+    {
+      id: 'pro_yearly_vn', businessLine: '越南', name: 'Pro 年卡', currency: 'VND',
+      price: 5999000, validDays: 365, validityMode: 'relative',
+      validStart: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), validEnd: now.add(400, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      creator: 'admin@dinoai.ai', status: '上架', createdAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), bestValue: true,
+    },
+    {
+      id: 'max_yearly_vn', businessLine: '越南', name: 'Max 年卡', currency: 'VND',
+      price: 8999000, validDays: 365, validityMode: 'relative',
+      validStart: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), validEnd: now.add(400, 'day').format('YYYY-MM-DD HH:mm:ss'),
+      creator: 'admin@dinoai.ai', status: '上架', createdAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'),
     },
   ]
 

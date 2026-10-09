@@ -8,6 +8,7 @@ import ManagementDashboard from './pages/ManagementDashboard'
 import AppLayout from './components/AppLayout'
 import ChannelManagement from './pages/ChannelManagement'
 import UserCenter from './pages/UserCenter'
+import UserCenterP6 from './pages/UserCenterP6'
 import UserCenterP1 from './pages/UserCenterP1'
 import UserDetail from './pages/UserDetail'
 import SalesCenter from './pages/SalesCenter'
@@ -100,10 +101,18 @@ export default function App() {
           <Route path="marketing-center/skus" element={<Guard module="marketingV2_skus"><MarketingCenterPrototype page="skus" /></Guard>} />
           <Route path="marketing-center/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
           <Route path="marketing-center/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
-          <Route path="marketing-center/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
+          <Route path="marketing-center-v5" element={<Navigate to="/marketing-center-v5/landing" replace />} />
+          <Route path="marketing-center-v5/channels" element={<Guard module="marketingV2_channels"><MarketingCenterPrototype page="channels" /></Guard>} />
+          <Route path="marketing-center-v5/skus" element={<Guard module="marketingV2_skus"><MarketingCenterPrototype page="skus" /></Guard>} />
+          <Route path="marketing-center-v5/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
+          <Route path="marketing-center-v5/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
+          <Route path="marketing-center-v5/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
+          <Route path="marketing-center/skins" element={<Navigate to="/marketing-center-v5/skins" replace />} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
           <Route path="users-v2/:studentId" element={<Guard module="usersV2"><UserDetail /></Guard>} />
+          <Route path="users-v6" element={<Guard module="usersV2"><UserCenterP6 /></Guard>} />
+          <Route path="users-v6/:studentId" element={<Guard module="usersV2"><UserDetail backPath="/users-v6" backText="返回用户中心" /></Guard>} />
           <Route path="orders" element={<Guard module="orders"><OrderCenter /></Guard>} />
           <Route path="orders/:orderId" element={<Guard module="orders"><OrderDetail /></Guard>} />
           <Route path="orders-v3" element={<Guard module="ordersV3"><OrderCenterP3 /></Guard>} />

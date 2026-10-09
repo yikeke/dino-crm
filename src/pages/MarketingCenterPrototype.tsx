@@ -32,7 +32,7 @@ export default function MarketingCenterPrototype({ page = 'links' }: { page?: 'c
     perm_landingCopy: can('marketingV2_landing_copy') === 'none' ? '0' : '1',
     perm_landingPreview: allowed(can('marketingV2_landing_preview')) ? '1' : '0',
   })
-    const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260920-landing-skins`
+    const src = `${import.meta.env.BASE_URL}marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260920-register-cta`
   return (
     <iframe
       key={src}
