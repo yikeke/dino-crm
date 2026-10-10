@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Button, Input, InputNumber, Radio, Switch, Tag, Tooltip, Typography, Upload } from 'antd'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import type { AssetBudgetKey, CtaStyle, SceneCtaMode, SkinAsset, VideoHole, VideoPlayMode } from '../landingSkin'
@@ -327,6 +327,69 @@ function centerHole(h: VideoHole, axis: 'h' | 'v' | 'both'): VideoHole {
   return clampMove(next)
 }
 
+const RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
+type ResizeHandle = (typeof RESIZE_HANDLES)[number]
+
+/** Resize from any corner (both axes) or edge (one axis). Keeps the opposite edge fixed. */
+function resizeByHandle(orig: VideoHole, dx: number, dy: number, handle: ResizeHandle): VideoHole {
+  const minW = 8
+  const minH = 6
+  let left = orig.left
+  let top = orig.top
+  let right = orig.left + orig.width
+  let bottom = orig.top + orig.height
+  if (handle.includes('w')) left += dx
+  if (handle.includes('e')) right += dx
+  if (handle.includes('n')) top += dy
+  if (handle.includes('s')) bottom += dy
+  if (right - left < minW) {
+    if (handle.includes('w')) left = right - minW
+    else right = left + minW
+  }
+  if (bottom - top < minH) {
+    if (handle.includes('n')) top = bottom - minH
+    else bottom = top + minH
+  }
+  left = Math.max(0, left)
+  top = Math.max(0, top)
+  right = Math.min(100, right)
+  bottom = Math.min(100, bottom)
+  if (right - left < minW) {
+    if (handle.includes('w')) left = Math.max(0, right - minW)
+    else right = Math.min(100, left + minW)
+  }
+  if (bottom - top < minH) {
+    if (handle.includes('n')) top = Math.max(0, bottom - minH)
+    else bottom = Math.min(100, top + minH)
+  }
+  return clampMove({ left, top, width: right - left, height: bottom - top })
+}
+
+function ResizeHandles({ onStart }: { onStart: (handle: ResizeHandle, e: ReactPointerEvent<HTMLSpanElement>) => void }) {
+  return (
+    <>
+      {RESIZE_HANDLES.map((handle) => (
+        <span
+          key={handle}
+          role="slider"
+          aria-label={({ nw: '左上角缩放', n: '上边缩放', ne: '右上角缩放', e: '右边缩放', se: '右下角缩放', s: '下边缩放', sw: '左下角缩放', w: '左边缩放' })[handle]}
+          className={`skin-resize-handle is-${handle}`}
+          onPointerDown={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            onStart(handle, e)
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
+type LayoutDrag =
+  | { target: 'video' | 'cta'; kind: 'move'; x: number; y: number; orig: VideoHole }
+  | { target: 'video' | 'cta'; kind: 'resize'; handle: ResizeHandle; x: number; y: number; orig: VideoHole }
+  | { target: 'video' | 'cta'; kind: 'draw'; x: number; y: number }
+
 /** Excel-style align toolbar: horizontal / vertical / both center. */
 function HoleAlignButtons({ rect, onChange }: { rect: VideoHole; onChange: (r: VideoHole) => void }) {
   return (
@@ -432,6 +495,7 @@ function SceneLayoutEditor({
   ctaText,
   ctaStyle,
   active,
+  onActive,
   compact = false,
 }: {
   image?: SkinAsset
@@ -444,35 +508,156 @@ function SceneLayoutEditor({
   onCtaRect: (r: VideoHole) => void
   ctaText: string
   ctaStyle?: CtaStyle
-  /** Highlights the layer selected in the side panel. The canvas itself is not interactive. */
+  /** Highlights the layer selected in the side panel; canvas drag also switches the active layer. */
   active?: LayerTarget
+  onActive?: (t: LayerTarget) => void
   /** Hide the intro text and number inputs (the parent renders them). */
   compact?: boolean
 }) {
+  const box = useRef<HTMLDivElement>(null)
+  const drag = useRef<LayoutDrag | null>(null)
   const { src } = useSkinAssetURL(image)
   const { src: videoSrc } = useSkinAssetURL(video)
   const paint = normalizeCtaStyle(ctaStyle)
-  const showCta = ctaMode === 'custom'
+  const canDragVideo = showVideo
+  const canDragCta = ctaMode === 'custom'
   const showBottomCta = ctaMode === 'bottom'
-  const emptyHint = src ? '左侧只预览位置' : '先上传底图'
+  const [ownTarget, setOwnTarget] = useState<LayerTarget>(canDragVideo ? 'video' : 'cta')
+  const drawTarget = active ?? ownTarget
+  const setDrawTarget = (t: LayerTarget) => {
+    setOwnTarget(t)
+    onActive?.(t)
+  }
+
+  useEffect(() => {
+    if (active) return
+    if (canDragVideo && !canDragCta) setOwnTarget('video')
+    else if (!canDragVideo && canDragCta) setOwnTarget('cta')
+  }, [active, canDragVideo, canDragCta])
+
+  const pct = (clientX: number, clientY: number) => {
+    const r = box.current!.getBoundingClientRect()
+    return {
+      x: Math.min(100, Math.max(0, ((clientX - r.left) / r.width) * 100)),
+      y: Math.min(100, Math.max(0, ((clientY - r.top) / r.height) * 100)),
+    }
+  }
+  const applyRect = (target: 'video' | 'cta', next: VideoHole) => {
+    if (target === 'video') onVideoRect(next)
+    else onCtaRect(next)
+  }
+  const applyDrag = (clientX: number, clientY: number) => {
+    if (!drag.current || !box.current) return
+    const now = pct(clientX, clientY)
+    const { target } = drag.current
+    if (drag.current.kind === 'move') {
+      applyRect(target, clampMove({
+        ...drag.current.orig,
+        left: drag.current.orig.left + (now.x - drag.current.x),
+        top: drag.current.orig.top + (now.y - drag.current.y),
+      }))
+      return
+    }
+    if (drag.current.kind === 'resize') {
+      applyRect(target, resizeByHandle(
+        drag.current.orig,
+        now.x - drag.current.x,
+        now.y - drag.current.y,
+        drag.current.handle,
+      ))
+      return
+    }
+    applyRect(target, clampHole({
+      left: Math.min(drag.current.x, now.x),
+      top: Math.min(drag.current.y, now.y),
+      width: Math.abs(now.x - drag.current.x),
+      height: Math.abs(now.y - drag.current.y),
+    }))
+  }
+  const stopDrag = () => {
+    drag.current = null
+    window.removeEventListener('pointermove', onWinMove)
+    window.removeEventListener('pointerup', onWinUp)
+  }
+  const onWinMove = (e: globalThis.PointerEvent) => applyDrag(e.clientX, e.clientY)
+  const onWinUp = () => stopDrag()
+  const startDrag = (next: LayoutDrag, pointerTarget?: HTMLElement, pointerId?: number) => {
+    drag.current = next
+    window.addEventListener('pointermove', onWinMove)
+    window.addEventListener('pointerup', onWinUp)
+    if (pointerTarget && pointerId != null) {
+      try { pointerTarget.setPointerCapture(pointerId) } catch { /* ignore */ }
+    }
+  }
+  const emptyHint = !src
+    ? '先上传底图'
+    : canDragVideo && canDragCta
+      ? '同一张图上同时显示视频窗口和按钮，可对照相对位置'
+      : canDragVideo
+        ? '在底图上拖出 / 调整视频窗口'
+        : canDragCta
+          ? '在底图上拖动叠按钮'
+          : '预览贴底按钮位置'
 
   return (
     <div className={`skin-hole-picker ${compact ? 'is-compact' : ''}`}>
       {compact ? null : (
         <Typography.Text type="secondary" className="skin-asset-hint" style={{ display: 'block', marginBottom: 8 }}>
-          左侧只预览相对位置。左、上、宽、高在下方用百分比填写，画布上不能拖动或缩放。
+          {canDragVideo && (canDragCta || showBottomCta)
+            ? '视频窗口与叠按钮在同一张底图上编辑，便于对齐相对位置。按钮始终叠在视频之上。'
+            : canDragVideo
+              ? '在底图上调整视频窗口位置与大小。'
+              : '拖选框可移动；拖四角或四边的圆点改大小。也可在右侧填百分比。'}
         </Typography.Text>
       )}
-      <div className="skin-hole-canvas is-preview">
+      {!compact && canDragVideo && canDragCta ? (
+        <Radio.Group
+          size="small"
+          optionType="button"
+          buttonStyle="solid"
+          style={{ marginBottom: 10 }}
+          value={drawTarget}
+          onChange={(e) => setDrawTarget(e.target.value)}
+          options={[
+            { value: 'video', label: '调整视频窗口' },
+            { value: 'cta', label: '调整叠按钮' },
+          ]}
+        />
+      ) : null}
+      <div
+        ref={box}
+        className={`skin-hole-canvas ${canDragVideo || canDragCta ? '' : 'is-preview'}`}
+        onPointerDown={(e) => {
+          if (!canDragVideo && !canDragCta) return
+          const target = canDragVideo && canDragCta ? drawTarget : (canDragVideo ? 'video' : 'cta')
+          const p = pct(e.clientX, e.clientY)
+          startDrag({ target, kind: 'draw', x: p.x, y: p.y }, e.currentTarget, e.pointerId)
+        }}
+      >
         {src ? <img src={src} alt="" draggable={false} /> : <div className="skin-hole-empty">{emptyHint}</div>}
-        {showVideo ? (
+        {canDragVideo ? (
           <div
-            className={`skin-video-hole ${active === 'video' && showCta ? 'is-active' : ''}`}
+            className={`skin-video-hole ${drawTarget === 'video' && canDragCta ? 'is-active' : ''}`}
             style={{ left: `${videoRect.left}%`, top: `${videoRect.top}%`, width: `${videoRect.width}%`, height: `${videoRect.height}%` }}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              setDrawTarget('video')
+              const p = pct(e.clientX, e.clientY)
+              startDrag({ target: 'video', kind: 'move', x: p.x, y: p.y, orig: videoRect }, e.currentTarget, e.pointerId)
+            }}
           >
             <div className="skin-video-hole-clip">
               {videoSrc ? <video src={videoSrc} muted loop playsInline autoPlay /> : <span>视频窗口</span>}
             </div>
+            {drawTarget === 'video' || !canDragCta ? (
+              <ResizeHandles
+                onStart={(handle, e) => {
+                  setDrawTarget('video')
+                  const p = pct(e.clientX, e.clientY)
+                  startDrag({ target: 'video', kind: 'resize', handle, x: p.x, y: p.y, orig: videoRect }, e.currentTarget, e.pointerId)
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
         {showBottomCta && src ? (
@@ -483,9 +668,10 @@ function SceneLayoutEditor({
             {ctaText || '立即体验'}
           </span>
         ) : null}
-        {showCta ? (
-          <span
-            className={buttonClassName({ ...paint, breathe: false }, `skin-cta-overlay ${active === 'cta' && showVideo ? 'is-active' : ''}`)}
+        {canDragCta ? (
+          <button
+            type="button"
+            className={buttonClassName({ ...paint, breathe: false }, `skin-cta-overlay ${drawTarget === 'cta' && canDragVideo ? 'is-active' : ''}`)}
             style={{
               ...buttonPaint(paint),
               left: `${ctaRect.left}%`,
@@ -493,13 +679,28 @@ function SceneLayoutEditor({
               width: `${ctaRect.width}%`,
               height: `${ctaRect.height}%`,
             }}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              setDrawTarget('cta')
+              const p = pct(e.clientX, e.clientY)
+              startDrag({ target: 'cta', kind: 'move', x: p.x, y: p.y, orig: ctaRect }, e.currentTarget, e.pointerId)
+            }}
           >
             {ctaText || '立即体验'}
-          </span>
+            {drawTarget === 'cta' || !canDragVideo ? (
+              <ResizeHandles
+                onStart={(handle, e) => {
+                  setDrawTarget('cta')
+                  const p = pct(e.clientX, e.clientY)
+                  startDrag({ target: 'cta', kind: 'resize', handle, x: p.x, y: p.y, orig: ctaRect }, e.currentTarget, e.pointerId)
+                }}
+              />
+            ) : null}
+          </button>
         ) : null}
       </div>
-      {!compact && showVideo ? <HoleNums title="视频窗口位置" rect={videoRect} onChange={onVideoRect} /> : null}
-      {!compact && showCta ? <HoleNums title="叠按钮位置" rect={ctaRect} onChange={onCtaRect} /> : null}
+      {!compact && canDragVideo ? <HoleNums title="视频窗口位置" rect={videoRect} onChange={onVideoRect} /> : null}
+      {!compact && canDragCta ? <HoleNums title="叠按钮位置" rect={ctaRect} onChange={onCtaRect} /> : null}
     </div>
   )
 }
@@ -631,10 +832,11 @@ export function SceneImageField({
               ctaText={ctaLabel}
               ctaStyle={normalizeCtaStyle(value.ctaStyle)}
               active={active}
+              onActive={setActive}
             />
             <Typography.Text type="secondary" className="skin-asset-hint">
               {videoOn || ctaOn
-                ? '左侧只预览。位置和大小在右侧填写百分比（左、上、宽、高），不能在图上拖动或缩放。按钮始终在视频上方。'
+                ? '可在图上拖动选框，或拖四角 / 四边圆点缩放；也可在右侧填百分比。按钮始终在视频上方。'
                 : '打开右侧的「视频窗口」或「叠按钮」，它们会出现在这张图上。'}
             </Typography.Text>
           </div>
@@ -821,7 +1023,7 @@ export function StickyBarField({
               />
               <Typography.Text type="secondary" className="skin-asset-hint">
                 {buttonEnabled
-                  ? (en ? 'Preview only. Set left, top, width and height on the right. Nothing on this image can be dragged.' : '左侧只预览。位置和大小在右侧填写百分比（左、上、宽、高），不能在图上拖动。')
+                  ? (en ? 'Drag the button, or use the corner and edge handles to resize. You can also type percentages on the right.' : '可在图上拖动按钮，或拖四角 / 四边圆点缩放；也可在右侧填百分比。')
                   : (en ? 'Turn on the sticky button to place it on this image.' : '打开右侧的「吸底按钮」，它会出现在这张图上。')}
               </Typography.Text>
             </div>

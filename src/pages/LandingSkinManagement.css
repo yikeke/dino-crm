@@ -87,7 +87,8 @@
   .skin-scene-layout { grid-template-columns: minmax(0, 1fr); }
   .skin-scene-canvas-col { position: static; max-width: 420px; }
 }
-.skin-hole-canvas { position: relative; width: min(420px, 100%); background: #111; border-radius: 8px; overflow: hidden; cursor: default; user-select: none; }
+.skin-hole-canvas { position: relative; width: min(420px, 100%); background: #111; border-radius: 8px; overflow: hidden; cursor: crosshair; user-select: none; touch-action: none; }
+.skin-hole-canvas.is-preview { cursor: default; }
 .skin-hole-canvas img { display: block; width: 100%; height: auto; pointer-events: none; }
 .skin-hole-empty { height: 180px; display: grid; place-items: center; color: #86909c; font-size: 13px; background: #f2f3f5; }
 .skin-hole-nums-block { margin-top: 10px; }
@@ -100,7 +101,8 @@
   background: #16324a;
   color: #fff;
   font-size: 12px;
-  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
   box-shadow: 0 0 0 1px rgba(255,255,255,.35);
 }
 .skin-video-hole-clip {
@@ -128,7 +130,7 @@
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
-  pointer-events: none;
+  cursor: grab;
   padding: 0 10px;
   min-height: 0;
   height: auto;
@@ -147,6 +149,26 @@
   cursor: default;
   pointer-events: none;
 }
+.skin-resize-handle {
+  position: absolute;
+  z-index: 4;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #1677ff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .9);
+  touch-action: none;
+}
+.skin-resize-handle.is-nw { left: 0; top: 0; cursor: nwse-resize; }
+.skin-resize-handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.skin-resize-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.skin-resize-handle.is-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.skin-resize-handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
+.skin-resize-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
+.skin-resize-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
+.skin-resize-handle.is-e { left: 100%; top: 50%; cursor: ew-resize; }
 .skin-hole-nums { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 8px; align-items: center; }
 .skin-hole-nums label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #526172; }
 .skin-hole-nums .ant-input-number { width: 78px; }
