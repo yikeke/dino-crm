@@ -538,6 +538,12 @@ export function verifyEnabledForPage(
   return !!verifyEnabled
 }
 
+/** Extra register fields are only for acquisition (lead) landings. Payment pages stay empty. */
+export function extraFieldsForPage(pageType: LandingPageKind, fields?: RegisterField[]): RegisterField[] {
+  if (pageType === 'pay') return []
+  return (fields || []).map(normalizeRegisterField)
+}
+
 export const DEFAULT_REGISTER_BG_COLOR = '#ffffff'
 
 export function normalizeRegisterBgKind(kind?: string): RegisterBgKind {
@@ -816,11 +822,11 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
     : (skin.registerBefore || [])
   return {
       ...rest,
-      extraFields: (skin.extraFields || []).map(normalizeRegisterField),
       thirdPartyLogins: normalizeThirdPartyLogins(skin.thirdPartyLogins),
       pageType,
       registerMode: registerModeForPage(pageType, skin.registerMode),
       verifyEnabled: verifyEnabledForPage(pageType, skin.registerMode, skin.verifyEnabled),
+      extraFields: extraFieldsForPage(pageType, skin.extraFields),
       afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line),
       registerBgKind: normalizeRegisterBgKind(skin.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(skin.registerBgColor),

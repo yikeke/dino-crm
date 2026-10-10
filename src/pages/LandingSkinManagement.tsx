@@ -48,6 +48,7 @@ import {
   normalizeRegisterMode,
   registerModeForPage,
   verifyEnabledForPage,
+  extraFieldsForPage,
   pageTypeLabel,
   previewHref,
   pushSkinHistory,
@@ -274,7 +275,7 @@ export default function LandingSkinManagement() {
       ...editing,
       ...(lockedBasics || {}),
       registerMode: normalizeRegisterMode(editing.registerMode),
-      extraFields: (editing.extraFields ?? []).map(normalizeRegisterField),
+      extraFields: extraFieldsForPage(nextPageType, editing.extraFields),
       language: lockedBasics?.language ?? defaultLanguageForLine(editing.line),
       pageType: nextPageType,
       afterRegisterAction: lockedBasics?.afterRegisterAction
@@ -474,6 +475,7 @@ export default function LandingSkinManagement() {
                     afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line),
                     registerMode: registerModeForPage(next, editing.registerMode),
                     verifyEnabled: verifyEnabledForPage(next, editing.registerMode, editing.verifyEnabled),
+                    extraFields: extraFieldsForPage(next, editing.extraFields),
                   })
                 }}
                 options={PAGE_TYPE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
@@ -580,11 +582,15 @@ export default function LandingSkinManagement() {
           {normalizeRegisterMode(editing.registerMode) !== 'none' ? (
             <div className="skin-form-row">
               <label>{en ? 'Extra fields' : '其他字段'}</label>
-              <div>
+              <div style={pageType === 'pay' ? { opacity: 0.55 } : undefined}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                  {en
-                    ? 'Add custom fields (label + required/optional) shown above the phone number. Collected only for this landing form, not written into the user profile.'
-                    : '可自定义增删字段（文案 + 必选 / 非必选），展示在手机号上方。仅用于本次落地页留资收集，不会写入用户个人资料。'}
+                  {pageType === 'pay'
+                    ? (en
+                      ? 'Only for acquisition landings. Payment landings cannot add extra fields.'
+                      : '仅获客落地页可配。支付落地页不支持新增其他字段。')
+                    : (en
+                      ? 'Add custom fields (label + required/optional) shown above the phone number. Collected only for this landing form, not written into the user profile.'
+                      : '可自定义增删字段（文案 + 必选 / 非必选），展示在手机号上方。仅用于本次落地页留资收集，不会写入用户个人资料。')}
                 </Text>
                 {(editing.extraFields ?? []).map((field, index) => (
                   <Space key={field.id} style={{ display: 'flex', marginBottom: 8, flexWrap: 'wrap' }} align="center">
@@ -592,6 +598,7 @@ export default function LandingSkinManagement() {
                       value={field.label}
                       placeholder={en ? 'Field label' : '字段文案，如 Name'}
                       style={{ width: 200 }}
+                      disabled={pageType === 'pay'}
                       onChange={(e) => {
                         const extraFields = editing.extraFields.slice()
                         extraFields[index] = { ...field, label: e.target.value }
@@ -599,6 +606,7 @@ export default function LandingSkinManagement() {
                       }}
                     />
                     <Radio.Group
+                      disabled={pageType === 'pay'}
                       value={field.required !== false ? 'required' : 'optional'}
                       onChange={(e) => {
                         const extraFields = editing.extraFields.slice()
@@ -612,11 +620,17 @@ export default function LandingSkinManagement() {
                     />
                     <Button
                       icon={<DeleteOutlined />}
+                      disabled={pageType === 'pay'}
                       onClick={() => setEditing({ ...editing, extraFields: editing.extraFields.filter((x) => x.id !== field.id) })}
                     />
                   </Space>
                 ))}
-                <Button type="dashed" icon={<PlusOutlined />} onClick={() => setEditing({ ...editing, extraFields: [...(editing.extraFields ?? []), emptyRegisterField(en ? 'Name' : 'Name')] })}>
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  disabled={pageType === 'pay'}
+                  onClick={() => setEditing({ ...editing, extraFields: [...(editing.extraFields ?? []), emptyRegisterField(en ? 'Name' : 'Name')] })}
+                >
                   {en ? 'Add field' : '新增字段'}
                 </Button>
               </div>
