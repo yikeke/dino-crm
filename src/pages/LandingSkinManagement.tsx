@@ -47,6 +47,7 @@ import {
   normalizeRegisterAreaBgKind,
   normalizeRegisterMode,
   registerModeForPage,
+  verifyEnabledForPage,
   pageTypeLabel,
   previewHref,
   pushSkinHistory,
@@ -175,6 +176,10 @@ export default function LandingSkinManagement() {
     if (!publish) return true
     if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
       message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
+      return false
+    }
+    if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && !editing.verifyEnabled) {
+      message.error(en ? 'Payment landings must use OTP verification.' : '支付落地页必须开启有验证')
       return false
     }
     if (!hasRequiredSceneContent(editing)) {
@@ -468,6 +473,7 @@ export default function LandingSkinManagement() {
                     pageType: next,
                     afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line),
                     registerMode: registerModeForPage(next, editing.registerMode),
+                    verifyEnabled: verifyEnabledForPage(next, editing.registerMode, editing.verifyEnabled),
                   })
                 }}
                 options={PAGE_TYPE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
@@ -524,7 +530,11 @@ export default function LandingSkinManagement() {
                 onChange={(e) => setEditing({
                   ...editing,
                   registerMode: registerModeForPage(pageType, e.target.value),
-                  verifyEnabled: e.target.value === 'none' ? false : editing.verifyEnabled,
+                  verifyEnabled: verifyEnabledForPage(
+                    pageType,
+                    e.target.value,
+                    e.target.value === 'none' ? false : editing.verifyEnabled,
+                  ),
                 })}
                 options={REGISTER_MODE_OPTIONS.map((x) => ({
                   value: x.value,
@@ -534,7 +544,7 @@ export default function LandingSkinManagement() {
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册。')
+                  ? (en ? 'Payment landings cannot use “No register”, and must use OTP.' : '支付落地页不能选择无注册，且必须有验证。')
                   : (en
                     ? 'No register hides the form. Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -544,15 +554,27 @@ export default function LandingSkinManagement() {
           {normalizeRegisterMode(editing.registerMode) !== 'none' ? (
             <div className="skin-form-row">
               <label>{en ? 'Verification' : '是否验证'}</label>
-              <Radio.Group
-                disabled={!editing.line}
-                value={editing.verifyEnabled ? 'otp' : 'none'}
-                onChange={(e) => setEditing({ ...editing, verifyEnabled: e.target.value === 'otp' })}
-                options={[
-                  { value: 'otp', label: en ? 'With OTP' : '有验证' },
-                  { value: 'none', label: en ? 'No OTP' : '无验证' },
-                ]}
-              />
+              <div>
+                <Radio.Group
+                  disabled={!editing.line}
+                  value={verifyEnabledForPage(pageType, editing.registerMode, editing.verifyEnabled) ? 'otp' : 'none'}
+                  onChange={(e) => setEditing({
+                    ...editing,
+                    verifyEnabled: verifyEnabledForPage(pageType, editing.registerMode, e.target.value === 'otp'),
+                  })}
+                  options={[
+                    { value: 'otp', label: en ? 'With OTP' : '有验证' },
+                    { value: 'none', label: en ? 'No OTP' : '无验证', disabled: pageType === 'pay' },
+                  ]}
+                />
+                {pageType === 'pay' ? (
+                  <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                    {en
+                      ? 'Payment landings must verify the phone with OTP before continuing. Matches current backend behavior.'
+                      : '支付落地页必须有验证，验证通过后才能进入后续流程（与现网后端一致）。'}
+                  </Text>
+                ) : null}
+              </div>
             </div>
           ) : null}
           {normalizeRegisterMode(editing.registerMode) !== 'none' ? (

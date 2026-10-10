@@ -524,6 +524,20 @@ export function registerModeForPage(pageType: LandingPageKind, mode?: string): R
   return normalizeRegisterMode(mode)
 }
 
+/**
+ * Payment landings must collect OTP before the backend lets the user continue.
+ * Acquisition pages keep the operator's choice; no-register skins have no OTP.
+ */
+export function verifyEnabledForPage(
+  pageType: LandingPageKind,
+  mode?: string,
+  verifyEnabled?: boolean,
+): boolean {
+  if (pageType === 'pay') return true
+  if (normalizeRegisterMode(mode) === 'none') return false
+  return !!verifyEnabled
+}
+
 export const DEFAULT_REGISTER_BG_COLOR = '#ffffff'
 
 export function normalizeRegisterBgKind(kind?: string): RegisterBgKind {
@@ -677,7 +691,14 @@ export function sceneVideoIncomplete(items?: SkinAsset[]) {
   return (items || []).some((item) => item.withVideo && !item.video?.src)
 }
 
-export function normalizeVerifyEnabled(skin: { registerMode?: string; verifyEnabled?: boolean }) {
+export function normalizeVerifyEnabled(skin: {
+  pageType?: string
+  afterRegisterAction?: string
+  registerMode?: string
+  verifyEnabled?: boolean
+}) {
+  const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
+  if (pageType === 'pay') return true
   if (typeof skin.verifyEnabled === 'boolean') return skin.verifyEnabled
   return skin.registerMode === 'full'
 }
@@ -799,6 +820,7 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
       thirdPartyLogins: normalizeThirdPartyLogins(skin.thirdPartyLogins),
       pageType,
       registerMode: registerModeForPage(pageType, skin.registerMode),
+      verifyEnabled: verifyEnabledForPage(pageType, skin.registerMode, skin.verifyEnabled),
       afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line),
       registerBgKind: normalizeRegisterBgKind(skin.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(skin.registerBgColor),
@@ -877,7 +899,7 @@ export function emptySkin(actor = 'admin@dinoai.ai'): LandingSkin {
     pageType: 'pay',
     language: 'en',
     registerMode: 'full',
-    verifyEnabled: false,
+    verifyEnabled: true,
     extraFields: [],
     thirdPartyLogins: [],
     afterRegisterAction: 'sku_promo_pay',
@@ -950,7 +972,7 @@ export function seedLandingSkins(): LandingSkinStore {
         pageType: 'pay',
         language: 'ko',
         registerMode: 'full',
-        verifyEnabled: false,
+        verifyEnabled: true,
         extraFields: [],
         thirdPartyLogins: ['kakao', 'apple'],
         afterRegisterAction: 'sku_promo_pay' as const,
