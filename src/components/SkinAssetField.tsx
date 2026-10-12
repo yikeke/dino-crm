@@ -888,7 +888,7 @@ export function SceneImageField({
                     <SkinAssetField
                       required
                       label="视频封面图"
-                      hint="点「点击后全屏播放」时必填。窗口内展示这张图，不取视频首帧。"
+                      hint="点「点击后全屏播放」时必填。窗口内展示这张图，不取视频首帧。单张不超过 300 KB。展示方式固定为等比裁切填满视频窗口（不拉伸变形），目前只有这一种，没有留白适配或拉抻选项。"
                       budget="scene"
                       value={value.videoCover}
                       onChange={(cover) => onChange({
