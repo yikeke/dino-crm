@@ -166,6 +166,7 @@ export default function SkinAssetField({
   videoOnly = false,
   required = false,
   budget,
+  hideBudgetHint = false,
   describe = false,
   hideLabel = false,
   line,
@@ -178,6 +179,8 @@ export default function SkinAssetField({
   videoOnly?: boolean
   required?: boolean
   budget?: AssetBudgetKey
+  /** When true, keep budget for validation but skip the auto format/size line (hint already covers it). */
+  hideBudgetHint?: boolean
   /** Show the image-description (alt) input used for SEO. */
   describe?: boolean
   /** Parent renders the section title. */
@@ -271,8 +274,8 @@ export default function SkinAssetField({
           </Upload>
         )}
       </div>
-      {hint ? <Text type="secondary" className="skin-asset-hint">{hint}</Text> : null}
-      {budget ? <Text type="secondary" className="skin-asset-hint">{ASSET_BUDGETS[budget].zh}</Text> : null}
+      {hint ? <Text type="secondary" className="skin-asset-hint" style={{ display: 'block', whiteSpace: 'pre-line' }}>{hint}</Text> : null}
+      {budget && !hideBudgetHint ? <Text type="secondary" className="skin-asset-hint">{ASSET_BUDGETS[budget].zh}</Text> : null}
       {value?.src && budget ? <AssetWeight value={value} budget={budget} /> : null}
       {value?.name && value.src?.startsWith('asset:') ? <Text type="secondary">{value.name}</Text> : null}
       {describe && value?.src ? (
@@ -888,8 +891,9 @@ export function SceneImageField({
                     <SkinAssetField
                       required
                       label="视频封面图"
-                      hint="展示方式固定为等比裁切填满视频窗口（不拉伸变形）。"
+                      hint={'支持 JPEG / PNG / WebP，单张不超过 300 KB。\n展示方式固定为等比裁切填满视频窗口（不拉伸变形）。'}
                       budget="scene"
+                      hideBudgetHint
                       value={value.videoCover}
                       onChange={(cover) => onChange({
                         ...value,
