@@ -888,7 +888,7 @@ export function SceneImageField({
                     <SkinAssetField
                       required
                       label="视频封面图"
-                      hint="单张不超过 300 KB。展示方式固定为等比裁切填满视频窗口（不拉伸变形）。"
+                      hint="展示方式固定为等比裁切填满视频窗口（不拉伸变形）。"
                       budget="scene"
                       value={value.videoCover}
                       onChange={(cover) => onChange({
