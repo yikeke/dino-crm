@@ -881,14 +881,14 @@ export function SceneImageField({
                   </div>
                   <Typography.Text type="secondary" className="skin-asset-hint" style={{ display: 'block', marginBottom: 8 }}>
                     {playMode === 'lightbox'
-                      ? '窗口内先显示封面图和播放键，用户点击后全屏播放，可出声。不支持用视频首帧当封面，需单独上传封面图。'
+                      ? '窗口内先显示封面图和播放键，用户点击后全屏播放，可出声。'
                       : '进入页面后在窗口内自动静音循环播放，没有播放控件。'}
                   </Typography.Text>
                   {playMode === 'lightbox' ? (
                     <SkinAssetField
                       required
                       label="视频封面图"
-                      hint="点「点击后全屏播放」时必填。窗口内展示这张图，不取视频首帧。单张不超过 300 KB。展示方式固定为等比裁切填满视频窗口（不拉伸变形），目前只有这一种，没有留白适配或拉抻选项。"
+                      hint="单张不超过 300 KB。展示方式固定为等比裁切填满视频窗口（不拉伸变形），目前只有这一种，没有留白适配或拉抻选项。"
                       budget="scene"
                       value={value.videoCover}
                       onChange={(cover) => onChange({
