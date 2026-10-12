@@ -81,6 +81,8 @@ export type SkinAsset = {
   alt?: string
   withVideo?: boolean
   video?: SkinAsset
+  /** Poster shown in the hole for lightbox mode. Not used for muted loop. */
+  videoCover?: SkinAsset
   videoRect?: VideoHole
   /** loop = muted autoplay in the hole; lightbox = tap hole to play fullscreen. */
   videoPlayMode?: VideoPlayMode
@@ -694,7 +696,13 @@ export function hasSceneSrc(items?: SkinAsset[]) {
 }
 
 export function sceneVideoIncomplete(items?: SkinAsset[]) {
-  return (items || []).some((item) => item.withVideo && !item.video?.src)
+  return (items || []).some((item) => {
+    if (!item.withVideo) return false
+    if (!item.video?.src) return true
+    // Lightbox cannot use the first frame as cover — operators must upload a poster.
+    if (normalizeVideoPlayMode(item.videoPlayMode) === 'lightbox' && !item.videoCover?.src) return true
+    return false
+  })
 }
 
 export function normalizeVerifyEnabled(skin: {
@@ -804,6 +812,7 @@ export function normalizeSceneAsset(asset: SkinAsset, inherit?: { text?: string;
     ...asset,
     withVideo: !!asset.withVideo,
     videoPlayMode: normalizeVideoPlayMode(asset.videoPlayMode),
+    videoCover: asset.videoCover?.src ? { ...asset.videoCover, kind: 'image' as const } : undefined,
     videoRect: asset.videoRect || { ...DEFAULT_VIDEO_HOLE },
     ctaMode: mode,
     ctaText: asset.ctaText || inherit?.text || '',

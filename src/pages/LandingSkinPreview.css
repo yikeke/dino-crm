@@ -253,7 +253,8 @@
 .lp-scene { position: relative; }
 .lp-scene > img, .lp-scene > video, .lp-scene .skin-media-fallback { width: 100%; display: block; }
 .lp-scene-video { position: absolute; z-index: 1; overflow: hidden; border-radius: 12px; background: #16324a; border: 0; padding: 0; }
-.lp-scene-video video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.lp-scene-video video,
+.lp-scene-video img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .lp-scene-video.is-lightbox-hit { cursor: pointer; }
 .lp-scene-play {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);

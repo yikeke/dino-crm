@@ -194,7 +194,9 @@ export default function LandingSkinManagement() {
       return false
     }
     if (sceneVideoIncomplete(editing.registerBefore) || sceneVideoIncomplete(editing.registerAfter)) {
-      message.error(en ? 'Upload a loop video for each scene that has a video window' : '已打开视频窗口的配图需要上传循环视频')
+      message.error(en
+        ? 'Each video window needs a video file; lightbox mode also needs a cover image'
+        : '已打开视频窗口的配图需要上传视频；选「点击后全屏播放」时还要上传封面图')
       return false
     }
     if (normalizeRegisterBgKind(editing.registerBgKind) === 'image' && !editing.registerBgImage?.src) {

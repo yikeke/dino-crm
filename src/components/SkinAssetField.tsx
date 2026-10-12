@@ -487,6 +487,8 @@ function SceneLayoutEditor({
   image,
   showVideo,
   video,
+  videoCover,
+  videoPlayMode = 'loop',
   videoRect,
   onVideoRect,
   ctaMode,
@@ -501,6 +503,8 @@ function SceneLayoutEditor({
   image?: SkinAsset
   showVideo: boolean
   video?: SkinAsset
+  videoCover?: SkinAsset
+  videoPlayMode?: VideoPlayMode
   videoRect: VideoHole
   onVideoRect: (r: VideoHole) => void
   ctaMode: SceneCtaMode
@@ -518,6 +522,8 @@ function SceneLayoutEditor({
   const drag = useRef<LayoutDrag | null>(null)
   const { src } = useSkinAssetURL(image)
   const { src: videoSrc } = useSkinAssetURL(video)
+  const { src: coverSrc } = useSkinAssetURL(videoCover)
+  const isLightbox = normalizeVideoPlayMode(videoPlayMode) === 'lightbox'
   const paint = normalizeCtaStyle(ctaStyle)
   const canDragVideo = showVideo
   const canDragCta = ctaMode === 'custom'
@@ -647,7 +653,10 @@ function SceneLayoutEditor({
             }}
           >
             <div className="skin-video-hole-clip">
-              {videoSrc ? <video src={videoSrc} muted loop playsInline autoPlay /> : <span>视频窗口</span>}
+              {isLightbox
+                ? (coverSrc ? <img src={coverSrc} alt="" draggable={false} /> : <span>需上传封面</span>)
+                : (videoSrc ? <video src={videoSrc} muted loop playsInline autoPlay /> : <span>视频窗口</span>)}
+              {isLightbox ? <span className="skin-video-play" aria-hidden="true">▶</span> : null}
             </div>
             {drawTarget === 'video' || !canDragCta ? (
               <ResizeHandles
@@ -776,6 +785,7 @@ export function SceneImageField({
                   kind: 'image',
                   withVideo: value.withVideo,
                   video: value.video,
+                  videoCover: value.videoCover,
                   videoRect: value.videoRect,
                   videoPlayMode: value.videoPlayMode,
                   ctaMode: value.ctaMode,
@@ -824,6 +834,8 @@ export function SceneImageField({
               image={value}
               showVideo={videoOn}
               video={value.video}
+              videoCover={value.videoCover}
+              videoPlayMode={playMode}
               videoRect={videoRect}
               onVideoRect={(next) => onChange({ ...value, videoRect: next })}
               ctaMode={ctaOn ? 'custom' : 'none'}
@@ -869,11 +881,25 @@ export function SceneImageField({
                   </div>
                   <Typography.Text type="secondary" className="skin-asset-hint" style={{ display: 'block', marginBottom: 8 }}>
                     {playMode === 'lightbox'
-                      ? '窗口内先显示封面和播放键，用户点击后全屏播放，可出声。'
+                      ? '窗口内先显示封面图和播放键，用户点击后全屏播放，可出声。不支持用视频首帧当封面，需单独上传封面图。'
                       : '进入页面后在窗口内自动静音循环播放，没有播放控件。'}
                   </Typography.Text>
+                  {playMode === 'lightbox' ? (
+                    <SkinAssetField
+                      required
+                      label="视频封面图"
+                      hint="点「点击后全屏播放」时必填。窗口内展示这张图，不取视频首帧。"
+                      budget="scene"
+                      value={value.videoCover}
+                      onChange={(cover) => onChange({
+                        ...value,
+                        videoCover: cover?.src ? { ...cover, kind: 'image' } : undefined,
+                      })}
+                    />
+                  ) : null}
                   <SkinAssetField
                     videoOnly
+                    required
                     label="视频文件"
                     budget="video"
                     value={value.video}

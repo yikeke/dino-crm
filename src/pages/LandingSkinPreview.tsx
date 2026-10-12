@@ -95,6 +95,7 @@ function Slot({ id, label, className = '', children }: { id: string; label: stri
 function SceneBlock({ asset, onCta }: { asset: SkinAsset; onCta: () => void }) {
   const hole = asset.videoRect || DEFAULT_VIDEO_HOLE
   const { src: videoSrc } = useSkinAssetURL(asset.withVideo ? asset.video : undefined)
+  const { src: coverSrc } = useSkinAssetURL(asset.withVideo ? asset.videoCover : undefined)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const ctaMode = asset.ctaMode
@@ -130,7 +131,9 @@ function SceneBlock({ asset, onCta }: { asset: SkinAsset; onCta: () => void }) {
             onClick={() => videoSrc && setLightboxOpen(true)}
             aria-label="播放视频"
           >
-            {videoSrc ? <video src={videoSrc} muted playsInline preload="metadata" /> : null}
+            {coverSrc
+              ? <img src={coverSrc} alt="" draggable={false} />
+              : (videoSrc ? <video src={videoSrc} muted playsInline preload="metadata" /> : null)}
             <span className="lp-scene-play" aria-hidden="true">▶</span>
           </button>
         ) : (
@@ -557,9 +560,9 @@ function sceneTags(item: SkinAsset) {
   const tags: string[] = []
   if (item.withVideo) {
     const mode = normalizeVideoPlayMode(item.videoPlayMode)
-    tags.push(item.video?.src
-      ? (mode === 'lightbox' ? '视频窗口·点击大屏' : '视频窗口·静音循环')
-      : '视频窗口（缺视频）')
+    if (!item.video?.src) tags.push('视频窗口（缺视频）')
+    else if (mode === 'lightbox' && !item.videoCover?.src) tags.push('视频窗口·点击大屏（缺封面）')
+    else tags.push(mode === 'lightbox' ? '视频窗口·点击大屏' : '视频窗口·静音循环')
   }
   if (item.ctaMode === 'bottom') tags.push('按钮贴底')
   if (item.ctaMode === 'custom') tags.push('按钮自定义位置')
