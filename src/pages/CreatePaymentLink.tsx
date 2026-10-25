@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Checkbox,
   Select,
   Space,
   Table,
@@ -15,7 +16,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   formatMoney,
@@ -23,8 +24,8 @@ import {
   loadMarketingCatalog,
   pricedSku,
   promosForSku,
-  PAY_HOST,
 } from '../paymentLinkCatalog'
+import { methodsForLine } from '../paymentMethods'
 
 const STORE_KEY = 'dino-cc-payment-links-v1'
 
@@ -46,6 +47,7 @@ type PaymentLink = {
   phone: string
   customerName: string
   note: string
+  methods: string[]
   url: string
   received: boolean
   createdAt: string
@@ -74,19 +76,24 @@ function nowText() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function buildUrl(link: Pick<PaymentLink, 'id' | 'kind' | 'line' | 'skuId' | 'amount' | 'currency' | 'promoCode' | 'depositPlanId'>) {
-  const host = PAY_HOST[link.line] || 'www.dinoai.ai'
+function buildUrl(link: Pick<PaymentLink, 'id' | 'kind' | 'line' | 'skuId' | 'skuName' | 'amount' | 'payable' | 'listPrice' | 'currency' | 'promoCode' | 'depositPlanId' | 'methods'>) {
   const type = link.kind === 'full' ? 'full' : link.kind === 'deposit_first' ? 'deposit_first' : 'deposit_balance'
   const query = new URLSearchParams({
     pay_link: link.id,
     type,
+    line: link.line,
     sku: link.skuId,
+    sku_name: link.skuName,
     amount: String(link.amount),
+    payable: String(link.payable),
+    list: String(link.listPrice),
     currency: link.currency,
+    methods: (link.methods || []).join(','),
   })
   if (link.promoCode) query.set('promo', link.promoCode)
   if (link.depositPlanId) query.set('deposit_plan', link.depositPlanId)
-  return `https://${host}/lp/pay-link/?${query.toString()}`
+  const root = import.meta.env.BASE_URL.replace(/\/$/, '')
+  return `${window.location.origin}${root}/#/lp/pay-link?${query.toString()}`
 }
 
 async function copyText(value: string) {
@@ -110,6 +117,7 @@ export default function CreatePaymentLink() {
   const [customerName, setCustomerName] = useState('')
   const [note, setNote] = useState('')
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
+  const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
 
   const reloadCatalog = () => setCatalog(loadMarketingCatalog())
@@ -133,6 +141,10 @@ export default function CreatePaymentLink() {
   useEffect(() => {
     if (!skuId && skus[0]) setSkuId(skus[0].id)
   }, [skuId, skus])
+
+  useEffect(() => {
+    setPayMethods(methodsForLine(activeLine).map((item) => item.code))
+  }, [activeLine])
 
   const persist = (next: PaymentLink[]) => {
     setLinks(next)
@@ -164,6 +176,10 @@ export default function CreatePaymentLink() {
       message.warning(en ? 'Enter the customer phone' : '请填写客户手机号')
       return false
     }
+    if (!payMethods.length) {
+      message.warning(en ? 'Select at least one payment method' : '请至少选择一种支付方式')
+      return false
+    }
     return true
   }
 
@@ -183,6 +199,7 @@ export default function CreatePaymentLink() {
     phone: phone.trim(),
     customerName: customerName.trim(),
     note: note.trim(),
+    methods: payMethods,
     url: '',
     received: false,
     createdAt: nowText(),
@@ -308,6 +325,24 @@ export default function CreatePaymentLink() {
             </Form.Item>
           )}
         </Space>
+        <Form.Item
+          label={en ? 'Payment methods' : '支付方式'}
+          required
+          extra={en ? 'Pick one method, or several. The customer page only shows the methods checked here.' : '可以只选一种，也可以多选。用户打开链接后，只会看到这里勾选的方式。'}
+        >
+          <Checkbox.Group value={payMethods} onChange={(value) => setPayMethods(value as string[])}>
+            <Space size={[16, 8]} wrap>
+              {methodsForLine(activeLine).map((method) => (
+                <Checkbox key={method.code} value={method.code}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <img src={method.icon} alt="" width={22} height={22} style={{ objectFit: 'contain' }} />
+                    {method.name}
+                  </span>
+                </Checkbox>
+              ))}
+            </Space>
+          </Checkbox.Group>
+        </Form.Item>
         {mode === 'deposit' && priced && (
           <Typography.Paragraph type="secondary">
             {en ? 'Balance after this first payment: ' : '付完这笔首款后，尾款为 '}
@@ -372,6 +407,10 @@ export default function CreatePaymentLink() {
       render: (code: string) => code ? <Typography.Text code>{code}</Typography.Text> : '—',
     },
     {
+      title: en ? 'Methods' : '支付方式',
+      render: (_: unknown, row: PaymentLink) => (row.methods || []).join(' / ') || '—',
+    },
+    {
       title: en ? 'Status' : '状态',
       render: (_: unknown, row: PaymentLink) => {
         if (row.kind === 'full') return row.received ? <Tag color="green">{en ? 'Received' : '已到账'}</Tag> : <Tag>{en ? 'Waiting' : '待转账'}</Tag>
@@ -386,6 +425,7 @@ export default function CreatePaymentLink() {
         const balance = links.find((item) => item.kind === 'deposit_balance' && item.depositPlanId === row.depositPlanId)
         return (
           <Space wrap>
+            <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
             <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{en ? 'Copy' : '复制链接'}</Button>
             {!row.received && (
               <Button size="small" onClick={() => markReceived(row.id)}>{en ? 'Mark received' : '标记到账'}</Button>

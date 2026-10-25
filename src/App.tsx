@@ -24,6 +24,7 @@ import LandingPageManagement from './pages/LandingPage'
 import LandingSkinManagement from './pages/LandingSkinManagement'
 import LandingSkinPreview from './pages/LandingSkinPreview'
 import CreatePaymentLink from './pages/CreatePaymentLink'
+import PayLinkPage from './pages/PayLinkPage'
 import SystemConfig from './pages/SystemConfig'
 import { loadLandingSkinStore } from './landingSkin'
 
@@ -87,6 +88,7 @@ export default function App() {
           element={session ? <Navigate to="/" replace /> : <Login />}
         />
         <Route path="/website/promotion/landingpage" element={<LandingSkinPreview />} />
+        <Route path="/lp/pay-link" element={<PayLinkPage />} />
         <Route
           path="/"
           element={
