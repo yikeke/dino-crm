@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatMoney, type LinkOffer } from '../paymentLinkCatalog'
 import { findMethods, payCopy, type PayMethod } from '../paymentMethods'
@@ -70,9 +70,13 @@ export default function PayLinkPage() {
   )
   const [host, setHost] = useState<PayMethod | null>(null)
   const [manual, setManual] = useState(false)
-  const [bankTab, setBankTab] = useState<'qr' | 'account'>('qr')
   const [acked, setAcked] = useState(false)
   const [copied, setCopied] = useState('')
+  const bankRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (manual) bankRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [manual])
 
   const discount = Math.max(list - payable, 0)
   const chargeLabel = type === 'deposit_first' ? copy.first : type === 'deposit_balance' ? copy.balance : copy.total
@@ -208,71 +212,56 @@ export default function PayLinkPage() {
             )}
           </section>
 
-          {manual && !acked && (
-            <section className="bank-panel">
+          {manual && (
+            <section className="pay-card bank-panel" ref={bankRef}>
               <p className="bank-lead">{BANK.instruction}</p>
               <div className="bank-amount">
                 <span>{BANK.amount}</span>
                 <strong>{formatMoney(amount, currency)}</strong>
               </div>
-              <div className="pay-card">
-                <h2>{BANK.step1}</h2>
-                <div className="bank-ref">
-                  <div>
-                    <p className="bank-label">{BANK.note} <em>{BANK.mandatory}</em></p>
-                    <p className="bank-ref__value">{note}</p>
-                  </div>
-                  <button type="button" className="bank-copy" onClick={() => copyValue('note', note)}>
-                    <img src={asset('copy.svg')} alt="" />
-                  </button>
+              <div className="bank-ref">
+                <div>
+                  <p className="bank-label">{BANK.note} <em>{BANK.mandatory}</em></p>
+                  <p className="bank-ref__value">{note}</p>
                 </div>
-                <p className="bank-warn">
-                  <img src={asset('warn.svg')} alt="" />
-                  <span>{BANK.warning}</span>
-                </p>
+                <button type="button" className="bank-copy" onClick={() => copyValue('note', note)}>
+                  <img src={asset('copy.svg')} alt="" />
+                </button>
               </div>
-              <div className="pay-card">
-                <h2>{bankTab === 'qr' ? BANK.stepQr : BANK.stepManual}</h2>
-                <div className="bank-tabs" role="tablist">
-                  <button type="button" className={bankTab === 'qr' ? 'is-active' : ''} onClick={() => setBankTab('qr')}>{BANK.tabQr}</button>
-                  <button type="button" className={bankTab === 'account' ? 'is-active' : ''} onClick={() => setBankTab('account')}>{BANK.tabManual}</button>
-                </div>
-                {bankTab === 'qr' ? (
-                  <div className="bank-qr">
-                    <img src={asset('vcb-qr.jpg')} alt={BANK.tabQr} />
-                    <p>{BANK.qrHint}</p>
+              <p className="bank-warn">
+                <img src={asset('warn.svg')} alt="" />
+                <span>{BANK.warning}</span>
+              </p>
+              <div className="bank-qr">
+                <img src={asset('vcb-qr.jpg')} alt={BANK.tabQr} />
+                <p>{BANK.qrHint}</p>
+              </div>
+              <div className="bank-rows">
+                {[
+                  ['bank', BANK.bank, RECEIVER.bank],
+                  ['name', BANK.accountName, RECEIVER.name],
+                  ['number', BANK.accountNumber, RECEIVER.number],
+                ].map(([key, label, value]) => (
+                  <div className="bank-row" key={key}>
+                    <div>
+                      <p className="bank-label">{label}</p>
+                      <p className="bank-row__value">{value}</p>
+                    </div>
+                    <button type="button" className="bank-copy" onClick={() => copyValue(key, value)}>
+                      <img src={asset('copy.svg')} alt="" />
+                    </button>
                   </div>
-                ) : (
-                  <div className="bank-rows">
-                    {[
-                      ['bank', BANK.bank, RECEIVER.bank],
-                      ['name', BANK.accountName, RECEIVER.name],
-                      ['number', BANK.accountNumber, RECEIVER.number],
-                    ].map(([key, label, value]) => (
-                      <div className="bank-row" key={key}>
-                        <div>
-                          <p className="bank-label">{label}</p>
-                          <p className="bank-row__value">{value}</p>
-                        </div>
-                        <button type="button" className="bank-copy" onClick={() => copyValue(key, value)}>
-                          <img src={asset('copy.svg')} alt="" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
               {copied && <p className="bank-copied">Đã sao chép</p>}
-              <button className="pay-continue" type="button" onClick={() => setAcked(true)}>{BANK.transferred}</button>
-            </section>
-          )}
-
-          {manual && acked && (
-            <section className="pay-card bank-noted">
-              <h2>{BANK.notedTitle}</h2>
-              <p>{BANK.notedBody}</p>
-              <p className="bank-ref__value">{note}</p>
-              <button className="psp-cancel" type="button" onClick={() => { setManual(false); setAcked(false) }}>{BANK.change}</button>
+              {!acked ? (
+                <button className="pay-continue" type="button" onClick={() => setAcked(true)}>{BANK.transferred}</button>
+              ) : (
+                <div className="bank-noted">
+                  <h2>{BANK.notedTitle}</h2>
+                  <p>{BANK.notedBody}</p>
+                </div>
+              )}
             </section>
           )}
 

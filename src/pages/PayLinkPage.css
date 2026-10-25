@@ -295,16 +295,11 @@
   line-height: 1.4;
 }
 
-.bank-lead {
-  color: #fff;
-  font-weight: 500;
-}
-
 .bank-amount {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  color: #fff;
+  color: #1d1349;
 }
 
 .bank-amount strong {
