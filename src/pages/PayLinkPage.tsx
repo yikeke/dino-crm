@@ -44,8 +44,6 @@ export default function PayLinkPage() {
   const copy = payCopy(line)
   const phone = params.get('phone') || ''
   const customerName = params.get('customer_name') || ''
-  const channelName = params.get('channel_name') || ''
-  const channelCode = params.get('channel_code') || ''
   const payLink = params.get('pay_link') || ''
   const offerKey = params.get('offers') || ''
   const offers = useMemo(() => {
@@ -129,7 +127,6 @@ export default function PayLinkPage() {
             <p>{copy.forLink}</p>
             <strong>{customerName || phone || '—'}</strong>
             {customerName && phone && <span>{phone}</span>}
-            {channelName && <span>{channelName}{channelCode ? ` · ${channelCode}` : ''}</span>}
           </header>
           <section className="pay-hero">
             <h1 className="pay-hero__title">{copy.title}</h1>
