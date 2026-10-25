@@ -624,7 +624,7 @@
     try{marketingScope=JSON.parse(scopeParams.get('scope')||(scopeParams.has('embedded')?'[]':'null'));if(marketingScope!==null&&!Array.isArray(marketingScope))marketingScope=[]}catch{marketingScope=[]}
     const inMarketingScope=line=>marketingScope===null||marketingScope.includes(line);
     let marketingSnapshot={distributors,links,channelSkuPlans,promotionTypes};
-    try{const saved=JSON.parse(localStorage.getItem(marketingStoreKey)||'null');if(saved&&['distributors','links','channelSkuPlans'].every(key=>Array.isArray(saved[key]))){marketingSnapshot=saved;distributors=saved.distributors;links=saved.links;channelSkuPlans=saved.channelSkuPlans;Object.assign(promotionTypes,saved.promotionTypes||{})}}catch{}
+    try{const saved=JSON.parse(localStorage.getItem(marketingStoreKey)||'null');if(saved&&['distributors','links','channelSkuPlans'].every(key=>Array.isArray(saved[key]))){marketingSnapshot=saved;distributors=saved.distributors;links=saved.links;channelSkuPlans=saved.channelSkuPlans;Object.assign(promotionTypes,saved.promotionTypes||{});if(Array.isArray(saved.skus)&&saved.skus.length)skus=saved.skus}}catch{}
     // Persist channel IDs before names can be edited; lead pages never bind a price plan.
     function snapshotLanding(link,channel){
       if(channel)link.channelSnapshot={id:channel.id,channelCode:channel.channelCode,name:channel.name,line:channel.line,type:channel.type,contentId:link.contentId||''};
@@ -643,7 +643,7 @@
         const latest=JSON.parse(localStorage.getItem(marketingStoreKey)||'null')||marketingSnapshot;
         const outsideOwners=(latest.distributors||[]).filter(channel=>!inMarketingScope(channel.line));
         const outsideIds=new Set(outsideOwners.map(channel=>channel.id));
-        const data={distributors:[...outsideOwners,...distributors],links:[...(latest.links||[]).filter(link=>!inMarketingScope(link.line)),...links],channelSkuPlans:[...(latest.channelSkuPlans||[]).filter(plan=>outsideIds.has(plan.channelId)),...channelSkuPlans],promotionTypes:{...(latest.promotionTypes||{}),...Object.fromEntries(businessLines.map(line=>[line,promotionTypes[line]]))}};
+        const data={distributors:[...outsideOwners,...distributors],links:[...(latest.links||[]).filter(link=>!inMarketingScope(link.line)),...links],channelSkuPlans:[...(latest.channelSkuPlans||[]).filter(plan=>outsideIds.has(plan.channelId)),...channelSkuPlans],skus:[...(latest.skus||[]).filter(sku=>!inMarketingScope(sku.line)),...skus],promotionTypes:{...(latest.promotionTypes||{}),...Object.fromEntries(businessLines.map(line=>[line,promotionTypes[line]]))}};
         localStorage.setItem(marketingStoreKey,JSON.stringify(data));marketingSnapshot=data;
       }catch{toast('浏览器未能保存数据，请保留当前页面并重试')}
     }

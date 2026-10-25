@@ -19,6 +19,7 @@ import {
   DashboardOutlined,
   ExperimentOutlined,
   SkinOutlined,
+  CreditCardOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -59,10 +60,12 @@ const NAV_MODULE: Record<string, ModuleKey> = {
 }
 
 export default function AppLayout() {
-  const [collapsed, setCollapsed] = useState(false)
-  const [openKeys, setOpenKeys] = useState<string[]>([])
   const navigate = useNavigate()
   const location = useLocation()
+  const [collapsed, setCollapsed] = useState(false)
+  const [openKeys, setOpenKeys] = useState<string[]>(() =>
+    location.pathname.startsWith('/marketing-center-v5') ? ['marketing-v5'] : [],
+  )
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
   const selectedPath = location.pathname.startsWith('/marketing-center') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
@@ -121,7 +124,10 @@ export default function AppLayout() {
     { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center-v5/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
     { key: '/marketing-center-v5/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
-  ].filter((n) => visible(n.key))
+    ...((can('salesV3') !== 'none' || can('marketingV2_landing') !== 'none')
+      ? [{ key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Create Payment Link' : 'Create Payment Link' }]
+      : []),
+  ].filter((n) => n.key === '/marketing-center-v5/payment-links' || visible(n.key))
 
   // 销售中心（二期）
   const salesNav = [
@@ -185,6 +191,7 @@ export default function AppLayout() {
     '/marketing-center-v5/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center-v5/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center-v5/skins': lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理',
+    '/marketing-center-v5/payment-links': 'Create Payment Link',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/users-v6': t('app.nav.usersV6'),

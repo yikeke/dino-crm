@@ -23,6 +23,7 @@ import CouponPage from './pages/Coupon'
 import LandingPageManagement from './pages/LandingPage'
 import LandingSkinManagement from './pages/LandingSkinManagement'
 import LandingSkinPreview from './pages/LandingSkinPreview'
+import CreatePaymentLink from './pages/CreatePaymentLink'
 import SystemConfig from './pages/SystemConfig'
 import { loadLandingSkinStore } from './landingSkin'
 
@@ -60,6 +61,14 @@ function firstAllowedPath(can: (m: ModuleKey) => string): string {
 function Guard({ module, children }: { module: ModuleKey; children: JSX.Element }) {
   const { can } = usePerm()
   if (can(module) === 'none') return <Navigate to={firstAllowedPath(can)} replace />
+  return children
+}
+
+function PaymentLinkGuard({ children }: { children: JSX.Element }) {
+  const { can } = usePerm()
+  if (can('salesV3') === 'none' && can('marketingV2_landing') === 'none') {
+    return <Navigate to={firstAllowedPath(can)} replace />
+  }
   return children
 }
 
@@ -107,6 +116,7 @@ export default function App() {
           <Route path="marketing-center-v5/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
           <Route path="marketing-center-v5/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
           <Route path="marketing-center-v5/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
+          <Route path="marketing-center-v5/payment-links" element={<PaymentLinkGuard><CreatePaymentLink /></PaymentLinkGuard>} />
           <Route path="marketing-center/skins" element={<Navigate to="/marketing-center-v5/skins" replace />} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
