@@ -91,6 +91,7 @@ export default function PayLinkPage() {
   }
 
   const choose = (method: PayMethod) => {
+    if (offers.length > 1 && !picked) return
     if (method.minAmount && amount < method.minAmount) return
     if (method.kind === 'manual') {
       setHost(null)
@@ -137,12 +138,17 @@ export default function PayLinkPage() {
             </div>
           </section>
 
-          {offers.length > 1 && !picked && (
+          {offers.length > 1 && (
             <section className="pay-card">
               <p className="pay-methods__title">{copy.chooseSku}</p>
               <div className="pay-method__list">
                 {offers.map((offer) => (
-                  <button key={offer.skuId} type="button" className="pay-method" onClick={() => setPickedId(offer.skuId)}>
+                  <button
+                    key={offer.skuId}
+                    type="button"
+                    className={`pay-method${picked?.skuId === offer.skuId ? ' is-selected' : ''}`}
+                    onClick={() => { setPickedId(offer.skuId); setManual(false); setAcked(false) }}
+                  >
                     <span className="pay-method__info"><span>{offer.skuName}</span></span>
                     <span>{formatMoney(offer.payable, offer.currency)}</span>
                   </button>
@@ -152,7 +158,6 @@ export default function PayLinkPage() {
           )}
 
           {(offers.length <= 1 || picked) && (
-          <>
           <section className="pay-card">
             <div className="pay-row">
               <span>{skuName}</span>
@@ -175,12 +180,13 @@ export default function PayLinkPage() {
               <span className="pay-row__total">{formatMoney(amount, currency)}</span>
             </div>
           </section>
+          )}
 
           <section className="pay-card">
             <p className="pay-methods__title">{copy.choose}</p>
             <div className="pay-method__list">
               {methods.map((method) => {
-                const blocked = !!method.minAmount && amount < method.minAmount
+                const blocked = (offers.length > 1 && !picked) || (!!method.minAmount && amount < method.minAmount)
                 const selected = method.kind === 'manual' && manual
                 return (
                   <button
@@ -271,9 +277,6 @@ export default function PayLinkPage() {
               <p className="bank-ref__value">{note}</p>
               <button className="psp-cancel" type="button" onClick={() => { setManual(false); setAcked(false) }}>{BANK.change}</button>
             </section>
-          )}
-
-          </>
           )}
 
           <p className="pay-terms pay-terms--flow">
