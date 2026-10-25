@@ -43,7 +43,7 @@ export default function PayLinkPage() {
   const copy = payCopy(line, lang)
   const bank = bankCopy(lang)
   const phone = params.get('phone') || ''
-  const customerName = params.get('customer_name') || ''
+  const userId = params.get('user_id') || ''
   const payLink = params.get('pay_link') || ''
   const offerKey = params.get('offers') || ''
   const offers = useMemo(() => {
@@ -108,7 +108,7 @@ export default function PayLinkPage() {
       skuName: `${memberTier(picked?.memberLevel)} · ${skuName}`,
       amount,
       currency,
-      userId: params.get('user_id') || undefined,
+      userId: userId || undefined,
     })
     setPaidOrderId(settled?.orderId || paidOrderId)
     setHost(null)
@@ -153,8 +153,8 @@ export default function PayLinkPage() {
         <div className="pay-shell">
           <header className="pay-user">
             <p>{copy.forLink}</p>
-            <strong>{customerName || phone || '—'}</strong>
-            {customerName && phone && <span>{phone}</span>}
+            <strong>{userId || phone || '—'}</strong>
+            {userId && phone && <span>{phone}</span>}
           </header>
           <section className="pay-hero">
             <h1 className="pay-hero__title">{copy.title}</h1>

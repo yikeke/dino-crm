@@ -133,8 +133,6 @@ export default function CreatePaymentLink() {
   const [channelId, setChannelId] = useState('')
   const [usePromo, setUsePromo] = useState(true)
   const [phone, setPhone] = useState('')
-  const [customerName, setCustomerName] = useState('')
-  const [note, setNote] = useState('')
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
@@ -194,8 +192,6 @@ export default function CreatePaymentLink() {
 
   const resetCustomer = () => {
     setPhone('')
-    setCustomerName('')
-    setNote('')
     setFirstAmount(null)
   }
 
@@ -249,8 +245,8 @@ export default function CreatePaymentLink() {
       payable: shown.length === 1 ? offer.payable : 0,
       amount,
       phone: phone.trim(),
-      customerName: customerName.trim(),
-      note: note.trim(),
+      customerName: '',
+      note: '',
       methods: payMethods,
       userId: linkedUserId,
       orderId: editingId ? links.find((item) => item.id === editingId)?.orderId : undefined,
@@ -328,8 +324,6 @@ export default function CreatePaymentLink() {
     setChannelId(row.channelId)
     setUsePromo(!!row.promoCode)
     setPhone(row.phone)
-    setCustomerName(row.customerName)
-    setNote(row.note)
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
     setTab(row.kind === 'full' ? 'full' : 'deposit')
@@ -411,7 +405,7 @@ export default function CreatePaymentLink() {
           )}
         </Form.Item>
         <Space size={16} align="start" wrap>
-          <Form.Item label={en ? 'Customer phone' : '客户手机号'} required style={{ minWidth: 220 }}>
+          <Form.Item label={en ? 'Phone · link User ID' : '客户手机号 · 关联 User ID'} required style={{ minWidth: 280 }}>
             <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+84…" />
             {linkedUserId && (
               <Typography.Text type="secondary">
@@ -419,12 +413,6 @@ export default function CreatePaymentLink() {
                 {matchedStudent ? (en ? ' · found in User Center' : ' · 已关联用户中心') : (en ? ' · new user bound at payment' : ' · 支付时关联为新用户')}
               </Typography.Text>
             )}
-          </Form.Item>
-          <Form.Item label={en ? 'Customer name' : '客户姓名'} style={{ minWidth: 180 }}>
-            <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
-          </Form.Item>
-          <Form.Item label={en ? 'Note' : '备注'} style={{ minWidth: 240 }}>
-            <Input value={note} onChange={(event) => setNote(event.target.value)} />
           </Form.Item>
           {mode === 'deposit' && shown.length > 0 && (
             <Form.Item label={en ? 'First payment' : '首款金额'} required style={{ minWidth: 180 }}>
@@ -490,7 +478,7 @@ export default function CreatePaymentLink() {
       render: (_: unknown, row: PaymentLink) => (
         <div>
           <div>{row.phone}</div>
-          <Typography.Text type="secondary">{row.customerName || '—'}</Typography.Text>
+          <Typography.Text type="secondary">{row.userId || '—'}</Typography.Text>
         </div>
       ),
     },
