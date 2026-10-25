@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier, type LinkOffer } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
-import { readPaymentLinks, settlePaymentLink } from '../paymentLinkStore'
+import { declareBankTransfer, readPaymentLinks, settlePaymentLink } from '../paymentLinkStore'
 import './PayLinkPage.css'
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
@@ -282,7 +282,7 @@ export default function PayLinkPage() {
               </div>
               {copied && <p className="bank-copied">{bank.copied}</p>}
               {!acked ? (
-                <button className="pay-continue" type="button" onClick={() => pay(activeMethod?.name || bank.methodName)}>{bank.transferred}</button>
+                <button className="pay-continue" type="button" onClick={() => { declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
               ) : (
                 <div className="bank-noted">
                   <h2>{bank.notedTitle}</h2>

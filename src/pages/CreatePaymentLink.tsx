@@ -8,15 +8,17 @@ import {
   Input,
   InputNumber,
   Checkbox,
+  Modal,
   Select,
   Space,
   Table,
   Tabs,
   Tag,
   Typography,
+  Upload,
   message,
 } from 'antd'
-import { CopyOutlined, EditOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, EditOutlined, EyeOutlined, InboxOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -60,6 +62,9 @@ type PaymentLink = {
   userId?: string
   orderId?: string
   paidMethod?: string
+  transferDeclared?: boolean
+  paidNote?: string
+  paymentProofName?: string
   url: string
   received: boolean
   createdAt: string
@@ -80,6 +85,16 @@ function saveLinks(links: PaymentLink[]) {
 
 function newId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+}
+
+function bankTransferOnly(row: PaymentLink) {
+  const methods = row.methods || []
+  return methods.length > 0 && methods.every((code) => code === 'bank_transfer')
+}
+
+function canMarkBankPaid(row: PaymentLink) {
+  if (row.orderId) return false
+  return bankTransferOnly(row) || row.transferDeclared || row.paidMethod === 'bank_transfer'
 }
 
 function nowText() {
@@ -137,6 +152,9 @@ export default function CreatePaymentLink() {
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [marking, setMarking] = useState<PaymentLink | null>(null)
+  const [paidNote, setPaidNote] = useState('')
+  const [proof, setProof] = useState<File | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const students = useStore((s) => s.students)
@@ -149,7 +167,10 @@ export default function CreatePaymentLink() {
   const reloadCatalog = () => setCatalog(loadMarketingCatalog())
 
   useEffect(() => {
-    const onFocus = () => reloadCatalog()
+    const onFocus = () => {
+      reloadCatalog()
+      setLinks(loadLinks())
+    }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
@@ -329,17 +350,30 @@ export default function CreatePaymentLink() {
     setTab(row.kind === 'full' ? 'full' : 'deposit')
   }
 
-  const markReceived = (row: PaymentLink) => {
-    if (row.orderId) return
-    const offer = row.offers?.[0]
-    settlePaymentLink(row.id, {
-      methodName: row.paidMethod || 'Payment Link',
-      skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : row.skuName,
-      amount: row.amount || offer?.payable || row.payable,
-      currency: row.currency,
-      userId: row.userId,
+  const openMarkPaid = (row: PaymentLink) => {
+    setMarking(row)
+    setPaidNote('')
+    setProof(null)
+  }
+
+  const confirmMarkPaid = () => {
+    if (!marking || !proof) {
+      message.warning(en ? 'Upload the payment screenshot' : '请上传用户支付截图')
+      return
+    }
+    const offer = marking.offers?.[0]
+    settlePaymentLink(marking.id, {
+      methodName: 'bank_transfer',
+      skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : marking.skuName,
+      amount: marking.amount || offer?.payable || marking.payable,
+      currency: marking.currency,
+      userId: marking.userId,
+      note: paidNote.trim(),
+      proofName: proof.name,
     })
     setLinks(loadLinks())
+    setMarking(null)
+    message.success(en ? 'Marked paid' : '已标记为已支付')
   }
 
   const formCard = (mode: 'full' | 'deposit') => (
@@ -518,9 +552,14 @@ export default function CreatePaymentLink() {
     },
     {
       title: en ? 'Status' : '状态',
-      render: (_: unknown, row: PaymentLink) => row.orderId
-        ? <Tag color="green">{en ? 'Paid · one-time used' : '已支付 · 链接已使用'}</Tag>
-        : <Tag>{en ? 'Unpaid' : '未支付'}</Tag>,
+      render: (_: unknown, row: PaymentLink) => {
+        if (row.orderId) {
+          const method = row.paidMethod === 'bank_transfer' ? (en ? 'Bank transfer' : '银行转账') : (row.paidMethod || '')
+          return <Tag color="green">{en ? 'Paid' : '已支付'}{method ? ` · ${method}` : ''}</Tag>
+        }
+        if (canMarkBankPaid(row)) return <Tag color="orange">{en ? 'Awaiting transfer confirmation' : '待确认转账'}</Tag>
+        return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
+      },
     },
     {
       title: en ? 'Actions' : '操作',
@@ -534,8 +573,8 @@ export default function CreatePaymentLink() {
             {!row.orderId && (
               <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
             )}
-            {!row.orderId && (
-              <Button size="small" onClick={() => markReceived(row)}>{en ? 'Mark paid' : '标记已支付'}</Button>
+            {canMarkBankPaid(row) && (
+              <Button size="small" onClick={() => openMarkPaid(row)}>{en ? 'Mark paid' : '标记已支付'}</Button>
             )}
             {row.orderId && (
               <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
@@ -586,6 +625,34 @@ export default function CreatePaymentLink() {
           },
         ]}
       />
+      <Modal
+        title={en ? 'Confirm bank transfer received' : '确认银行转账已支付'}
+        open={!!marking}
+        okText={en ? 'Confirm paid' : '确认已支付'}
+        cancelText={en ? 'Cancel' : '取消'}
+        okButtonProps={{ disabled: !proof }}
+        onOk={confirmMarkPaid}
+        onCancel={() => setMarking(null)}
+        destroyOnClose
+      >
+        <Form layout="vertical">
+          <Form.Item label={en ? 'Note' : '备注'}>
+            <Input.TextArea rows={3} value={paidNote} onChange={(event) => setPaidNote(event.target.value)} placeholder={en ? 'Optional note for this transfer' : '可填写这笔转账的说明'} />
+          </Form.Item>
+          <Form.Item label={en ? 'Payment screenshot' : '用户支付截图'} required>
+            <Upload.Dragger
+              accept="image/*"
+              maxCount={1}
+              fileList={proof ? [{ uid: 'proof', name: proof.name, status: 'done' }] : []}
+              beforeUpload={(file) => { setProof(file); return false }}
+              onRemove={() => { setProof(null); return true }}
+            >
+              <p><InboxOutlined /></p>
+              <p>{en ? 'Upload the customer’s transfer screenshot' : '上传用户的转账截图，确认后才会标记已支付'}</p>
+            </Upload.Dragger>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
