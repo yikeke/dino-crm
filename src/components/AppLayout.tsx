@@ -63,9 +63,7 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
-  const [openKeys, setOpenKeys] = useState<string[]>(() =>
-    location.pathname.startsWith('/marketing-center-v5') ? ['marketing-v5'] : [],
-  )
+  const [openKeys, setOpenKeys] = useState<string[]>(['marketing-v5'])
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
   const selectedPath = location.pathname.startsWith('/marketing-center') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
@@ -150,28 +148,29 @@ export default function AppLayout() {
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
   ].filter((n) => visible(n.key))
 
+  const placeholder = (label: string) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {label}
+      <Tag color="default" style={{ margin: 0, lineHeight: '16px', fontSize: 11 }}>{lang === 'en' ? 'Placeholder' : '占位'}</Tag>
+    </span>
+  )
+
   const NAV = [
-    ...topNav,
-    ...salesNav,
-    ...systemNav,
-    ...usersV2Nav,
-    ...usersV6Nav,
-    ...ordersV3Nav,
-    ...salesV3Nav,
-    ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
-    ...(marketingV5Children.length ? [{ key: 'marketing-v5', icon: <ShopOutlined />, label: appABPhaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV5Children }] : []),
-    ...(marketingBackupChildren.length
-      ? [
-          {
-            key: 'marketing-backup',
-            icon: <HistoryOutlined />,
-            label: phase4Label(lang === 'en' ? 'Marketing Center Backup' : '营销中心备份'),
-            children: [{ key: '/marketing-backup', icon: <HistoryOutlined />, label: lang === 'en' ? 'Backup overview' : '备份说明' }, ...marketingBackupChildren],
-          },
-        ]
-      : []),
-    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
-    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
+    { key: '/users', icon: <TeamOutlined />, label: lang === 'en' ? 'User Center' : '用户中心' },
+    { key: '/orders', icon: <ProfileOutlined />, label: lang === 'en' ? 'Order Center' : '订单中心' },
+    {
+      key: 'marketing-v5',
+      icon: <ShopOutlined />,
+      label: lang === 'en' ? 'Marketing Center' : '营销中心',
+      children: [
+        { key: '/marketing-center-v5/channels', icon: <ApartmentOutlined />, label: lang === 'en' ? 'Channel Management' : '渠道管理' },
+        { key: '/marketing-center-v5/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
+        { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
+        { key: 'landing-placeholder', icon: <LinkOutlined />, label: placeholder(lang === 'en' ? 'Landing Page Management' : '落地页管理'), disabled: true },
+        { key: 'skin-placeholder', icon: <SkinOutlined />, label: placeholder(lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理'), disabled: true },
+        { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: 'Create Payment Link' },
+      ],
+    },
   ]
 
   const TITLES: Record<string, string> = {

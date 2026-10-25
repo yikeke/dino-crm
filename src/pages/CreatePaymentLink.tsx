@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -15,7 +16,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, EditOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -25,6 +26,8 @@ import {
   offersOnPlan,
   type LinkOffer,
 } from '../paymentLinkCatalog'
+import { useStore } from '../store'
+import { settlePaymentLink } from '../paymentLinkStore'
 import { methodsForLine } from '../paymentMethods'
 
 const STORE_KEY = 'dino-cc-payment-links-v1'
@@ -54,6 +57,9 @@ type PaymentLink = {
   customerName: string
   note: string
   methods: string[]
+  userId?: string
+  orderId?: string
+  paidMethod?: string
   url: string
   received: boolean
   createdAt: string
@@ -101,6 +107,7 @@ function buildUrl(link: PaymentLink) {
     channel_code: link.channelCode || '',
     offers: JSON.stringify(link.offers || []),
   })
+  if (link.userId) query.set('user_id', link.userId)
   if (link.promoCode) query.set('promo', link.promoCode)
   if (link.depositPlanId) query.set('deposit_plan', link.depositPlanId)
   if (link.kind === 'deposit_balance') query.set('deposit_paid', String(link.depositPaid || 0))
@@ -131,6 +138,15 @@ export default function CreatePaymentLink() {
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const holdLineReset = useRef(false)
+  const navigate = useNavigate()
+  const students = useStore((s) => s.students)
+  const phoneDigits = phone.replace(/\D/g, '')
+  const matchedStudent = phoneDigits.length >= 6
+    ? students.find((student) => (student.phone || student.account || '').replace(/\D/g, '').endsWith(phoneDigits))
+    : undefined
+  const linkedUserId = matchedStudent?.studentId || (phoneDigits.length >= 6 ? `U${phoneDigits.slice(-10)}` : '')
 
   const reloadCatalog = () => setCatalog(loadMarketingCatalog())
 
@@ -156,6 +172,10 @@ export default function CreatePaymentLink() {
   const lowestPayable = shown.reduce((min, offer) => Math.min(min, offer.payable), shown[0]?.payable || 0)
 
   useEffect(() => {
+    if (holdLineReset.current) {
+      holdLineReset.current = false
+      return
+    }
     const next = lineChannels.find((item) => item.plan && item.channel.type === '销售') || lineChannels.find((item) => item.plan)
     const offers = offersOnPlan(next?.plan, catalog.skus)
     setChannelId(next?.channel.id || '')
@@ -232,6 +252,8 @@ export default function CreatePaymentLink() {
       customerName: customerName.trim(),
       note: note.trim(),
       methods: payMethods,
+      userId: linkedUserId,
+      orderId: editingId ? links.find((item) => item.id === editingId)?.orderId : undefined,
       url: '',
       received: false,
       createdAt: nowText(),
@@ -240,12 +262,22 @@ export default function CreatePaymentLink() {
 
   const createFull = () => {
     if (!requireCustomer()) return
-    const id = newId('PL')
+    if (editingId && links.some((item) => item.id === editingId && item.orderId)) {
+      message.warning(en ? 'This link is already paid' : '这条链接已经支付，不能再改')
+      return
+    }
+    const id = editingId || newId('PL')
     const amount = shown.length === 1 ? shown[0].payable : 0
-    const row = baseFields('full', amount, '', id)
+    const row = baseFields('full', amount, editingId ? (links.find((item) => item.id === editingId)?.depositPlanId || '') : '', id)
+    if (editingId) {
+      const previous = links.find((item) => item.id === editingId)
+      row.createdAt = previous?.createdAt || row.createdAt
+      row.received = false
+    }
     row.url = buildUrl(row)
-    persist([row, ...links])
-    message.success(en ? 'Full payment link created' : '全款链接已生成')
+    persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
+    setEditingId(null)
+    message.success(editingId ? (en ? 'Payment link updated' : '支付链接已更新') : (en ? 'Full payment link created' : '全款链接已生成'))
     resetCustomer()
   }
 
@@ -256,11 +288,13 @@ export default function CreatePaymentLink() {
       message.warning(en ? 'First payment must be greater than 0 and less than every package price on this plan' : '首款必须大于 0，且小于方案里每一个套餐的应付金额')
       return
     }
-    const id = newId('PL')
-    const planId = newId('DP')
+    const id = editingId || newId('PL')
+    const planId = editingId ? (links.find((item) => item.id === editingId)?.depositPlanId || newId('DP')) : newId('DP')
     const row = baseFields('deposit_first', amount, planId, id)
+    if (editingId) row.createdAt = links.find((item) => item.id === editingId)?.createdAt || row.createdAt
     row.url = buildUrl(row)
-    persist([row, ...links])
+    persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
+    setEditingId(null)
     message.success(en ? 'Deposit link created' : '定金首款链接已生成')
     resetCustomer()
   }
@@ -283,8 +317,35 @@ export default function CreatePaymentLink() {
     message.success(en ? 'Balance link created' : '尾款链接已生成')
   }
 
-  const markReceived = (id: string) => {
-    persist(links.map((item) => (item.id === id ? { ...item, received: true } : item)))
+  const startEdit = (row: PaymentLink) => {
+    if (row.orderId) {
+      message.warning(en ? 'Paid links cannot be edited' : '已经支付的链接不能再编辑')
+      return
+    }
+    if (row.line !== activeLine) holdLineReset.current = true
+    setEditingId(row.id)
+    setLine(row.line)
+    setChannelId(row.channelId)
+    setUsePromo(!!row.promoCode)
+    setPhone(row.phone)
+    setCustomerName(row.customerName)
+    setNote(row.note)
+    setPayMethods(row.methods || [])
+    setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
+    setTab(row.kind === 'full' ? 'full' : 'deposit')
+  }
+
+  const markReceived = (row: PaymentLink) => {
+    if (row.orderId) return
+    const offer = row.offers?.[0]
+    settlePaymentLink(row.id, {
+      methodName: row.paidMethod || 'Payment Link',
+      skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : row.skuName,
+      amount: row.amount || offer?.payable || row.payable,
+      currency: row.currency,
+      userId: row.userId,
+    })
+    setLinks(loadLinks())
   }
 
   const formCard = (mode: 'full' | 'deposit') => (
@@ -335,6 +396,7 @@ export default function CreatePaymentLink() {
               <Space direction="vertical" size={4}>
                 {shown.map((offer) => (
                   <div key={offer.skuId}>
+                    <Tag color={offer.memberLevel === 'Max' ? 'gold' : 'purple'}>{offer.memberLevel}</Tag>
                     <b>{offer.skuName}</b>
                     {' · '}
                     {offer.payable !== offer.listPrice
@@ -351,6 +413,12 @@ export default function CreatePaymentLink() {
         <Space size={16} align="start" wrap>
           <Form.Item label={en ? 'Customer phone' : '客户手机号'} required style={{ minWidth: 220 }}>
             <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+84…" />
+            {linkedUserId && (
+              <Typography.Text type="secondary">
+                User ID {linkedUserId}
+                {matchedStudent ? (en ? ' · found in User Center' : ' · 已关联用户中心') : (en ? ' · new user bound at payment' : ' · 支付时关联为新用户')}
+              </Typography.Text>
+            )}
           </Form.Item>
           <Form.Item label={en ? 'Customer name' : '客户姓名'} style={{ minWidth: 180 }}>
             <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
@@ -397,7 +465,9 @@ export default function CreatePaymentLink() {
           </Typography.Paragraph>
         )}
         <Button type="primary" icon={<LinkOutlined />} onClick={mode === 'full' ? createFull : createDepositFirst}>
-          {mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first-payment link' : '生成首款链接')}
+          {editingId
+            ? (en ? 'Save changes' : '保存修改')
+            : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first-payment link' : '生成首款链接')}
         </Button>
       </Form>
     </Card>
@@ -460,11 +530,9 @@ export default function CreatePaymentLink() {
     },
     {
       title: en ? 'Status' : '状态',
-      render: (_: unknown, row: PaymentLink) => {
-        if (row.kind === 'full') return row.received ? <Tag color="green">{en ? 'Received' : '已到账'}</Tag> : <Tag>{en ? 'Waiting' : '待转账'}</Tag>
-        if (row.received) return <Tag color="green">{row.kind === 'deposit_first' ? (en ? 'First received' : '首款已到账') : (en ? 'Balance received' : '尾款已到账')}</Tag>
-        return <Tag>{row.kind === 'deposit_first' ? (en ? 'Waiting for first' : '待收首款') : (en ? 'Waiting for balance' : '待收尾款')}</Tag>
-      },
+      render: (_: unknown, row: PaymentLink) => row.orderId
+        ? <Tag color="green">{en ? 'Paid · one-time used' : '已支付 · 链接已使用'}</Tag>
+        : <Tag>{en ? 'Unpaid' : '未支付'}</Tag>,
     },
     {
       title: en ? 'Actions' : '操作',
@@ -475,8 +543,14 @@ export default function CreatePaymentLink() {
           <Space wrap>
             <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
             <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{en ? 'Copy' : '复制链接'}</Button>
-            {!row.received && (
-              <Button size="small" onClick={() => markReceived(row.id)}>{en ? 'Mark received' : '标记到账'}</Button>
+            {!row.orderId && (
+              <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
+            )}
+            {!row.orderId && (
+              <Button size="small" onClick={() => markReceived(row)}>{en ? 'Mark paid' : '标记已支付'}</Button>
+            )}
+            {row.orderId && (
+              <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
             )}
             {mode === 'deposit' && row.kind === 'deposit_first' && row.received && !balance && (
               <Button size="small" type="primary" onClick={() => createBalance(row)}>{en ? 'Balance link' : '生成尾款链接'}</Button>

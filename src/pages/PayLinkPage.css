@@ -223,6 +223,31 @@
   background: #c9e5ff;
 }
 
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tier-badge.tier-pro { background: #efe7ff; color: #5b3cc4; }
+.tier-badge.tier-max { background: #fff1cc; color: #8a5a00; }
+.pay-method.tier-pro.is-selected { background: #efe7ff; }
+.pay-method.tier-max.is-selected { background: #fff1cc; }
+
+.pay-used {
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #f4f7ff;
+  color: #1d1349;
+}
+
+.pay-used strong { display: block; margin-top: 4px; font-size: 18px; }
+
 .pay-method.is-under-min {
   opacity: 0.4;
   cursor: default;

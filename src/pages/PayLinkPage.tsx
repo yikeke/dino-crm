@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatMoney, type LinkOffer } from '../paymentLinkCatalog'
+import { formatMoney, memberTier, type LinkOffer } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
+import { readPaymentLinks, settlePaymentLink } from '../paymentLinkStore'
 import './PayLinkPage.css'
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
@@ -78,6 +79,7 @@ export default function PayLinkPage() {
   const [host, setHost] = useState<PayMethod | null>(null)
   const [acked, setAcked] = useState(false)
   const [copied, setCopied] = useState('')
+  const [paidOrderId, setPaidOrderId] = useState(() => readPaymentLinks().find((item) => item.id === payLink)?.orderId || '')
   const bankRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -98,7 +100,23 @@ export default function PayLinkPage() {
     }
   }
 
+  const pay = (methodName: string) => {
+    if (paidOrderId) return
+    if (!picked && offers.length > 0) return
+    const settled = settlePaymentLink(payLink || `PL-${Date.now()}`, {
+      methodName,
+      skuName: `${memberTier(picked?.memberLevel)} · ${skuName}`,
+      amount,
+      currency,
+      userId: params.get('user_id') || undefined,
+    })
+    setPaidOrderId(settled?.orderId || paidOrderId)
+    setHost(null)
+    setAcked(true)
+  }
+
   const choose = (method: PayMethod) => {
+    if (paidOrderId) return
     if (method.minAmount && amount < method.minAmount) return
     setMethodCode(method.code)
     setAcked(false)
@@ -118,7 +136,7 @@ export default function PayLinkPage() {
           <p className="psp-kicker">{host.name}</p>
           <h1>{formatMoney(amount, currency)}</h1>
           <p className="psp-sku">{skuName}</p>
-          <button className="psp-pay" type="button">{copy.pay}</button>
+          <button className="psp-pay" type="button" onClick={() => pay(host.name)}>{copy.pay}</button>
           <button className="psp-cancel" type="button" onClick={() => setHost(null)}>{copy.choose}</button>
         </div>
       </div>
@@ -153,10 +171,13 @@ export default function PayLinkPage() {
                   <button
                     key={offer.skuId}
                     type="button"
-                    className={`pay-method${picked?.skuId === offer.skuId ? ' is-selected' : ''}`}
+                    className={`pay-method tier-${(offer.memberLevel || 'Pro').toLowerCase()}${picked?.skuId === offer.skuId ? ' is-selected' : ''}`}
                     onClick={() => setPickedId(offer.skuId)}
                   >
-                    <span className="pay-method__info"><span>{offer.skuName}</span></span>
+                    <span className="pay-method__info">
+                      <span className={`tier-badge tier-${(offer.memberLevel || 'Pro').toLowerCase()}`}>{offer.memberLevel || 'Pro'}</span>
+                      <span>{offer.skuName}</span>
+                    </span>
                     <span>{formatMoney(offer.payable, offer.currency)}</span>
                   </button>
                 ))}
@@ -261,7 +282,7 @@ export default function PayLinkPage() {
               </div>
               {copied && <p className="bank-copied">{bank.copied}</p>}
               {!acked ? (
-                <button className="pay-continue" type="button" onClick={() => setAcked(true)}>{bank.transferred}</button>
+                <button className="pay-continue" type="button" onClick={() => pay(activeMethod?.name || bank.methodName)}>{bank.transferred}</button>
               ) : (
                 <div className="bank-noted">
                   <h2>{bank.notedTitle}</h2>
@@ -271,6 +292,12 @@ export default function PayLinkPage() {
             </section>
           )}
 
+          {paidOrderId && (
+            <section className="pay-used">
+              <p>{lang === 'zh' ? '这条支付链接已支付，只能使用一次' : lang === 'en' ? 'This payment link is paid and can only be used once' : 'This payment link is paid and can only be used once'}</p>
+              <strong>Order {paidOrderId}</strong>
+            </section>
+          )}
           <p className="pay-terms pay-terms--flow">
             <span>{copy.cancel}</span>
             <button type="button">{copy.terms}</button>

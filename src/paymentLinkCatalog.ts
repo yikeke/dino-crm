@@ -49,12 +49,14 @@ export type PromoOption = {
 }
 
 const SEED_SKUS: CatalogSku[] = [
-  { id: 'KR-Q-2026', productCode: 'web-kr-pro-1q', name: 'Dino English 季度包', line: '韩国', price: '99,000 KRW', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
-  { id: 'KR-H-2026', productCode: 'web-kr-max-6m', name: 'Dino English 半年包', line: '韩国', price: '178,000 KRW', memberLevel: 'PRO_MAX', valid: '购买后 180 天', status: '上架' },
-  { id: 'KR-Y-2026', productCode: 'web-kr-pro-1y', name: 'Dino English 年度包', line: '韩国', price: '298,000 KRW', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
-  { id: 'VN-Q-2026', productCode: 'web-vn-pro-1q', name: 'Dino English 季度包', line: '越南', price: '990,000 VND', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
-  { id: 'VN-H-2026', productCode: 'web-vn-pro-6m', name: 'Dino English 半年包', line: '越南', price: '1,790,000 VND', memberLevel: 'PRO', valid: '购买后 180 天', status: '上架' },
-  { id: 'VN-Y-2026', productCode: 'web-vn-pro-1y', name: 'Dino English 年度包', line: '越南', price: '2,990,000 VND', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
+  { id: 'KR-Q-2026', productCode: 'web-kr-pro-1q', name: 'Pro 季度包', line: '韩国', price: '99,000 KRW', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
+  { id: 'KR-H-2026', productCode: 'web-kr-max-6m', name: 'Max 半年包', line: '韩国', price: '178,000 KRW', memberLevel: 'MAX', valid: '购买后 180 天', status: '上架' },
+  { id: 'KR-Y-2026', productCode: 'web-kr-pro-1y', name: 'Pro 年度包', line: '韩国', price: '298,000 KRW', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
+  { id: 'KR-MY-2026', productCode: 'web-kr-max-1y', name: 'Max 年度包', line: '韩国', price: '398,000 KRW', memberLevel: 'MAX', valid: '购买后 365 天', status: '上架' },
+  { id: 'VN-Q-2026', productCode: 'web-vn-pro-1q', name: 'Pro 季度包', line: '越南', price: '990,000 VND', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
+  { id: 'VN-H-2026', productCode: 'web-vn-max-6m', name: 'Max 半年包', line: '越南', price: '1,790,000 VND', memberLevel: 'MAX', valid: '购买后 180 天', status: '上架' },
+  { id: 'VN-Y-2026', productCode: 'web-vn-pro-1y', name: 'Pro 年度包', line: '越南', price: '2,990,000 VND', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
+  { id: 'VN-MY-2026', productCode: 'web-vn-max-1y', name: 'Max 年度包', line: '越南', price: '3,990,000 VND', memberLevel: 'MAX', valid: '购买后 365 天', status: '上架' },
 ]
 
 const SEED_CHANNELS: CatalogChannel[] = [
@@ -66,10 +68,10 @@ const SEED_CHANNELS: CatalogChannel[] = [
 ]
 
 const SEED_PLANS: CatalogPlan[] = [
-  { id: 'CSP-AMY', channelId: 'sales_amy_zhang', promoCode: 'CSP-AMY-PROMO', status: '生效中', rules: [{ skuId: 'KR-Q-2026', mode: '折扣', value: '10' }, { skuId: 'KR-H-2026', mode: '原价售卖', value: '' }, { skuId: 'KR-Y-2026', mode: '立减', value: '50000' }] },
+  { id: 'CSP-AMY', channelId: 'sales_amy_zhang', promoCode: 'CSP-AMY-PROMO', status: '生效中', rules: [{ skuId: 'KR-Q-2026', mode: '折扣', value: '10' }, { skuId: 'KR-H-2026', mode: '原价售卖', value: '' }, { skuId: 'KR-Y-2026', mode: '立减', value: '50000' }, { skuId: 'KR-MY-2026', mode: '折扣', value: '15' }] },
   { id: 'CSP-JISU', channelId: 'kol_jisu_mom', promoCode: 'CSP-JISU-PROMO', status: '生效中', rules: [{ skuId: 'KR-Q-2026', mode: '折扣', value: '10' }, { skuId: 'KR-H-2026', mode: '折扣', value: '15' }] },
   { id: 'CSP-KR-META', channelId: 'ad_kr_meta', promoCode: 'CSP-KR-META-PROMO', status: '生效中', rules: [{ skuId: 'KR-Y-2026', mode: '立减', value: '59600' }, { skuId: 'KR-H-2026', mode: '折扣', value: '10' }] },
-  { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: '生效中', rules: [{ skuId: 'VN-Q-2026', mode: '折扣', value: '10' }, { skuId: 'VN-H-2026', mode: '原价售卖', value: '' }] },
+  { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: '生效中', rules: [{ skuId: 'VN-Q-2026', mode: '折扣', value: '10' }, { skuId: 'VN-H-2026', mode: '原价售卖', value: '' }, { skuId: 'VN-Y-2026', mode: '折扣', value: '15' }, { skuId: 'VN-MY-2026', mode: '立减', value: '500000' }] },
   { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: '生效中', rules: [{ skuId: 'VN-Y-2026', mode: '立减', value: '500000' }, { skuId: 'VN-Q-2026', mode: '折扣', value: '10' }] },
 ]
 
@@ -117,9 +119,14 @@ export function loadMarketingCatalog(): { skus: CatalogSku[]; channels: CatalogC
   } catch {
     saved = null
   }
-  const skus = Array.isArray(saved?.skus) && saved.skus.length ? saved.skus : SEED_SKUS
+  const savedSkus = Array.isArray(saved?.skus) ? saved.skus : []
+  const skus = savedSkus.length
+    ? [...savedSkus, ...SEED_SKUS.filter((sku) => !savedSkus.some((item) => item.id === sku.id))]
+    : SEED_SKUS
   const channels = Array.isArray(saved?.distributors) && saved.distributors.length ? saved.distributors : SEED_CHANNELS
-  const plans = Array.isArray(saved?.channelSkuPlans) && saved.channelSkuPlans.length ? saved.channelSkuPlans : SEED_PLANS
+  const savedPlans = Array.isArray(saved?.channelSkuPlans) ? saved.channelSkuPlans : []
+  const savedHasMax = savedPlans.some((plan) => (plan.rules || []).some((rule) => memberTier(skus.find((sku) => sku.id === rule.skuId)?.memberLevel) === 'Max'))
+  const plans = savedPlans.length && savedHasMax ? savedPlans : SEED_PLANS
   return {
     skus: skus.filter((sku) => sku.status !== '下架'),
     channels,
@@ -159,10 +166,16 @@ export function promosForSku(sku: CatalogSku, plans: CatalogPlan[], channels: Ca
 export type LinkOffer = {
   skuId: string
   skuName: string
+  memberLevel: 'Pro' | 'Max'
   listPrice: number
   payable: number
   currency: string
   ruleLabel: string
+}
+
+export function memberTier(level?: string): 'Pro' | 'Max' {
+  const value = (level || '').toUpperCase()
+  return value === 'MAX' || value === 'PRO_MAX' ? 'Max' : 'Pro'
 }
 
 export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]): LinkOffer[] {
@@ -175,6 +188,7 @@ export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]):
     return [{
       skuId: sku.id,
       skuName: sku.name,
+      memberLevel: memberTier(sku.memberLevel),
       listPrice: priced.original,
       payable: discounted ? applyRule(priced.original, rule.mode, rule.value) : priced.original,
       currency: priced.currency,

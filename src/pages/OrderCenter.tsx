@@ -272,7 +272,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           style={{ width: 160 }}
           value={payMethod}
           onChange={setPayMethod}
-          options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay'].map((l) => ({ label: l, value: l }))}
+          options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay', 'Payment Link'].map((l) => ({ label: l, value: l }))}
         />
         {canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>{d('export')}</Button>}
       </Space>
