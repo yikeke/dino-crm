@@ -54,7 +54,7 @@ export default function PayLinkPage() {
     }
   }, [offerKey])
   const [pickedId, setPickedId] = useState('')
-  const picked = offers.find((offer) => offer.skuId === pickedId) || (offers.length === 1 ? offers[0] : undefined)
+  const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
   const skuName = picked?.skuName || params.get('sku_name') || params.get('sku') || ''
   const currency = picked?.currency || params.get('currency') || ''
   const payable = picked?.payable ?? Number(params.get('payable') || params.get('amount') || 0)
@@ -72,15 +72,17 @@ export default function PayLinkPage() {
     () => findMethods(line, methodKey.split(',').map((item) => item.trim()).filter(Boolean)),
     [line, methodKey],
   )
+  const [methodCode, setMethodCode] = useState('')
+  const activeMethod = methods.find((method) => method.code === methodCode) || methods[0]
+  const showBank = activeMethod?.kind === 'manual'
   const [host, setHost] = useState<PayMethod | null>(null)
-  const [manual, setManual] = useState(false)
   const [acked, setAcked] = useState(false)
   const [copied, setCopied] = useState('')
   const bankRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (manual) bankRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [manual])
+    if (showBank) bankRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [showBank])
 
   const discount = Math.max(list - payable, 0)
   const chargeLabel = type === 'deposit_first' ? copy.first : type === 'deposit_balance' ? copy.balance : copy.total
@@ -97,15 +99,13 @@ export default function PayLinkPage() {
   }
 
   const choose = (method: PayMethod) => {
-    if (offers.length > 1 && !picked) return
     if (method.minAmount && amount < method.minAmount) return
+    setMethodCode(method.code)
+    setAcked(false)
     if (method.kind === 'manual') {
       setHost(null)
-      setManual(true)
-      setAcked(false)
       return
     }
-    setManual(false)
     setHost(method)
   }
 
@@ -145,7 +145,7 @@ export default function PayLinkPage() {
             </div>
           </section>
 
-          {offers.length > 1 && (
+          {offers.length > 0 && (
             <section className="pay-card">
               <p className="pay-methods__title">{copy.chooseSku}</p>
               <div className="pay-method__list">
@@ -154,7 +154,7 @@ export default function PayLinkPage() {
                     key={offer.skuId}
                     type="button"
                     className={`pay-method${picked?.skuId === offer.skuId ? ' is-selected' : ''}`}
-                    onClick={() => { setPickedId(offer.skuId); setManual(false); setAcked(false) }}
+                    onClick={() => setPickedId(offer.skuId)}
                   >
                     <span className="pay-method__info"><span>{offer.skuName}</span></span>
                     <span>{formatMoney(offer.payable, offer.currency)}</span>
@@ -164,7 +164,7 @@ export default function PayLinkPage() {
             </section>
           )}
 
-          {(offers.length <= 1 || picked) && (
+          {picked && (
           <section className="pay-card">
             <div className="pay-row">
               <span>{skuName}</span>
@@ -193,8 +193,8 @@ export default function PayLinkPage() {
             <p className="pay-methods__title">{copy.choose}</p>
             <div className="pay-method__list">
               {methods.map((method) => {
-                const blocked = (offers.length > 1 && !picked) || (!!method.minAmount && amount < method.minAmount)
-                const selected = method.kind === 'manual' && manual
+                const blocked = !!method.minAmount && amount < method.minAmount
+                const selected = method.code === activeMethod?.code
                 return (
                   <button
                     key={method.code}
@@ -218,7 +218,7 @@ export default function PayLinkPage() {
             )}
           </section>
 
-          {manual && (
+          {showBank && (
             <section className="pay-card bank-panel" ref={bankRef}>
               <p className="bank-lead">{bank.instruction}</p>
               <div className="bank-amount">
