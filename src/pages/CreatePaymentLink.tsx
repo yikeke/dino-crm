@@ -76,7 +76,7 @@ function nowText() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-function buildUrl(link: Pick<PaymentLink, 'id' | 'kind' | 'line' | 'skuId' | 'skuName' | 'amount' | 'payable' | 'listPrice' | 'currency' | 'promoCode' | 'depositPlanId' | 'methods'>) {
+function buildUrl(link: Pick<PaymentLink, 'id' | 'kind' | 'line' | 'skuId' | 'skuName' | 'amount' | 'payable' | 'listPrice' | 'currency' | 'promoCode' | 'depositPlanId' | 'methods' | 'phone' | 'customerName'>) {
   const type = link.kind === 'full' ? 'full' : link.kind === 'deposit_first' ? 'deposit_first' : 'deposit_balance'
   const query = new URLSearchParams({
     pay_link: link.id,
@@ -89,6 +89,8 @@ function buildUrl(link: Pick<PaymentLink, 'id' | 'kind' | 'line' | 'skuId' | 'sk
     list: String(link.listPrice),
     currency: link.currency,
     methods: (link.methods || []).join(','),
+    phone: link.phone,
+    customer_name: link.customerName,
   })
   if (link.promoCode) query.set('promo', link.promoCode)
   if (link.depositPlanId) query.set('deposit_plan', link.depositPlanId)

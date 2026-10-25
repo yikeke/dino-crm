@@ -48,32 +48,40 @@
   box-sizing: border-box;
 }
 
-.pay-topbar {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-}
-
-.pay-back {
-  width: 40px;
-  height: 40px;
-  margin-left: -12px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.pay-link-page[dir="rtl"] .pay-back {
-  margin-left: 0;
-  margin-right: -12px;
-  transform: scaleX(-1);
-}
-
+.pay-topbar,
+.pay-back,
+.pay-link-page[dir="rtl"] .pay-back,
 .pay-back img {
+  display: none;
+}
+
+.pay-user {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 4px;
+  color: #fff;
+}
+
+.pay-user p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.86;
+}
+
+.pay-user strong {
   display: block;
-  width: 100%;
-  height: 100%;
+  margin-top: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pay-user span {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .pay-hero {
@@ -256,17 +264,234 @@
   cursor: pointer;
 }
 
-.pay-toast {
-  position: fixed;
-  left: 50%;
-  top: 24px;
-  z-index: 5;
-  width: min(360px, calc(100% - 32px));
-  transform: translateX(-50%);
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: #1d1349;
+.pay-method__go {
+  width: 16px;
+  height: 16px;
+  transform: rotate(-90deg);
+}
+
+.pay-link-page[dir="rtl"] .pay-method__go {
+  transform: rotate(90deg);
+}
+
+.pay-terms--flow {
+  margin-top: 18px;
+}
+
+.bank-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.bank-lead,
+.bank-panel h2,
+.bank-noted h2 {
+  margin: 0;
+  color: #1d1349;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.bank-lead {
   color: #fff;
-  font-size: 14px;
+  font-weight: 500;
+}
+
+.bank-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #fff;
+}
+
+.bank-amount strong {
+  font-size: 28px;
+}
+
+.bank-label {
+  margin: 0;
+  color: #7b7396;
+  font-size: 12px;
+}
+
+.bank-label em {
+  margin-left: 6px;
+  color: #e23b3b;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.bank-ref,
+.bank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bank-ref__value,
+.bank-row__value {
+  margin: 4px 0 0;
+  color: #1d1349;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.bank-copy {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: #e7eeff;
+  cursor: pointer;
+}
+
+.bank-copy img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bank-warn {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #9a4b12;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bank-warn img {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.bank-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.bank-tabs button {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: #e7eeff;
+  color: #1d1349;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bank-tabs button.is-active {
+  background: #6c76ff;
+  color: #fff;
+}
+
+.bank-qr {
   text-align: center;
+}
+
+.bank-qr img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.bank-qr p,
+.bank-copied,
+.bank-noted p {
+  margin: 8px 0 0;
+  color: #7b7396;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bank-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bank-panel .pay-continue {
+  margin-top: 4px;
+}
+
+.psp-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f4f6f8;
+  font-family: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.psp-card {
+  width: min(380px, 100%);
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(20, 24, 40, 0.08);
+  text-align: center;
+}
+
+.psp-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.psp-kicker {
+  margin: 12px 0 0;
+  color: #5c6570;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.psp-card h1 {
+  margin: 8px 0 0;
+  color: #12141a;
+  font-size: 28px;
+}
+
+.psp-sku {
+  margin: 6px 0 20px;
+  color: #5c6570;
+  font-size: 14px;
+}
+
+.psp-pay {
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: #111;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.psp-cancel {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #3f4ad6;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
 }
