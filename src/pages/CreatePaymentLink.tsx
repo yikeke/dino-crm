@@ -68,6 +68,8 @@ type PaymentLink = {
   url: string
   received: boolean
   createdAt: string
+  updatedAt: string
+  sourceLinkId?: string
 }
 
 function loadLinks(): PaymentLink[] {
@@ -152,6 +154,10 @@ export default function CreatePaymentLink() {
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [screen, setScreen] = useState<'list' | 'form'>('list')
+  const [keyword, setKeyword] = useState('')
+  const [typeFilter, setTypeFilter] = useState<string | undefined>()
+  const [statusFilter, setStatusFilter] = useState<string | undefined>()
   const [marking, setMarking] = useState<PaymentLink | null>(null)
   const [paidNote, setPaidNote] = useState('')
   const [proof, setProof] = useState<File | null>(null)
@@ -273,7 +279,9 @@ export default function CreatePaymentLink() {
       orderId: editingId ? links.find((item) => item.id === editingId)?.orderId : undefined,
       url: '',
       received: false,
-      createdAt: nowText(),
+      createdAt: editingId ? (links.find((item) => item.id === editingId)?.createdAt || nowText()) : nowText(),
+      updatedAt: nowText(),
+      sourceLinkId: editingId ? links.find((item) => item.id === editingId)?.sourceLinkId : undefined,
     }
   }
 
@@ -294,6 +302,7 @@ export default function CreatePaymentLink() {
     row.url = buildUrl(row)
     persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
     setEditingId(null)
+    setScreen('list')
     message.success(editingId ? (en ? 'Payment link updated' : '支付链接已更新') : (en ? 'Full payment link created' : '全款链接已生成'))
     resetCustomer()
   }
@@ -312,6 +321,7 @@ export default function CreatePaymentLink() {
     row.url = buildUrl(row)
     persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
     setEditingId(null)
+    setScreen('list')
     message.success(en ? 'Deposit link created' : '定金首款链接已生成')
     resetCustomer()
   }
@@ -322,16 +332,21 @@ export default function CreatePaymentLink() {
       ...first,
       id,
       kind: 'deposit_balance',
-      amount: 0,
-      payable: 0,
+      orderId: undefined,
+      received: false,
+      paidMethod: undefined,
+      transferDeclared: false,
+      sourceLinkId: first.id,
       depositPaid: first.amount,
+      updatedAt: nowText(),
       note: '',
       createdAt: nowText(),
       url: '',
     }
     row.url = buildUrl(row)
     persist([row, ...links])
-    message.success(en ? 'Balance link created' : '尾款链接已生成')
+    setScreen('list')
+    message.success(en ? 'Balance link created. When it is paid, the first payment order is updated. No second order is created.' : '尾款链接已生成。尾款支付后会更新首款那张订单，不另开订单。')
   }
 
   const startEdit = (row: PaymentLink) => {
@@ -348,6 +363,7 @@ export default function CreatePaymentLink() {
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
     setTab(row.kind === 'full' ? 'full' : 'deposit')
+    setScreen('form')
   }
 
   const openMarkPaid = (row: PaymentLink) => {
@@ -361,15 +377,21 @@ export default function CreatePaymentLink() {
       message.warning(en ? 'Upload the payment screenshot' : '请上传用户支付截图')
       return
     }
+    const first = marking.kind === 'deposit_balance'
+      ? links.find((item) => item.kind === 'deposit_first' && item.depositPlanId === marking.depositPlanId)
+      : undefined
     const offer = marking.offers?.[0]
     settlePaymentLink(marking.id, {
       methodName: 'bank_transfer',
       skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : marking.skuName,
       amount: marking.amount || offer?.payable || marking.payable,
+      packageAmount: offer?.payable || marking.payable,
       currency: marking.currency,
       userId: marking.userId,
       note: paidNote.trim(),
       proofName: proof.name,
+      leg: marking.kind,
+      existingOrderId: first?.orderId,
     })
     setLinks(loadLinks())
     setMarking(null)
@@ -496,15 +518,14 @@ export default function CreatePaymentLink() {
   )
 
   const columns = (mode: 'full' | 'deposit') => [
-    { title: en ? 'Created' : '创建时间', dataIndex: 'createdAt', width: 150 },
     {
       title: en ? 'Type' : '类型',
       dataIndex: 'kind',
       width: 110,
       render: (kind: LinkKind) => {
         if (kind === 'full') return <Tag color="green">{en ? 'Full' : '全款'}</Tag>
-        if (kind === 'deposit_first') return <Tag color="orange">{en ? 'First' : '定金首款'}</Tag>
-        return <Tag color="gold">{en ? 'Balance' : '定金尾款'}</Tag>
+        if (kind === 'deposit_first') return <Tag color="orange">{en ? 'Deposit first' : '定金首款'}</Tag>
+        return <Tag color="gold">{en ? 'Deposit balance' : '定金尾款'}</Tag>
       },
     },
     {
@@ -528,26 +549,21 @@ export default function CreatePaymentLink() {
       ),
     },
     {
-      title: en ? 'This link' : '本链接金额',
-      render: (_: unknown, row: PaymentLink) => (
-        <div>
-          <b>{formatMoney(row.amount, row.currency)}</b>
-          <div>
-            <Typography.Text type="secondary">
-              {en ? 'Package ' : '套餐应付 '}
-              {formatMoney(row.payable, row.currency)}
-            </Typography.Text>
-          </div>
-        </div>
-      ),
+      title: en ? 'Link amount' : '链接金额',
+      render: (_: unknown, row: PaymentLink) => {
+        const prices = (row.offers || []).map((offer) => offer.payable).filter((value) => value > 0)
+        if (row.kind === 'deposit_first') return <b>{formatMoney(row.amount, row.currency)}</b>
+        if (row.kind === 'deposit_balance') return <span>{en ? 'Balance of ' : '尾款，关联 '}{row.sourceLinkId || row.depositPlanId}</span>
+        if (prices.length > 1) {
+          const min = Math.min(...prices)
+          const max = Math.max(...prices)
+          return <b>{min === max ? formatMoney(min, row.currency) : `${formatMoney(min, row.currency)} – ${formatMoney(max, row.currency)}`}</b>
+        }
+        return <b>{formatMoney(prices[0] || row.amount || row.payable, row.currency)}</b>
+      },
     },
     {
-      title: 'Promo',
-      dataIndex: 'promoCode',
-      render: (code: string) => code ? <Typography.Text code>{code}</Typography.Text> : '—',
-    },
-    {
-      title: en ? 'Methods' : '支付方式',
+      title: en ? 'Payment methods' : '包含的支付方式',
       render: (_: unknown, row: PaymentLink) => (row.methods || []).join(' / ') || '—',
     },
     {
@@ -561,6 +577,8 @@ export default function CreatePaymentLink() {
         return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
       },
     },
+    { title: en ? 'Created' : '创建时间', dataIndex: 'createdAt', width: 150 },
+    { title: en ? 'Updated' : '更新时间', width: 150, render: (_: unknown, row: PaymentLink) => row.updatedAt || row.createdAt },
     {
       title: en ? 'Actions' : '操作',
       width: 280,
@@ -579,7 +597,7 @@ export default function CreatePaymentLink() {
             {row.orderId && (
               <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
             )}
-            {mode === 'deposit' && row.kind === 'deposit_first' && row.received && !balance && (
+            {row.kind === 'deposit_first' && row.orderId && !balance && (
               <Button size="small" type="primary" onClick={() => createBalance(row)}>{en ? 'Balance link' : '生成尾款链接'}</Button>
             )}
           </Space>
@@ -588,43 +606,100 @@ export default function CreatePaymentLink() {
     },
   ]
 
-  const fullRows = links.filter((item) => item.kind === 'full')
-  const depositRows = links.filter((item) => item.kind !== 'full')
+  const rows = links.filter((row) => {
+    const text = [row.phone, row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase()
+    if (keyword.trim() && !text.includes(keyword.trim().toLowerCase())) return false
+    if (typeFilter && row.kind !== typeFilter) return false
+    if (statusFilter === 'paid' && !row.orderId) return false
+    if (statusFilter === 'bank' && !canMarkBankPaid(row)) return false
+    if (statusFilter === 'callback' && (row.orderId || canMarkBankPaid(row))) return false
+    return true
+  })
+
+  const openCreate = (kind: 'full' | 'deposit') => {
+    setEditingId(null)
+    resetCustomer()
+    setTab(kind)
+    setScreen('form')
+  }
+
+  if (screen === 'form') {
+    return (
+      <div style={{ display: 'grid', gap: 16 }}>
+        <Space>
+          <Button onClick={() => { setEditingId(null); setScreen('list') }}>{en ? 'Back to list' : '返回列表'}</Button>
+          <Typography.Text strong>
+            {tab === 'full' ? (en ? 'Full payment link' : '全款支付链接') : (en ? 'Deposit payment link' : '定金支付链接')}
+          </Typography.Text>
+        </Space>
+        {tab === 'deposit' && (
+          <Alert
+            type="info"
+            showIcon
+            message={en
+              ? 'Deposit uses one order. The first payment opens it as partially paid. The balance link points at that order and, once paid, updates the same order. The two payments stay as separate lines.'
+              : '定金只用一张订单。首款支付后订单是部分付款。尾款链接关联这张订单，付完后更新同一张订单，不另开订单。两笔付款各自保留。'}
+          />
+        )}
+        {formCard(tab)}
+        <Modal
+          title={en ? 'Confirm bank transfer received' : '确认银行转账已支付'}
+          open={!!marking}
+          okText={en ? 'Confirm paid' : '确认已支付'}
+          cancelText={en ? 'Cancel' : '取消'}
+          okButtonProps={{ disabled: !proof }}
+          onOk={confirmMarkPaid}
+          onCancel={() => setMarking(null)}
+          destroyOnClose
+        >
+          <Form layout="vertical">
+            <Form.Item label={en ? 'Note' : '备注'}>
+              <Input.TextArea rows={3} value={paidNote} onChange={(event) => setPaidNote(event.target.value)} placeholder={en ? 'Optional note for this transfer' : '可填写这笔转账的说明'} />
+            </Form.Item>
+            <Form.Item label={en ? 'Payment screenshot' : '用户支付截图'} required>
+              <Upload.Dragger
+                accept="image/*"
+                maxCount={1}
+                fileList={proof ? [{ uid: 'proof', name: proof.name, status: 'done' }] : []}
+                beforeUpload={(file) => { setProof(file); return false }}
+                onRemove={() => { setProof(null); return true }}
+              >
+                <p><InboxOutlined /></p>
+                <p>{en ? 'Upload the customer’s transfer screenshot' : '上传用户的转账截图，确认后才会标记已支付'}</p>
+              </Upload.Dragger>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <Alert
-        type="info"
-        showIcon
-        message={en ? 'Pick a channel. The payment link includes every SKU on that channel’s price plan, and you only choose whether to apply the promo.' : '先选渠道。链接带上该渠道价格方案里的全部 SKU，只选择用不用优惠。这是给某一个客户的 CC 支付链接，和落地页并列。'}
-        action={<Button size="small" icon={<ReloadOutlined />} onClick={reloadCatalog}>{en ? 'Reload catalog' : '刷新货盘'}</Button>}
-      />
-      <Tabs
-        activeKey={tab}
-        onChange={(key) => setTab(key as 'full' | 'deposit')}
-        items={[
-          {
-            key: 'full',
-            label: en ? 'Full Payment' : '全款支付',
-            children: (
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                {formCard('full')}
-                <Table rowKey="id" size="middle" columns={columns('full')} dataSource={fullRows} pagination={false} locale={{ emptyText: en ? 'No full payment links yet' : '还没有全款链接' }} />
-              </Space>
-            ),
-          },
-          {
-            key: 'deposit',
-            label: en ? 'Deposit' : '定金（首款 / 尾款）',
-            children: (
-              <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                {formCard('deposit')}
-                <Table rowKey="id" size="middle" columns={columns('deposit')} dataSource={depositRows} pagination={false} locale={{ emptyText: en ? 'No deposit plans yet' : '还没有定金计划' }} />
-              </Space>
-            ),
-          },
-        ]}
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <Space wrap>
+          <Input allowClear placeholder={en ? 'Phone / User ID / link' : '手机号 / User ID / 链接'} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} />
+          <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}
+            options={[
+              { value: 'full', label: en ? 'Full' : '全款' },
+              { value: 'deposit_first', label: en ? 'Deposit first' : '定金首款' },
+              { value: 'deposit_balance', label: en ? 'Deposit balance' : '定金尾款' },
+            ]}
+          />
+          <Select allowClear placeholder={en ? 'Status' : '状态'} value={statusFilter} onChange={setStatusFilter} style={{ width: 180 }}
+            options={[
+              { value: 'callback', label: en ? 'Waiting for callback' : '等待支付回调' },
+              { value: 'bank', label: en ? 'Awaiting transfer confirmation' : '待确认转账' },
+              { value: 'paid', label: en ? 'Paid' : '已支付' },
+            ]}
+          />
+        </Space>
+        <Space>
+          <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New full payment link' : '新建全款支付链接'}</Button>
+          <Button icon={<LinkOutlined />} onClick={() => openCreate('deposit')}>{en ? 'New deposit link' : '新建定金支付链接'}</Button>
+        </Space>
+      </div>
+      <Table rowKey="id" size="middle" columns={columns('full')} dataSource={rows} pagination={false} locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }} />
       <Modal
         title={en ? 'Confirm bank transfer received' : '确认银行转账已支付'}
         open={!!marking}

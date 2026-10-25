@@ -103,12 +103,20 @@ export default function PayLinkPage() {
   const pay = (methodName: string) => {
     if (paidOrderId) return
     if (!picked && offers.length > 0) return
+    const stored = readPaymentLinks().find((item) => item.id === payLink)
+    const leg = stored?.kind === 'deposit_balance' || stored?.kind === 'deposit_first' ? stored.kind : 'full'
+    const first = leg === 'deposit_balance'
+      ? readPaymentLinks().find((item) => item.kind === 'deposit_first' && item.depositPlanId && item.depositPlanId === stored?.depositPlanId)
+      : undefined
     const settled = settlePaymentLink(payLink || `PL-${Date.now()}`, {
       methodName,
       skuName: `${memberTier(picked?.memberLevel)} · ${skuName}`,
       amount,
+      packageAmount: payable,
       currency,
       userId: userId || undefined,
+      leg,
+      existingOrderId: first?.orderId,
     })
     setPaidOrderId(settled?.orderId || paidOrderId)
     setHost(null)
