@@ -49,6 +49,7 @@ type PaymentLink = {
   promoLabel: string
   payable: number
   amount: number
+  depositPaid?: number
   phone: string
   customerName: string
   note: string
@@ -102,6 +103,7 @@ function buildUrl(link: PaymentLink) {
   })
   if (link.promoCode) query.set('promo', link.promoCode)
   if (link.depositPlanId) query.set('deposit_plan', link.depositPlanId)
+  if (link.kind === 'deposit_balance') query.set('deposit_paid', String(link.depositPaid || 0))
   const root = import.meta.env.BASE_URL.replace(/\/$/, '')
   return `${window.location.origin}${root}/#/lp/pay-link?${query.toString()}`
 }
@@ -122,7 +124,7 @@ export default function CreatePaymentLink() {
   const [links, setLinks] = useState<PaymentLink[]>(() => loadLinks())
   const [line, setLine] = useState('')
   const [channelId, setChannelId] = useState('')
-  const [skuIds, setSkuIds] = useState<string[]>([])
+  const [usePromo, setUsePromo] = useState(true)
   const [phone, setPhone] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [note, setNote] = useState('')
@@ -146,14 +148,18 @@ export default function CreatePaymentLink() {
   )
   const activeChannel = lineChannels.find((item) => item.channel.id === channelId) || lineChannels.find((item) => item.plan) || lineChannels[0]
   const planOffers = offersOnPlan(activeChannel?.plan, catalog.skus)
-  const chosen = planOffers.filter((offer) => skuIds.includes(offer.skuId))
-  const single = chosen.length === 1 ? chosen[0] : undefined
-  const currency = single?.currency || chosen[0]?.currency || ''
+  const hasDiscount = !!activeChannel?.plan?.promoCode && planOffers.some((offer) => offer.ruleLabel !== '原价')
+  const shown = planOffers.map((offer) => (
+    usePromo && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: '原价' }
+  ))
+  const currency = shown[0]?.currency || ''
+  const lowestPayable = shown.reduce((min, offer) => Math.min(min, offer.payable), shown[0]?.payable || 0)
 
   useEffect(() => {
     const next = lineChannels.find((item) => item.plan && item.channel.type === '销售') || lineChannels.find((item) => item.plan)
+    const offers = offersOnPlan(next?.plan, catalog.skus)
     setChannelId(next?.channel.id || '')
-    setSkuIds(offersOnPlan(next?.plan, catalog.skus).map((offer) => offer.skuId))
+    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== '原价'))
     setFirstAmount(null)
   }, [activeLine, catalog.skus, lineChannels])
 
@@ -180,21 +186,14 @@ export default function CreatePaymentLink() {
   const onChannel = (value: string) => {
     setChannelId(value)
     const next = lineChannels.find((item) => item.channel.id === value)
-    setSkuIds(offersOnPlan(next?.plan, catalog.skus).map((offer) => offer.skuId))
+    const offers = offersOnPlan(next?.plan, catalog.skus)
+    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== '原价'))
     setFirstAmount(null)
   }
 
-  const requireCustomer = (mode: 'full' | 'deposit') => {
-    if (!activeChannel?.plan) {
+  const requireCustomer = () => {
+    if (!activeChannel?.plan || !shown.length) {
       message.warning(en ? 'This channel has no active price plan' : '这个渠道还没有生效中的价格方案')
-      return false
-    }
-    if (!chosen.length) {
-      message.warning(en ? 'Select at least one SKU from the price plan' : '请从价格方案里至少选择一个 SKU')
-      return false
-    }
-    if (mode === 'deposit' && chosen.length !== 1) {
-      message.warning(en ? 'A deposit link can include only one SKU' : '定金链接只能包含一个 SKU')
       return false
     }
     if (!phone.trim()) {
@@ -209,10 +208,8 @@ export default function CreatePaymentLink() {
   }
 
   const baseFields = (kind: LinkKind, amount: number, depositPlanId: string, id: string): PaymentLink => {
-    const offer = chosen[0]
-    const promo = activeChannel?.plan?.promoCode && chosen.some((item) => item.ruleLabel !== '原价')
-      ? activeChannel.plan.promoCode
-      : ''
+    const offer = shown[0]
+    const promo = usePromo && hasDiscount ? (activeChannel?.plan?.promoCode || '') : ''
     return {
       id,
       kind,
@@ -222,14 +219,14 @@ export default function CreatePaymentLink() {
       channelName: activeChannel?.channel.name || '',
       channelCode: activeChannel?.channel.channelCode || '',
       planId: activeChannel?.plan?.id || '',
-      offers: chosen,
-      skuId: chosen.map((item) => item.skuId).join(','),
-      skuName: chosen.map((item) => item.skuName).join(' / '),
+      offers: shown,
+      skuId: shown.map((item) => item.skuId).join(','),
+      skuName: shown.map((item) => item.skuName).join(' / '),
       currency: offer?.currency || '',
       listPrice: offer?.listPrice || 0,
       promoCode: promo,
       promoLabel: promo,
-      payable: kind === 'full' && chosen.length > 1 ? 0 : (offer?.payable || 0),
+      payable: shown.length === 1 ? offer.payable : 0,
       amount,
       phone: phone.trim(),
       customerName: customerName.trim(),
@@ -242,9 +239,9 @@ export default function CreatePaymentLink() {
   }
 
   const createFull = () => {
-    if (!requireCustomer('full')) return
+    if (!requireCustomer()) return
     const id = newId('PL')
-    const amount = chosen.length === 1 ? chosen[0].payable : 0
+    const amount = shown.length === 1 ? shown[0].payable : 0
     const row = baseFields('full', amount, '', id)
     row.url = buildUrl(row)
     persist([row, ...links])
@@ -253,10 +250,10 @@ export default function CreatePaymentLink() {
   }
 
   const createDepositFirst = () => {
-    if (!requireCustomer('deposit') || !single) return
+    if (!requireCustomer()) return
     const amount = Math.round(Number(firstAmount) || 0)
-    if (amount <= 0 || amount >= single.payable) {
-      message.warning(en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于套餐应付金额')
+    if (amount <= 0 || amount >= lowestPayable) {
+      message.warning(en ? 'First payment must be greater than 0 and less than every package price on this plan' : '首款必须大于 0，且小于方案里每一个套餐的应付金额')
       return
     }
     const id = newId('PL')
@@ -270,13 +267,13 @@ export default function CreatePaymentLink() {
 
   const createBalance = (first: PaymentLink) => {
     const id = newId('PL')
-    const amount = first.payable - first.amount
     const row: PaymentLink = {
       ...first,
       id,
       kind: 'deposit_balance',
-      amount,
-      received: false,
+      amount: 0,
+      payable: 0,
+      depositPaid: first.amount,
       note: '',
       createdAt: nowText(),
       url: '',
@@ -317,27 +314,35 @@ export default function CreatePaymentLink() {
         <Form.Item
           label={en ? 'Channel SKU price plan' : '渠道 SKU 价格方案'}
           required
-          extra={mode === 'deposit'
-            ? (en ? 'A deposit link keeps exactly one SKU from this plan. Promo comes with the plan.' : '定金链接从这套方案里只保留一个 SKU。优惠码跟着方案走，不用再单独选。')
-            : (en ? 'Check one SKU, or several. The customer picks among them. Promo comes with the plan.' : '可以只放一个 SKU，也可以多选。用户打开后在这些 SKU 里选。优惠码跟着这套方案走。')}
+          extra={en
+            ? 'Every SKU on this channel plan is included. Choose whether the whole page uses the plan promo or list price.'
+            : '价格方案里有几个 SKU 就全部展示。只选择整页使用优惠，或全部按原价。'}
         >
           {activeChannel?.plan ? (
             <div>
-              <Typography.Paragraph style={{ marginBottom: 8 }}>
-                {activeChannel.plan.promoCode
-                  ? <><Tag>{activeChannel.plan.promoCode}</Tag>{en ? 'Promo on this plan' : '本方案 Promo Code'}</>
-                  : (en ? 'This plan has no promo code. Selected SKUs sell at list price.' : '这套方案没有 Promo Code，选中的 SKU 按原价。')}
-              </Typography.Paragraph>
-              <Checkbox.Group value={skuIds} onChange={(value) => setSkuIds(value as string[])}>
-                <Space direction="vertical">
-                  {planOffers.map((offer) => (
-                    <Checkbox key={offer.skuId} value={offer.skuId}>
-                      {offer.skuName} · {formatMoney(offer.listPrice, offer.currency)}
-                      {offer.ruleLabel !== '原价' ? ` → ${formatMoney(offer.payable, offer.currency)}（${offer.ruleLabel}）` : ` · ${offer.ruleLabel}`}
-                    </Checkbox>
-                  ))}
-                </Space>
-              </Checkbox.Group>
+              <Select
+                style={{ minWidth: 320, marginBottom: 12 }}
+                disabled={!hasDiscount}
+                value={hasDiscount && usePromo ? 'yes' : 'no'}
+                options={hasDiscount
+                  ? [
+                    { value: 'yes', label: en ? `Use promo · ${activeChannel.plan.promoCode}` : `使用优惠 · ${activeChannel.plan.promoCode}` },
+                    { value: 'no', label: en ? 'No promo (list price for every SKU)' : '不使用优惠（全部按原价）' },
+                  ]
+                  : [{ value: 'no', label: en ? 'No promo on this plan. Every SKU stays at list price.' : '当前方案无优惠，全部按原价售卖' }]}
+                onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
+              />
+              <Space direction="vertical" size={4}>
+                {shown.map((offer) => (
+                  <div key={offer.skuId}>
+                    <b>{offer.skuName}</b>
+                    {' · '}
+                    {offer.payable !== offer.listPrice
+                      ? <>{formatMoney(offer.listPrice, offer.currency)} → {formatMoney(offer.payable, offer.currency)}（{offer.ruleLabel}）</>
+                      : <>{formatMoney(offer.listPrice, offer.currency)} · {en ? 'List price' : '原价'}</>}
+                  </div>
+                ))}
+              </Space>
             </div>
           ) : (
             <Typography.Text type="secondary">{en ? 'Pick a channel that already has a price plan.' : '请选择已经配好价格方案的渠道。'}</Typography.Text>
@@ -353,11 +358,11 @@ export default function CreatePaymentLink() {
           <Form.Item label={en ? 'Note' : '备注'} style={{ minWidth: 240 }}>
             <Input value={note} onChange={(event) => setNote(event.target.value)} />
           </Form.Item>
-          {mode === 'deposit' && single && (
+          {mode === 'deposit' && shown.length > 0 && (
             <Form.Item label={en ? 'First payment' : '首款金额'} required style={{ minWidth: 180 }}>
               <InputNumber
                 min={1}
-                max={Math.max(single.payable - 1, 1)}
+                max={Math.max(lowestPayable - 1, 1)}
                 value={firstAmount}
                 onChange={(value) => setFirstAmount(typeof value === 'number' ? value : null)}
                 style={{ width: '100%' }}
@@ -384,11 +389,11 @@ export default function CreatePaymentLink() {
             </Space>
           </Checkbox.Group>
         </Form.Item>
-        {mode === 'deposit' && single && (
+        {mode === 'deposit' && shown.length > 0 && (
           <Typography.Paragraph type="secondary">
             {en ? 'Balance after this first payment: ' : '付完这笔首款后，尾款为 '}
-            <b>{formatMoney(Math.max(single.payable - Math.round(Number(firstAmount) || 0), 0), currency)}</b>
-            {en ? '. The balance link stays on the same SKU and channel plan.' : '。尾款链接仍用同一个 SKU 和这套渠道价格方案。'}
+            <b>{formatMoney(Math.max(lowestPayable - Math.round(Number(firstAmount) || 0), 0), currency)}</b>
+            {en ? '. This first payment stays below every package, so the customer can still choose a SKU on the page.' : '。这笔首款低于方案里每一个套餐，用户仍可在页面上选择 SKU。'}
           </Typography.Paragraph>
         )}
         <Button type="primary" icon={<LinkOutlined />} onClick={mode === 'full' ? createFull : createDepositFirst}>
@@ -490,7 +495,7 @@ export default function CreatePaymentLink() {
       <Alert
         type="info"
         showIcon
-        message={en ? 'Pick a channel, then choose one or more SKUs from that channel’s price plan. The promo code belongs to the plan. This is the CC payment link for one customer, alongside landing pages.' : '先选渠道，再从该渠道的价格方案里勾选一个或多个 SKU。Promo Code 属于这套方案。这是给某一个客户的 CC 支付链接，和落地页并列。'}
+        message={en ? 'Pick a channel. The payment link includes every SKU on that channel’s price plan, and you only choose whether to apply the promo.' : '先选渠道。链接带上该渠道价格方案里的全部 SKU，只选择用不用优惠。这是给某一个客户的 CC 支付链接，和落地页并列。'}
         action={<Button size="small" icon={<ReloadOutlined />} onClick={reloadCatalog}>{en ? 'Reload catalog' : '刷新货盘'}</Button>}
       />
       <Tabs

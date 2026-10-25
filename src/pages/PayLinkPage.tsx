@@ -61,7 +61,12 @@ export default function PayLinkPage() {
   const list = picked?.listPrice ?? Number(params.get('list') || payable)
   const promo = params.get('promo') || ''
   const type = params.get('type') || 'full'
-  const amount = type === 'full' ? payable : Number(params.get('amount') || 0)
+  const depositPaid = Number(params.get('deposit_paid') || 0)
+  const amount = type === 'deposit_first'
+    ? Number(params.get('amount') || 0)
+    : type === 'deposit_balance'
+      ? Math.max(payable - depositPaid, 0)
+      : payable
   const methodKey = params.get('methods') || ''
   const methods = useMemo(
     () => findMethods(line, methodKey.split(',').map((item) => item.trim()).filter(Boolean)),
