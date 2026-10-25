@@ -23,6 +23,7 @@ export type PayCopy = {
   packageDue: string
   installment: string
   forLink: string
+  chooseSku: string
   dir: 'ltr' | 'rtl'
 }
 
@@ -71,39 +72,39 @@ const COPY: Record<string, PayCopy> = {
   韩国: {
     title: '결제', discount: '할인', total: '합계', choose: '결제 수단 선택', pay: '결제하기',
     cancel: '언제든 취소 가능 · ', terms: '이용약관', privacy: '개인정보 처리방침',
-    first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', dir: 'ltr',
+    first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택', dir: 'ltr',
   },
   越南: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
     cancel: 'Hủy bất cứ lúc nào · ', terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
-    first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', dir: 'ltr',
+    first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói', dir: 'ltr',
   },
   马来: {
     title: 'Pembayaran', discount: 'Diskaun', total: 'Jumlah', choose: 'Pilih kaedah pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batal bila-bila masa · ', terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
-    first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', dir: 'ltr',
+    first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan', dir: 'ltr',
   },
   沙特: {
     title: 'الدفع', discount: 'الخصم', total: 'الإجمالي', choose: 'اختر طريقة الدفع', pay: 'ادفع الآن',
     cancel: 'يمكن الإلغاء في أي وقت · ', terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
-    first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', dir: 'rtl',
+    first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة', dir: 'rtl',
   },
   泰国: {
     title: 'ชำระเงิน', discount: 'ส่วนลด', total: 'ยอดรวม', choose: 'เลือกวิธีชำระเงิน', pay: 'ชำระเงินตอนนี้',
     cancel: 'ยกเลิกได้ทุกเมื่อ · ', terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
-    first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', dir: 'ltr',
+    first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ', dir: 'ltr',
   },
   印尼: {
     title: 'Pembayaran', discount: 'Diskon', total: 'Total', choose: 'Pilih metode pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batalkan kapan saja · ', terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
-    first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', dir: 'ltr',
+    first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket', dir: 'ltr',
   },
 }
 
 const EN: PayCopy = {
   title: 'Payment', discount: 'Discount', total: 'Total', choose: 'Choose Payment Method', pay: 'Pay now',
   cancel: 'Cancel anytime · ', terms: 'Terms of Service', privacy: 'Privacy Policy',
-  first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: '', forLink: 'Payment link for', dir: 'ltr',
+  first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: '', forLink: 'Payment link for', chooseSku: 'Choose a plan', dir: 'ltr',
 }
 
 export function methodsForLine(line: string): PayMethod[] {

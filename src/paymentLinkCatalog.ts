@@ -156,10 +156,47 @@ export function promosForSku(sku: CatalogSku, plans: CatalogPlan[], channels: Ca
   return options
 }
 
-export function linesInCatalog(skus: CatalogSku[]): string[] {
+export type LinkOffer = {
+  skuId: string
+  skuName: string
+  listPrice: number
+  payable: number
+  currency: string
+  ruleLabel: string
+}
+
+export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]): LinkOffer[] {
+  if (!plan) return []
+  return (plan.rules || []).flatMap((rule) => {
+    const sku = skus.find((item) => item.id === rule.skuId)
+    if (!sku) return []
+    const priced = pricedSku(sku)
+    const discounted = rule.mode !== '原价售卖'
+    return [{
+      skuId: sku.id,
+      skuName: sku.name,
+      listPrice: priced.original,
+      payable: discounted ? applyRule(priced.original, rule.mode, rule.value) : priced.original,
+      currency: priced.currency,
+      ruleLabel: discounted ? ruleLabel(rule.mode, rule.value, priced.currency) : '原价',
+    }]
+  })
+}
+
+export function channelsOnLine(line: string, channels: CatalogChannel[], plans: CatalogPlan[]) {
+  return channels
+    .filter((channel) => channel.line === line && channel.enabled !== false)
+    .map((channel) => ({
+      channel,
+      plan: plans.find((plan) => plan.channelId === channel.id && (!plan.status || plan.status === '生效中')),
+    }))
+    .sort((a, b) => Number(a.channel.type !== '销售') - Number(b.channel.type !== '销售'))
+}
+
+export function linesInCatalog(skus: CatalogSku[], channels: CatalogChannel[] = []): string[] {
   const seen: string[] = []
-  for (const sku of skus) {
-    if (sku.line && !seen.includes(sku.line)) seen.push(sku.line)
+  for (const name of [...channels.map((item) => item.line), ...skus.map((item) => item.line)]) {
+    if (name && !seen.includes(name)) seen.push(name)
   }
   return seen
 }

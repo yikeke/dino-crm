@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatMoney } from '../paymentLinkCatalog'
+import { formatMoney, type LinkOffer } from '../paymentLinkCatalog'
 import { findMethods, payCopy, type PayMethod } from '../paymentMethods'
 import './PayLinkPage.css'
 
@@ -42,16 +42,29 @@ export default function PayLinkPage() {
   const [params] = useSearchParams()
   const line = params.get('line') || '韩国'
   const copy = payCopy(line)
-  const skuName = params.get('sku_name') || params.get('sku') || ''
-  const currency = params.get('currency') || ''
-  const amount = Number(params.get('amount') || 0)
-  const payable = Number(params.get('payable') || amount)
-  const list = Number(params.get('list') || payable)
-  const promo = params.get('promo') || ''
-  const type = params.get('type') || 'full'
   const phone = params.get('phone') || ''
   const customerName = params.get('customer_name') || ''
+  const channelName = params.get('channel_name') || ''
+  const channelCode = params.get('channel_code') || ''
   const payLink = params.get('pay_link') || ''
+  const offerKey = params.get('offers') || ''
+  const offers = useMemo(() => {
+    try {
+      const parsed = JSON.parse(offerKey) as LinkOffer[]
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }, [offerKey])
+  const [pickedId, setPickedId] = useState('')
+  const picked = offers.find((offer) => offer.skuId === pickedId) || (offers.length === 1 ? offers[0] : undefined)
+  const skuName = picked?.skuName || params.get('sku_name') || params.get('sku') || ''
+  const currency = picked?.currency || params.get('currency') || ''
+  const payable = picked?.payable ?? Number(params.get('payable') || params.get('amount') || 0)
+  const list = picked?.listPrice ?? Number(params.get('list') || payable)
+  const promo = params.get('promo') || ''
+  const type = params.get('type') || 'full'
+  const amount = type === 'full' ? payable : Number(params.get('amount') || 0)
   const methodKey = params.get('methods') || ''
   const methods = useMemo(
     () => findMethods(line, methodKey.split(',').map((item) => item.trim()).filter(Boolean)),
@@ -115,6 +128,7 @@ export default function PayLinkPage() {
             <p>{copy.forLink}</p>
             <strong>{customerName || phone || '—'}</strong>
             {customerName && phone && <span>{phone}</span>}
+            {channelName && <span>{channelName}{channelCode ? ` · ${channelCode}` : ''}</span>}
           </header>
           <section className="pay-hero">
             <h1 className="pay-hero__title">{copy.title}</h1>
@@ -123,6 +137,22 @@ export default function PayLinkPage() {
             </div>
           </section>
 
+          {offers.length > 1 && !picked && (
+            <section className="pay-card">
+              <p className="pay-methods__title">{copy.chooseSku}</p>
+              <div className="pay-method__list">
+                {offers.map((offer) => (
+                  <button key={offer.skuId} type="button" className="pay-method" onClick={() => setPickedId(offer.skuId)}>
+                    <span className="pay-method__info"><span>{offer.skuName}</span></span>
+                    <span>{formatMoney(offer.payable, offer.currency)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {(offers.length <= 1 || picked) && (
+          <>
           <section className="pay-card">
             <div className="pay-row">
               <span>{skuName}</span>
@@ -241,6 +271,9 @@ export default function PayLinkPage() {
               <p className="bank-ref__value">{note}</p>
               <button className="psp-cancel" type="button" onClick={() => { setManual(false); setAcked(false) }}>{BANK.change}</button>
             </section>
+          )}
+
+          </>
           )}
 
           <p className="pay-terms pay-terms--flow">
