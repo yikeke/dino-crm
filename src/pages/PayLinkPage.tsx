@@ -1,31 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatMoney, type LinkOffer } from '../paymentLinkCatalog'
-import { findMethods, payCopy, type PayMethod } from '../paymentMethods'
+import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
 import './PayLinkPage.css'
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
-
-const BANK = {
-  instruction: 'Mở ứng dụng ngân hàng. Chuyển đúng số tiền này và giữ nguyên nội dung bên dưới.',
-  amount: 'Số tiền cần chuyển',
-  step1: 'Bước 1 · Sao chép nội dung chuyển khoản, rồi mở ứng dụng ngân hàng',
-  note: 'Nội dung chuyển khoản',
-  mandatory: 'Bắt buộc',
-  warning: 'Nhập đúng nội dung này khi chuyển khoản. Nếu thiếu hoặc sai, chúng tôi không thể mở hội viên cho bạn.',
-  stepQr: 'Bước 2 · Quét mã này trong ứng dụng ngân hàng',
-  stepManual: 'Bước 2 · Nhập thông tin này trong ứng dụng ngân hàng',
-  tabQr: 'Quét mã QR',
-  tabManual: 'Nhập thông tin',
-  qrHint: 'Dùng điện thoại? Chụp màn hình rồi chọn ảnh này trong ứng dụng ngân hàng.',
-  bank: 'Ngân hàng',
-  accountName: 'Tên tài khoản',
-  accountNumber: 'Số tài khoản',
-  transferred: 'Tôi đã chuyển khoản',
-  change: 'Đổi phương thức thanh toán',
-  notedTitle: 'Chúng tôi đã ghi nhận thông báo chuyển khoản',
-  notedBody: 'Chúng tôi chỉ mở hội viên sau khi xác nhận đã nhận thanh toán. Vào ngày làm việc, việc này thường xong trong vòng 1 giờ.',
-}
 
 const RECEIVER = {
   bank: 'Vietcombank',
@@ -38,10 +17,30 @@ function transferNote(payLink: string) {
   return `DINO${tail}`
 }
 
+function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string; onChange: (next: ReviewLang) => void }) {
+  const options: { id: ReviewLang; label: string }[] = [
+    { id: 'en', label: 'EN' },
+    { id: 'zh', label: '中文' },
+    { id: 'local', label: localLangLabel(line) },
+  ]
+  return (
+    <div className="review-lang" dir="ltr">
+      <span>评审</span>
+      {options.map((item) => (
+        <button key={item.id} type="button" className={lang === item.id ? 'is-on' : ''} onClick={() => onChange(item.id)}>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function PayLinkPage() {
   const [params] = useSearchParams()
   const line = params.get('line') || '韩国'
-  const copy = payCopy(line)
+  const [lang, setLang] = useState<ReviewLang>('local')
+  const copy = payCopy(line, lang)
+  const bank = bankCopy(lang)
   const phone = params.get('phone') || ''
   const customerName = params.get('customer_name') || ''
   const payLink = params.get('pay_link') || ''
@@ -108,6 +107,7 @@ export default function PayLinkPage() {
   if (host) {
     return (
       <div className="psp-page">
+        <ReviewSwitch lang={lang} line={line} onChange={setLang} />
         <div className="psp-card">
           <img className="psp-logo" src={host.icon} alt="" />
           <p className="psp-kicker">{host.name}</p>
@@ -126,6 +126,7 @@ export default function PayLinkPage() {
         <div className="pay-bg" aria-hidden="true">
           <img src={asset('bg.png')} alt="" />
         </div>
+        <ReviewSwitch lang={lang} line={line} onChange={setLang} />
         <div className="pay-shell">
           <header className="pay-user">
             <p>{copy.forLink}</p>
@@ -198,7 +199,7 @@ export default function PayLinkPage() {
                   >
                     <span className="pay-method__info">
                       <span className="pay-method__icon"><img src={method.icon} alt="" /></span>
-                      <span>{method.name}</span>
+                      <span>{methodDisplayName(method, lang)}</span>
                     </span>
                     {method.kind === 'redirect' && !blocked && (
                       <img className="pay-method__go" src={asset('icon-arrow-down.png')} alt="" />
@@ -214,14 +215,14 @@ export default function PayLinkPage() {
 
           {manual && (
             <section className="pay-card bank-panel" ref={bankRef}>
-              <p className="bank-lead">{BANK.instruction}</p>
+              <p className="bank-lead">{bank.instruction}</p>
               <div className="bank-amount">
-                <span>{BANK.amount}</span>
+                <span>{bank.amount}</span>
                 <strong>{formatMoney(amount, currency)}</strong>
               </div>
               <div className="bank-ref">
                 <div>
-                  <p className="bank-label">{BANK.note} <em>{BANK.mandatory}</em></p>
+                  <p className="bank-label">{bank.note} <em>{bank.mandatory}</em></p>
                   <p className="bank-ref__value">{note}</p>
                 </div>
                 <button type="button" className="bank-copy" onClick={() => copyValue('note', note)}>
@@ -230,17 +231,17 @@ export default function PayLinkPage() {
               </div>
               <p className="bank-warn">
                 <img src={asset('warn.svg')} alt="" />
-                <span>{BANK.warning}</span>
+                <span>{bank.warning}</span>
               </p>
               <div className="bank-qr">
-                <img src={asset('vcb-qr.jpg')} alt={BANK.tabQr} />
-                <p>{BANK.qrHint}</p>
+                <img src={asset('vcb-qr.jpg')} alt={bank.methodName} />
+                <p>{bank.qrHint}</p>
               </div>
               <div className="bank-rows">
                 {[
-                  ['bank', BANK.bank, RECEIVER.bank],
-                  ['name', BANK.accountName, RECEIVER.name],
-                  ['number', BANK.accountNumber, RECEIVER.number],
+                  ['bank', bank.bank, RECEIVER.bank],
+                  ['name', bank.accountName, RECEIVER.name],
+                  ['number', bank.accountNumber, RECEIVER.number],
                 ].map(([key, label, value]) => (
                   <div className="bank-row" key={key}>
                     <div>
@@ -253,13 +254,13 @@ export default function PayLinkPage() {
                   </div>
                 ))}
               </div>
-              {copied && <p className="bank-copied">Đã sao chép</p>}
+              {copied && <p className="bank-copied">{bank.copied}</p>}
               {!acked ? (
-                <button className="pay-continue" type="button" onClick={() => setAcked(true)}>{BANK.transferred}</button>
+                <button className="pay-continue" type="button" onClick={() => setAcked(true)}>{bank.transferred}</button>
               ) : (
                 <div className="bank-noted">
-                  <h2>{BANK.notedTitle}</h2>
-                  <p>{BANK.notedBody}</p>
+                  <h2>{bank.notedTitle}</h2>
+                  <p>{bank.notedBody}</p>
                 </div>
               )}
             </section>

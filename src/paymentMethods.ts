@@ -101,18 +101,125 @@ const COPY: Record<string, PayCopy> = {
   },
 }
 
+export type ReviewLang = 'en' | 'zh' | 'local'
+
+const ZH: PayCopy = {
+  title: '支付', discount: '优惠', total: '合计', choose: '选择支付方式', pay: '立即支付',
+  cancel: '可随时取消 · ', terms: '服务条款', privacy: '隐私政策',
+  first: '定金首款', balance: '定金尾款', packageDue: '套餐应付', installment: '分期支付需要在 3,000,000 越南盾以上。',
+  forLink: '这条支付链接的客户', chooseSku: '选择套餐', dir: 'ltr',
+}
+
 const EN: PayCopy = {
   title: 'Payment', discount: 'Discount', total: 'Total', choose: 'Choose Payment Method', pay: 'Pay now',
   cancel: 'Cancel anytime · ', terms: 'Terms of Service', privacy: 'Privacy Policy',
-  first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: '', forLink: 'Payment link for', chooseSku: 'Choose a plan', dir: 'ltr',
+  first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: 'Instalments require at least 3,000,000 VND.',
+  forLink: 'Payment link for', chooseSku: 'Choose a plan', dir: 'ltr',
 }
 
 export function methodsForLine(line: string): PayMethod[] {
   return LINE_PAY_METHODS[line] || [{ code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' }]
 }
 
-export function payCopy(line: string): PayCopy {
+export function payCopy(line: string, lang: ReviewLang = 'local'): PayCopy {
+  if (lang === 'en') return EN
+  if (lang === 'zh') return ZH
   return COPY[line] || EN
+}
+
+const LOCAL_LANG_LABEL: Record<string, string> = {
+  韩国: '한국어',
+  越南: 'Tiếng Việt',
+  马来: 'Bahasa Melayu',
+  沙特: 'العربية',
+  泰国: 'ไทย',
+  印尼: 'Bahasa Indonesia',
+  新加坡: 'English',
+}
+
+export function localLangLabel(line: string): string {
+  return LOCAL_LANG_LABEL[line] || 'Local'
+}
+
+export type BankCopy = {
+  instruction: string
+  amount: string
+  note: string
+  mandatory: string
+  warning: string
+  qrHint: string
+  bank: string
+  accountName: string
+  accountNumber: string
+  transferred: string
+  notedTitle: string
+  notedBody: string
+  copied: string
+  methodName: string
+}
+
+const BANK_LOCAL: BankCopy = {
+  instruction: 'Mở ứng dụng ngân hàng. Chuyển đúng số tiền này và giữ nguyên nội dung bên dưới.',
+  amount: 'Số tiền cần chuyển',
+  note: 'Nội dung chuyển khoản',
+  mandatory: 'Bắt buộc',
+  warning: 'Nhập đúng nội dung này khi chuyển khoản. Nếu thiếu hoặc sai, chúng tôi không thể mở hội viên cho bạn.',
+  qrHint: 'Dùng điện thoại? Chụp màn hình rồi chọn ảnh này trong ứng dụng ngân hàng.',
+  bank: 'Ngân hàng',
+  accountName: 'Tên tài khoản',
+  accountNumber: 'Số tài khoản',
+  transferred: 'Tôi đã chuyển khoản',
+  notedTitle: 'Chúng tôi đã ghi nhận thông báo chuyển khoản',
+  notedBody: 'Chúng tôi chỉ mở hội viên sau khi xác nhận đã nhận thanh toán. Vào ngày làm việc, việc này thường xong trong vòng 1 giờ.',
+  copied: 'Đã sao chép',
+  methodName: 'Chuyển khoản',
+}
+
+const BANK_EN: BankCopy = {
+  instruction: 'Open your banking app. Transfer this exact amount and keep the note below unchanged.',
+  amount: 'Amount to transfer',
+  note: 'Transfer note',
+  mandatory: 'Required',
+  warning: 'Enter this note exactly. If it is missing or wrong, we cannot open the membership.',
+  qrHint: 'On a phone, take a screenshot and choose that image in your banking app.',
+  bank: 'Bank',
+  accountName: 'Account name',
+  accountNumber: 'Account number',
+  transferred: 'I have transferred',
+  notedTitle: 'We have recorded your transfer notice',
+  notedBody: 'Membership opens after the payment is confirmed. On business days this usually takes about an hour.',
+  copied: 'Copied',
+  methodName: 'Bank transfer',
+}
+
+const BANK_ZH: BankCopy = {
+  instruction: '打开银行 App，按这个金额转账，并原样填写下面的附言。',
+  amount: '需转金额',
+  note: '转账附言',
+  mandatory: '必填',
+  warning: '附言必须一字不差。少了或错了，就无法开通会员。',
+  qrHint: '用手机的话，先截图，再在银行 App 里选择这张图。',
+  bank: '银行',
+  accountName: '户名',
+  accountNumber: '账号',
+  transferred: '我已转账',
+  notedTitle: '已记下你的转账申报',
+  notedBody: '确认到账后才会开通会员。工作日通常大约 1 小时内完成。',
+  copied: '已复制',
+  methodName: '银行转账',
+}
+
+export function bankCopy(lang: ReviewLang): BankCopy {
+  if (lang === 'en') return BANK_EN
+  if (lang === 'zh') return BANK_ZH
+  return BANK_LOCAL
+}
+
+export function methodDisplayName(method: PayMethod, lang: ReviewLang): string {
+  if (method.code === 'bank_transfer') return bankCopy(lang).methodName
+  if (method.code === 'onepay_installment' && lang === 'en') return 'OnePay instalment'
+  if (method.code === 'onepay_installment' && lang === 'zh') return 'OnePay 分期'
+  return method.name
 }
 
 export function findMethods(line: string, codes: string[]): PayMethod[] {

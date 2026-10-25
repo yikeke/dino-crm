@@ -55,9 +55,54 @@
   display: none;
 }
 
+.review-lang {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+  padding: 4px 6px 4px 8px;
+  border-radius: 999px;
+  background: rgba(20, 16, 48, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.review-lang span {
+  opacity: 0.85;
+  margin-right: 2px;
+}
+
+.review-lang button {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 7px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.review-lang button.is-on {
+  background: #fff;
+  color: #1d1349;
+  font-weight: 700;
+}
+
+.psp-page {
+  position: relative;
+}
+
 .pay-user {
   position: relative;
   z-index: 1;
+  max-width: calc(100% - 168px);
   margin-bottom: 4px;
   color: #fff;
 }
