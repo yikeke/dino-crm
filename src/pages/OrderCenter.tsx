@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import type { Order, OrderStatus, UserStatus, UserType } from '../types'
 import { USER_TYPES } from '../types'
 import { useI18n } from '../i18n'
+import { enValue } from '../channel'
 import { resolveUserType } from '../userType'
 import { useLineScope } from '../useLineScope'
 import LineFilter from '../components/LineFilter'
@@ -138,7 +139,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       `订单中心_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`,
       ['订单ID', '商品名称', '用户ID', '用户类型', '国家', '用户状态', '订单状态', '优惠码', '原价', '实际付款金额', '币种', '支付方式', '成功支付时间', '有效期到期时间'],
       data.map((order) => [
-        order.orderId, order.productName, order.studentId, typeOf(order.studentId), countryOf(order.studentId),
+        order.orderId, enValue(order.productName), order.studentId, typeOf(order.studentId), enValue(countryOf(order.studentId)),
         order.userStatus, ORDER_STATUS_CODE[order.orderStatus], couponCodeOf(order.studentId, order.payMethod), order.originalPrice, order.paidAmount, order.currency,
         order.payMethod, order.paidTime, order.validUntil,
       ]),
@@ -154,7 +155,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       fixed: 'left',
       render: (id: string) => detailsPath ? <a onClick={() => navigate(`${detailsPath}/${id}`, { state: { ...dashboardContext.state, ordersReturn: location.pathname + location.search } })}>{id}</a> : <Text code>{id}</Text>,
     },
-    { title: t('order.col.product'), dataIndex: 'productName', width: 180 },
+    { title: t('order.col.product'), dataIndex: 'productName', width: 180, render: (name: string) => enValue(name) },
     { title: t('order.col.studentId'), dataIndex: 'studentId', width: 190 },
     {
       title: t('user.col.couponCode'),
@@ -181,7 +182,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       dataIndex: 'studentId',
       key: 'country',
       width: 100,
-      render: (id: string) => <Tag>{countryOf(id) ?? '—'}</Tag>,
+      render: (id: string) => <Tag>{enValue(countryOf(id)) || '—'}</Tag>,
     },
     {
       title: t('order.col.userStatus'),
@@ -248,7 +249,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           style={{ width: 140 }}
           value={countryFilter}
           onChange={setCountryFilter}
-          options={countries.map((l) => ({ label: l, value: l }))}
+          options={countries.map((l) => ({ label: enValue(l), value: l }))}
         />
         <Select
           allowClear

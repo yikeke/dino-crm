@@ -30,11 +30,11 @@ export type PayCopy = {
 const icon = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
 
 export const LINE_PAY_METHODS: Record<string, PayMethod[]> = {
-  韩国: [
+  Korea: [
     { code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' },
     { code: 'kakaopay', name: 'Kakao Pay', icon: icon('pay-kakao.png'), kind: 'redirect' },
   ],
-  马来: [
+  Malaysia: [
     { code: 'fpx', name: 'FPX', icon: icon('pay-fpx.png'), kind: 'redirect' },
     { code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' },
     { code: 'atome', name: 'Atome', icon: icon('pay-atome.png'), kind: 'redirect' },
@@ -43,58 +43,58 @@ export const LINE_PAY_METHODS: Record<string, PayMethod[]> = {
     { code: 'boost', name: 'Boost', icon: icon('pay-boost.png'), kind: 'redirect' },
     { code: 'spaylater', name: 'SPayLater', icon: icon('pay-spaylater.jpg'), kind: 'redirect' },
   ],
-  沙特: [
+  'Saudi Arabia': [
     { code: 'mada', name: 'mada', icon: icon('pay-mada.png'), kind: 'redirect' },
     { code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' },
     { code: 'stcpay', name: 'STC Pay', icon: icon('pay-stc.png'), kind: 'redirect' },
     { code: 'tamara', name: 'Tamara', icon: icon('pay-tamara.png'), kind: 'redirect' },
     { code: 'tabby', name: 'Tabby', icon: icon('pay-tabby.png'), kind: 'redirect' },
   ],
-  越南: [
+  Vietnam: [
     { code: 'vietqr', name: 'VietQR', icon: icon('pay-vietqr.png'), kind: 'redirect' },
     { code: 'bank_transfer', name: 'Chuyển khoản', icon: icon('pay-bank.png'), kind: 'manual' },
     { code: 'card', name: 'Visa / Mastercard', icon: icon('pay-card-my.png'), kind: 'redirect' },
     { code: 'momo', name: 'MoMo', icon: icon('pay-momo.png'), kind: 'redirect' },
     { code: 'onepay_installment', name: 'Trả góp qua OnePay', icon: icon('pay-onepay-installment.png'), kind: 'redirect', minAmount: 3000000 },
   ],
-  泰国: [
+  Thailand: [
     { code: 'KPLUS', name: 'K PLUS', icon: icon('pay-kplus.png'), kind: 'redirect' },
   ],
-  新加坡: [
+  Singapore: [
     { code: 'PAYNOW', name: 'PayNow', icon: icon('pay-paynow.png'), kind: 'redirect' },
   ],
-  印尼: [
+  Indonesia: [
     { code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' },
   ],
 }
 
 const COPY: Record<string, PayCopy> = {
-  韩国: {
+  Korea: {
     title: '결제', discount: '할인', total: '합계', choose: '결제 수단 선택', pay: '결제하기',
     cancel: '언제든 취소 가능 · ', terms: '이용약관', privacy: '개인정보 처리방침',
     first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택', dir: 'ltr',
   },
-  越南: {
+  Vietnam: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
     cancel: 'Hủy bất cứ lúc nào · ', terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
     first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói', dir: 'ltr',
   },
-  马来: {
+  Malaysia: {
     title: 'Pembayaran', discount: 'Diskaun', total: 'Jumlah', choose: 'Pilih kaedah pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batal bila-bila masa · ', terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
     first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan', dir: 'ltr',
   },
-  沙特: {
+  'Saudi Arabia': {
     title: 'الدفع', discount: 'الخصم', total: 'الإجمالي', choose: 'اختر طريقة الدفع', pay: 'ادفع الآن',
     cancel: 'يمكن الإلغاء في أي وقت · ', terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
     first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة', dir: 'rtl',
   },
-  泰国: {
+  Thailand: {
     title: 'ชำระเงิน', discount: 'ส่วนลด', total: 'ยอดรวม', choose: 'เลือกวิธีชำระเงิน', pay: 'ชำระเงินตอนนี้',
     cancel: 'ยกเลิกได้ทุกเมื่อ · ', terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
     first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ', dir: 'ltr',
   },
-  印尼: {
+  Indonesia: {
     title: 'Pembayaran', discount: 'Diskon', total: 'Total', choose: 'Pilih metode pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batalkan kapan saja · ', terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
     first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket', dir: 'ltr',
@@ -128,13 +128,13 @@ export function payCopy(line: string, lang: ReviewLang = 'local'): PayCopy {
 }
 
 const LOCAL_LANG_LABEL: Record<string, string> = {
-  韩国: '한국어',
-  越南: 'Tiếng Việt',
-  马来: 'Bahasa Melayu',
-  沙特: 'العربية',
-  泰国: 'ไทย',
-  印尼: 'Bahasa Indonesia',
-  新加坡: 'English',
+  Korea: '한국어',
+  Vietnam: 'Tiếng Việt',
+  Malaysia: 'Bahasa Melayu',
+  'Saudi Arabia': 'العربية',
+  Thailand: 'ไทย',
+  Indonesia: 'Bahasa Indonesia',
+  Singapore: 'English',
 }
 
 export function localLangLabel(line: string): string {

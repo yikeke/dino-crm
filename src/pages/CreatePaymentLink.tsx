@@ -18,7 +18,7 @@ import {
   Upload,
   message,
 } from 'antd'
-import { CopyOutlined, EditOutlined, EyeOutlined, InboxOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, EditOutlined, EyeOutlined, InboxOutlined, LinkOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -189,9 +189,9 @@ export default function CreatePaymentLink() {
   )
   const activeChannel = lineChannels.find((item) => item.channel.id === channelId) || lineChannels.find((item) => item.plan) || lineChannels[0]
   const planOffers = offersOnPlan(activeChannel?.plan, catalog.skus)
-  const hasDiscount = !!activeChannel?.plan?.promoCode && planOffers.some((offer) => offer.ruleLabel !== '原价')
+  const hasDiscount = !!activeChannel?.plan?.promoCode && planOffers.some((offer) => offer.ruleLabel !== 'List price')
   const shown = planOffers.map((offer) => (
-    usePromo && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: '原价' }
+    usePromo && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }
   ))
   const currency = shown[0]?.currency || ''
   const lowestPayable = shown.reduce((min, offer) => Math.min(min, offer.payable), shown[0]?.payable || 0)
@@ -201,10 +201,10 @@ export default function CreatePaymentLink() {
       holdLineReset.current = false
       return
     }
-    const next = lineChannels.find((item) => item.plan && item.channel.type === '销售') || lineChannels.find((item) => item.plan)
+    const next = lineChannels.find((item) => item.plan && (item.channel.type === 'Sales' || item.channel.type === '销售')) || lineChannels.find((item) => item.plan)
     const offers = offersOnPlan(next?.plan, catalog.skus)
     setChannelId(next?.channel.id || '')
-    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== '原价'))
+    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== 'List price'))
     setFirstAmount(null)
   }, [activeLine, catalog.skus, lineChannels])
 
@@ -230,7 +230,7 @@ export default function CreatePaymentLink() {
     setChannelId(value)
     const next = lineChannels.find((item) => item.channel.id === value)
     const offers = offersOnPlan(next?.plan, catalog.skus)
-    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== '原价'))
+    setUsePromo(!!next?.plan?.promoCode && offers.some((offer) => offer.ruleLabel !== 'List price'))
     setFirstAmount(null)
   }
 
@@ -451,7 +451,7 @@ export default function CreatePaymentLink() {
                     {' · '}
                     {offer.payable !== offer.listPrice
                       ? <>{formatMoney(offer.listPrice, offer.currency)} → {formatMoney(offer.payable, offer.currency)}（{offer.ruleLabel}）</>
-                      : <>{formatMoney(offer.listPrice, offer.currency)} · {en ? 'List price' : '原价'}</>}
+                      : <>{formatMoney(offer.listPrice, offer.currency)} · List price</>}
                   </div>
                 ))}
               </Space>

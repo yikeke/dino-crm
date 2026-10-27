@@ -1,4 +1,5 @@
 import { Select } from 'antd'
+import { enValue } from '../channel'
 import { useI18n } from '../i18n'
 
 // 业务线多选筛选（默认勾选账号数据权限内的业务线，可自行增减）
@@ -28,7 +29,7 @@ export default function LineFilter({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      options={options.map((l) => ({ label: l, value: l }))}
+      options={options.map((l) => ({ label: enValue(l), value: l }))}
     />
   )
 }

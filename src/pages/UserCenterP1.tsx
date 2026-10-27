@@ -22,6 +22,7 @@ dayjs.extend(utc)
 import { setState, useStore } from '../store'
 import type { LoginMethod, Student, StudentEditLog, StudentFieldChange, UserStatus, UserType } from '../types'
 import { AGE_GROUPS, LOGIN_METHODS, USER_STATUSES, USER_TYPES } from '../types'
+import { enValue } from '../channel'
 import { useI18n } from '../i18n'
 import { useCurrentAccount, usePerm } from '../perm'
 import { hasPhoneLogin, resolveUserType } from '../userType'
@@ -314,7 +315,7 @@ export default function UserCenterP1() {
       width: 200,
       render: (_: unknown, r: Student) => {
         const txt = lpChannelSourceText(channels, r)
-        return txt === '—' ? <Text type="secondary">—</Text> : <span>{txt}</span>
+        return txt === '—' ? <Text type="secondary">—</Text> : <span>{enValue(txt)}</span>
       },
     },
     {
@@ -323,7 +324,7 @@ export default function UserCenterP1() {
       width: 200,
       render: (_: unknown, r: Student) => {
         const txt = appChannelSourceText(r)
-        return txt === '—' ? <Text type="secondary">—</Text> : <span>{txt}</span>
+        return txt === '—' ? <Text type="secondary">—</Text> : <span>{enValue(txt)}</span>
       },
     },
     {
@@ -336,7 +337,7 @@ export default function UserCenterP1() {
       title: t('user.col.country'),
       dataIndex: 'country',
       width: 120,
-      render: (v: string | undefined) => (v ? <Tag>{v}</Tag> : <Text type="secondary">—</Text>),
+      render: (v: string | undefined) => (v ? <Tag>{enValue(v)}</Tag> : <Text type="secondary">—</Text>),
     },
     {
       title: '验证码', // t('user.col.verifyCode') if I were to add it to i18n
@@ -517,7 +518,7 @@ export default function UserCenterP1() {
             />
           </Form.Item>
           <Form.Item label={t('user.col.country')}>
-            <Input value={editing?.country} disabled />
+            <Input value={enValue(editing?.country)} disabled />
           </Form.Item>
         </Form>
       </Modal>

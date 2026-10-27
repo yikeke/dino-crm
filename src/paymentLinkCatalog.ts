@@ -1,6 +1,6 @@
 /** Reads the marketing-center prototype catalog (same localStorage the demo page writes). */
 
-export const MARKETING_STORE_KEY = 'dino-marketing-demo-v2'
+export const MARKETING_STORE_KEY = 'dino-marketing-demo-v3'
 
 export type CatalogSku = {
   id: string
@@ -49,41 +49,41 @@ export type PromoOption = {
 }
 
 const SEED_SKUS: CatalogSku[] = [
-  { id: 'KR-Q-2026', productCode: 'web-kr-pro-1q', name: 'Pro 季度包', line: '韩国', price: '99,000 KRW', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
-  { id: 'KR-H-2026', productCode: 'web-kr-max-6m', name: 'Max 半年包', line: '韩国', price: '178,000 KRW', memberLevel: 'MAX', valid: '购买后 180 天', status: '上架' },
-  { id: 'KR-Y-2026', productCode: 'web-kr-pro-1y', name: 'Pro 年度包', line: '韩国', price: '298,000 KRW', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
-  { id: 'KR-MY-2026', productCode: 'web-kr-max-1y', name: 'Max 年度包', line: '韩国', price: '398,000 KRW', memberLevel: 'MAX', valid: '购买后 365 天', status: '上架' },
-  { id: 'VN-Q-2026', productCode: 'web-vn-pro-1q', name: 'Pro 季度包', line: '越南', price: '990,000 VND', memberLevel: 'PRO', valid: '购买后 90 天', status: '上架' },
-  { id: 'VN-H-2026', productCode: 'web-vn-max-6m', name: 'Max 半年包', line: '越南', price: '1,790,000 VND', memberLevel: 'MAX', valid: '购买后 180 天', status: '上架' },
-  { id: 'VN-Y-2026', productCode: 'web-vn-pro-1y', name: 'Pro 年度包', line: '越南', price: '2,990,000 VND', memberLevel: 'PRO', valid: '购买后 365 天', status: '上架' },
-  { id: 'VN-MY-2026', productCode: 'web-vn-max-1y', name: 'Max 年度包', line: '越南', price: '3,990,000 VND', memberLevel: 'MAX', valid: '购买后 365 天', status: '上架' },
+  { id: 'KR-Q-2026', productCode: 'web-kr-pro-1q', name: 'Pro Quarterly', line: 'Korea', price: '99,000 KRW', memberLevel: 'PRO', valid: '90 days after purchase', status: 'Active' },
+  { id: 'KR-H-2026', productCode: 'web-kr-max-6m', name: 'Max 6 Months', line: 'Korea', price: '178,000 KRW', memberLevel: 'MAX', valid: '180 days after purchase', status: 'Active' },
+  { id: 'KR-Y-2026', productCode: 'web-kr-pro-1y', name: 'Pro Yearly', line: 'Korea', price: '298,000 KRW', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
+  { id: 'KR-MY-2026', productCode: 'web-kr-max-1y', name: 'Max Yearly', line: 'Korea', price: '398,000 KRW', memberLevel: 'MAX', valid: '365 days after purchase', status: 'Active' },
+  { id: 'VN-Q-2026', productCode: 'web-vn-pro-1q', name: 'Pro Quarterly', line: 'Vietnam', price: '990,000 VND', memberLevel: 'PRO', valid: '90 days after purchase', status: 'Active' },
+  { id: 'VN-H-2026', productCode: 'web-vn-max-6m', name: 'Max 6 Months', line: 'Vietnam', price: '1,790,000 VND', memberLevel: 'MAX', valid: '180 days after purchase', status: 'Active' },
+  { id: 'VN-Y-2026', productCode: 'web-vn-pro-1y', name: 'Pro Yearly', line: 'Vietnam', price: '2,990,000 VND', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
+  { id: 'VN-MY-2026', productCode: 'web-vn-max-1y', name: 'Max Yearly', line: 'Vietnam', price: '3,990,000 VND', memberLevel: 'MAX', valid: '365 days after purchase', status: 'Active' },
 ]
 
 const SEED_CHANNELS: CatalogChannel[] = [
-  { id: 'sales_amy_zhang', name: 'Amy Zhang', line: '韩国', channelCode: 'CH-KR-0001', type: '销售', enabled: true },
-  { id: 'kol_jisu_mom', name: '@jisu_mom', line: '韩国', channelCode: 'CH-KR-0002', type: 'KOL', enabled: true },
-  { id: 'ad_kr_meta', name: '韩国 Meta 开学季投放', line: '韩国', channelCode: 'CH-KR-0003', type: '广告投放', enabled: true },
-  { id: 'sales_linh_nguyen', name: 'Linh Nguyen', line: '越南', channelCode: 'CH-VN-0005', type: '销售', enabled: true },
-  { id: 'ad_vn_meta', name: '越南 Meta 中秋投放', line: '越南', channelCode: 'CH-VN-0007', type: '广告投放', enabled: true },
+  { id: 'sales_amy_zhang', name: 'Amy Zhang', line: 'Korea', channelCode: 'CH-KR-0001', type: 'Sales', enabled: true },
+  { id: 'kol_jisu_mom', name: '@jisu_mom', line: 'Korea', channelCode: 'CH-KR-0002', type: 'KOL', enabled: true },
+  { id: 'ad_kr_meta', name: 'Korea Meta Back to School', line: 'Korea', channelCode: 'CH-KR-0003', type: 'Ads', enabled: true },
+  { id: 'sales_linh_nguyen', name: 'Linh Nguyen', line: 'Vietnam', channelCode: 'CH-VN-0005', type: 'Sales', enabled: true },
+  { id: 'ad_vn_meta', name: 'Vietnam Meta Mid-Autumn', line: 'Vietnam', channelCode: 'CH-VN-0007', type: 'Ads', enabled: true },
 ]
 
 const SEED_PLANS: CatalogPlan[] = [
-  { id: 'CSP-AMY', channelId: 'sales_amy_zhang', promoCode: 'CSP-AMY-PROMO', status: '生效中', rules: [{ skuId: 'KR-Q-2026', mode: '折扣', value: '10' }, { skuId: 'KR-H-2026', mode: '原价售卖', value: '' }, { skuId: 'KR-Y-2026', mode: '立减', value: '50000' }, { skuId: 'KR-MY-2026', mode: '折扣', value: '15' }] },
-  { id: 'CSP-JISU', channelId: 'kol_jisu_mom', promoCode: 'CSP-JISU-PROMO', status: '生效中', rules: [{ skuId: 'KR-Q-2026', mode: '折扣', value: '10' }, { skuId: 'KR-H-2026', mode: '折扣', value: '15' }] },
-  { id: 'CSP-KR-META', channelId: 'ad_kr_meta', promoCode: 'CSP-KR-META-PROMO', status: '生效中', rules: [{ skuId: 'KR-Y-2026', mode: '立减', value: '59600' }, { skuId: 'KR-H-2026', mode: '折扣', value: '10' }] },
-  { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: '生效中', rules: [{ skuId: 'VN-Q-2026', mode: '折扣', value: '10' }, { skuId: 'VN-H-2026', mode: '原价售卖', value: '' }, { skuId: 'VN-Y-2026', mode: '折扣', value: '15' }, { skuId: 'VN-MY-2026', mode: '立减', value: '500000' }] },
-  { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: '生效中', rules: [{ skuId: 'VN-Y-2026', mode: '立减', value: '500000' }, { skuId: 'VN-Q-2026', mode: '折扣', value: '10' }] },
+  { id: 'CSP-AMY', channelId: 'sales_amy_zhang', promoCode: 'CSP-AMY-PROMO', status: 'Active', rules: [{ skuId: 'KR-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'KR-H-2026', mode: 'List price', value: '' }, { skuId: 'KR-Y-2026', mode: 'Amount off', value: '50000' }, { skuId: 'KR-MY-2026', mode: 'Percent off', value: '15' }] },
+  { id: 'CSP-JISU', channelId: 'kol_jisu_mom', promoCode: 'CSP-JISU-PROMO', status: 'Active', rules: [{ skuId: 'KR-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'KR-H-2026', mode: 'Percent off', value: '15' }] },
+  { id: 'CSP-KR-META', channelId: 'ad_kr_meta', promoCode: 'CSP-KR-META-PROMO', status: 'Active', rules: [{ skuId: 'KR-Y-2026', mode: 'Amount off', value: '59600' }, { skuId: 'KR-H-2026', mode: 'Percent off', value: '10' }] },
+  { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: 'Active', rules: [{ skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'VN-H-2026', mode: 'List price', value: '' }, { skuId: 'VN-Y-2026', mode: 'Percent off', value: '15' }, { skuId: 'VN-MY-2026', mode: 'Amount off', value: '500000' }] },
+  { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: 'Active', rules: [{ skuId: 'VN-Y-2026', mode: 'Amount off', value: '500000' }, { skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }] },
 ]
 
 export const PAY_HOST: Record<string, string> = {
-  韩国: 'kr.dinoai.ai',
-  越南: 'vn.dinoai.ai',
-  马来: 'ma.dinoai.ai',
-  沙特: 'sa.dinoai.ai',
-  日本: 'jp.dinoai.ai',
-  印尼: 'id.dinoai.ai',
-  泰国: 'th.dinoai.ai',
-  新加坡: 'sg.dinoai.ai',
+  Korea: 'kr.dinoai.ai',
+  Vietnam: 'vn.dinoai.ai',
+  Malaysia: 'ma.dinoai.ai',
+  'Saudi Arabia': 'sa.dinoai.ai',
+  Japan: 'jp.dinoai.ai',
+  Indonesia: 'id.dinoai.ai',
+  Thailand: 'th.dinoai.ai',
+  Singapore: 'sg.dinoai.ai',
 }
 
 export function parseSkuPrice(price: string): { value: number; currency: string } {
@@ -94,18 +94,18 @@ export function parseSkuPrice(price: string): { value: number; currency: string 
   }
 }
 
-/** Same rule as the marketing-center demo: 折扣 subtracts n% of list price; 立减 subtracts n. */
+/** Percent off subtracts n% of list price. Amount off subtracts n. */
 export function applyRule(original: number, mode: string, value: string): number {
-  if (mode === '原价售卖' || !mode) return original
+  if (mode === 'List price' || mode === '原价售卖' || !mode) return original
   const n = Number(value || 0)
-  const discount = mode === '折扣' ? (original * n) / 100 : n
+  const discount = mode === 'Percent off' || mode === '折扣' ? (original * n) / 100 : n
   return Math.max(0, Math.round(original - discount))
 }
 
 export function ruleLabel(mode: string, value: string, currency: string): string {
-  if (mode === '原价售卖' || !mode) return '原价'
-  if (mode === '折扣') return `折扣 ${value}%`
-  return `立减 ${Number(value || 0).toLocaleString('en-US')} ${currency}`
+  if (mode === 'List price' || mode === '原价售卖' || !mode) return 'List price'
+  if (mode === 'Percent off' || mode === '折扣') return `${value}% off`
+  return `Amount off ${Number(value || 0).toLocaleString('en-US')} ${currency}`
 }
 
 export function formatMoney(amount: number, currency: string): string {
@@ -143,12 +143,12 @@ export function promosForSku(sku: CatalogSku, plans: CatalogPlan[], channels: Ca
   const priced = pricedSku(sku)
   const options: PromoOption[] = []
   for (const plan of plans) {
-    if (plan.status && plan.status !== '生效中') continue
+    if (plan.status && plan.status !== 'Active' && plan.status !== '生效中') continue
     if (!plan.promoCode) continue
     const channel = channels.find((item) => item.id === plan.channelId)
     if (!channel || channel.line !== sku.line || channel.enabled === false) continue
     const rule = (plan.rules || []).find((item) => item.skuId === sku.id)
-    if (!rule || rule.mode === '原价售卖') continue
+    if (!rule || rule.mode === 'List price' || rule.mode === '原价售卖') continue
     const finalPrice = applyRule(priced.original, rule.mode, rule.value)
     options.push({
       code: plan.promoCode,
@@ -184,7 +184,7 @@ export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]):
     const sku = skus.find((item) => item.id === rule.skuId)
     if (!sku) return []
     const priced = pricedSku(sku)
-    const discounted = rule.mode !== '原价售卖'
+    const discounted = rule.mode !== 'List price' && rule.mode !== '原价售卖'
     return [{
       skuId: sku.id,
       skuName: sku.name,
@@ -192,7 +192,7 @@ export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]):
       listPrice: priced.original,
       payable: discounted ? applyRule(priced.original, rule.mode, rule.value) : priced.original,
       currency: priced.currency,
-      ruleLabel: discounted ? ruleLabel(rule.mode, rule.value, priced.currency) : '原价',
+      ruleLabel: discounted ? ruleLabel(rule.mode, rule.value, priced.currency) : 'List price',
     }]
   })
 }
@@ -202,9 +202,9 @@ export function channelsOnLine(line: string, channels: CatalogChannel[], plans: 
     .filter((channel) => channel.line === line && channel.enabled !== false)
     .map((channel) => ({
       channel,
-      plan: plans.find((plan) => plan.channelId === channel.id && (!plan.status || plan.status === '生效中')),
+      plan: plans.find((plan) => plan.channelId === channel.id && (!plan.status || plan.status === 'Active' || plan.status === '生效中')),
     }))
-    .sort((a, b) => Number(a.channel.type !== '销售') - Number(b.channel.type !== '销售'))
+    .sort((a, b) => Number(a.channel.type !== 'Sales' && a.channel.type !== '销售') - Number(b.channel.type !== 'Sales' && b.channel.type !== '销售'))
 }
 
 export function linesInCatalog(skus: CatalogSku[], channels: CatalogChannel[] = []): string[] {

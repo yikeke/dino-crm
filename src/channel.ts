@@ -59,7 +59,40 @@ export function appChannelSourceText(s: ChannelUser): string {
 // 业务线展示：CRM 渠道仅用于投放落地页配置，无渠道码（仅投 App）的用户
 // 业务线取「注册时的国家」；有落地页渠道码的用户，国家即业务线，二者一致。
 export function lineLabel(s: { businessLine: string; country?: string }): string {
-  return s.country || s.businessLine
+  return enValue(s.country || s.businessLine)
+}
+
+const EN_VALUE: Record<string, string> = {
+  韩国: 'Korea',
+  越南: 'Vietnam',
+  马来: 'Malaysia',
+  印尼: 'Indonesia',
+  泰国: 'Thailand',
+  新加坡: 'Singapore',
+  沙特: 'Saudi Arabia',
+  日本: 'Japan',
+  其他: 'Other',
+  销售: 'Sales',
+  广告投放: 'Ads',
+  自然流量: 'Organic',
+}
+
+export function enValue(value?: string): string {
+  if (!value) return ''
+  if (EN_VALUE[value]) return EN_VALUE[value]
+  return [
+    ['启蒙季度商品包', 'Starter Quarterly'],
+    ['年度畅学商品包', 'Yearly'],
+    ['季度包', 'Quarterly'],
+    ['半年包', '6 Months'],
+    ['年度包', 'Yearly'],
+    ['月卡', 'Monthly'],
+    ['季卡', 'Quarterly'],
+    ['年卡', 'Yearly'],
+  ].reduce(
+    (text, [from, to]) => text.split(from).join(to),
+    Object.entries(EN_VALUE).reduce((text, [from, to]) => text.split(from).join(to), value),
+  )
 }
 
 // 是否为「有落地页渠道码」的用户（渠道码能在渠道树中解析到实际渠道）

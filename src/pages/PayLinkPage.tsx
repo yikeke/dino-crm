@@ -38,7 +38,7 @@ function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string
 
 export default function PayLinkPage() {
   const [params] = useSearchParams()
-  const line = params.get('line') || '韩国'
+  const line = params.get('line') || 'Korea'
   const [lang, setLang] = useState<ReviewLang>('local')
   const copy = payCopy(line, lang)
   const bank = bankCopy(lang)
