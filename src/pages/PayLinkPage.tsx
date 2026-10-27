@@ -42,7 +42,6 @@ export default function PayLinkPage() {
   const [lang, setLang] = useState<ReviewLang>('local')
   const copy = payCopy(line, lang)
   const bank = bankCopy(lang)
-  const phone = params.get('phone') || ''
   const userId = params.get('user_id') || ''
   const payLink = params.get('pay_link') || ''
   const offerKey = params.get('offers') || ''
@@ -161,8 +160,7 @@ export default function PayLinkPage() {
         <div className="pay-shell">
           <header className="pay-user">
             <p>{copy.forLink}</p>
-            <strong>{userId || phone || '—'}</strong>
-            {userId && phone && <span>{phone}</span>}
+            <strong>{userId || '—'}</strong>
           </header>
           <section className="pay-hero">
             <h1 className="pay-hero__title">{copy.title}</h1>

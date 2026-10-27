@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
+  AutoComplete,
   Button,
   Card,
   Form,
@@ -149,7 +150,7 @@ export default function CreatePaymentLink() {
   const [line, setLine] = useState('')
   const [channelId, setChannelId] = useState('')
   const [usePromo, setUsePromo] = useState(true)
-  const [phone, setPhone] = useState('')
+  const [userQuery, setUserQuery] = useState('')
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
@@ -164,11 +165,20 @@ export default function CreatePaymentLink() {
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const students = useStore((s) => s.students)
-  const phoneDigits = phone.replace(/\D/g, '')
-  const matchedStudent = phoneDigits.length >= 6
-    ? students.find((student) => (student.phone || student.account || '').replace(/\D/g, '').endsWith(phoneDigits))
-    : undefined
-  const linkedUserId = matchedStudent?.studentId || (phoneDigits.length >= 6 ? `U${phoneDigits.slice(-10)}` : '')
+  const userMatches = useMemo(() => {
+    const query = userQuery.trim().toLowerCase()
+    if (query.length < 2) return []
+    const digits = query.replace(/\D/g, '')
+    return students.filter((student) => {
+      if (student.studentId.toLowerCase().includes(query)) return true
+      if (digits.length >= 4) {
+        const phone = (student.phone || student.account || '').replace(/\D/g, '')
+        return phone.includes(digits)
+      }
+      return false
+    }).slice(0, 8)
+  }, [students, userQuery])
+  const linkedUserId = students.find((student) => student.studentId === userQuery.trim())?.studentId || ''
 
   const reloadCatalog = () => setCatalog(loadMarketingCatalog())
 
@@ -218,7 +228,7 @@ export default function CreatePaymentLink() {
   }
 
   const resetCustomer = () => {
-    setPhone('')
+    setUserQuery('')
     setFirstAmount(null)
   }
 
@@ -239,8 +249,8 @@ export default function CreatePaymentLink() {
       message.warning(en ? 'This channel has no active price plan' : '这个渠道还没有生效中的价格方案')
       return false
     }
-    if (!phone.trim()) {
-      message.warning(en ? 'Enter the customer phone' : '请填写客户手机号')
+    if (!linkedUserId) {
+      message.warning(en ? 'Pick a User ID from the matches' : '请从匹配结果里选中一个 User ID')
       return false
     }
     if (!payMethods.length) {
@@ -271,7 +281,7 @@ export default function CreatePaymentLink() {
       promoLabel: promo,
       payable: shown.length === 1 ? offer.payable : 0,
       amount,
-      phone: phone.trim(),
+      phone: '',
       customerName: '',
       note: '',
       methods: payMethods,
@@ -359,7 +369,7 @@ export default function CreatePaymentLink() {
     setLine(row.line)
     setChannelId(row.channelId)
     setUsePromo(!!row.promoCode)
-    setPhone(row.phone)
+    setUserQuery(row.userId || '')
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
     setTab(row.kind === 'full' ? 'full' : 'deposit')
@@ -461,14 +471,22 @@ export default function CreatePaymentLink() {
           )}
         </Form.Item>
         <Space size={16} align="start" wrap>
-          <Form.Item label={en ? 'Phone · link User ID' : '客户手机号 · 关联 User ID'} required style={{ minWidth: 280 }}>
-            <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+84…" />
-            {linkedUserId && (
-              <Typography.Text type="secondary">
-                User ID {linkedUserId}
-                {matchedStudent ? (en ? ' · found in User Center' : ' · 已关联用户中心') : (en ? ' · new user bound at payment' : ' · 支付时关联为新用户')}
-              </Typography.Text>
-            )}
+          <Form.Item
+            label="User ID"
+            required
+            style={{ minWidth: 320 }}
+            extra={en
+              ? 'Enter a phone number or a User ID. Matches are User IDs from the user database, and the saved value is the User ID.'
+              : '可输入手机号或 User ID。输入时会匹配用户库里的 User ID，选中后保存的是 User ID。'}
+          >
+            <AutoComplete
+              value={userQuery}
+              options={userMatches.map((student) => ({ value: student.studentId }))}
+              onChange={setUserQuery}
+              onSelect={setUserQuery}
+              placeholder={en ? 'Phone or User ID' : '手机号或 User ID'}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           {mode === 'deposit' && shown.length > 0 && (
             <Form.Item label={en ? 'First payment' : '首款金额'} required style={{ minWidth: 180 }}>
@@ -529,13 +547,9 @@ export default function CreatePaymentLink() {
       },
     },
     {
-      title: en ? 'Customer' : '客户',
-      render: (_: unknown, row: PaymentLink) => (
-        <div>
-          <div>{row.phone}</div>
-          <Typography.Text type="secondary">{row.userId || '—'}</Typography.Text>
-        </div>
-      ),
+      title: 'User ID',
+      dataIndex: 'userId',
+      render: (userId: string | undefined) => userId || '—',
     },
     {
       title: en ? 'Channel / SKU' : '渠道 / SKU',
@@ -678,7 +692,7 @@ export default function CreatePaymentLink() {
     <div style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <Space wrap>
-          <Input allowClear placeholder={en ? 'Phone / User ID / link' : '手机号 / User ID / 链接'} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} />
+          <Input allowClear placeholder={en ? 'User ID / link' : 'User ID / 链接'} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} />
           <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}
             options={[
               { value: 'full', label: en ? 'Full' : '全款' },
