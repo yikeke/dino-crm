@@ -332,6 +332,7 @@ export default function CreatePaymentLink() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
   const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
   const [qrImage, setQrImage] = useState('')
+  const [expanded, setExpanded] = useState<string[]>([])
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { role } = useCurrentAccount()
@@ -759,7 +760,52 @@ export default function CreatePaymentLink() {
     </Card>
   )
 
-  const columns = (mode: 'full' | 'deposit') => [
+  type ListRow = PaymentLink & { children?: PaymentLink[] }
+
+  const statusOf = (row: PaymentLink) => {
+    if (row.orderId) {
+      const method = row.paidMethod === 'bank_transfer' ? (en ? 'Bank transfer' : '银行转账') : (row.paidMethod || '')
+      return <Tag color="green">{en ? 'Paid' : '已支付'}{method ? ` · ${method}` : ''}</Tag>
+    }
+    if (hasBankTransfer(row)) return <Tag color="orange">{en ? 'Awaiting manager confirmation' : '待管理员确认支付'}</Tag>
+    return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
+  }
+
+  const amountOf = (row: PaymentLink) => {
+    const prices = (row.offers || []).map((offer) => offer.payable).filter((value) => value > 0)
+    if (row.kind === 'deposit_first' || row.kind === 'deposit_balance') return <b>{formatMoney(row.amount, row.currency)}</b>
+    if (prices.length > 1) {
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+      return <b>{min === max ? formatMoney(min, row.currency) : `${formatMoney(min, row.currency)} – ${formatMoney(max, row.currency)}`}</b>
+    }
+    return <b>{formatMoney(prices[0] || row.amount || row.payable, row.currency)}</b>
+  }
+
+  const actionsOf = (row: PaymentLink) => (
+    <Space wrap>
+      <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
+      <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>
+        {row.kind === 'deposit_first' ? (en ? 'Copy first-payment link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
+      </Button>
+      <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
+      {!row.orderId && row.kind !== 'deposit_balance' && (
+        <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
+      )}
+      {canConfirmBank && canMarkBankPaid(row, links) && (
+        <Button size="small" type="primary" onClick={() => markBankPaid(row)}>
+          {row.kind === 'deposit_first'
+            ? (en ? 'Confirm first transfer' : '确认首款已转账')
+            : (en ? 'Confirm transfer and open membership' : '确认已转账并开通会员')}
+        </Button>
+      )}
+      {row.orderId && (
+        <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
+      )}
+    </Space>
+  )
+
+  const columns = [
     {
       title: en ? 'Type' : '类型',
       dataIndex: 'kind',
@@ -767,7 +813,12 @@ export default function CreatePaymentLink() {
       render: (kind: LinkKind) => {
         if (kind === 'full') return <Tag color="green">{en ? 'Full' : '全款'}</Tag>
         if (kind === 'deposit_first') return <Tag color="orange">{en ? 'Deposit first' : '定金首款'}</Tag>
-        return <Tag color="gold">{en ? 'Deposit balance' : '定金尾款'}</Tag>
+        return (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#d48806', fontFamily: 'monospace' }}>└</span>
+            <Tag color="gold">{en ? 'Deposit balance' : '定金尾款'}</Tag>
+          </span>
+        )
       },
     },
     {
@@ -788,24 +839,7 @@ export default function CreatePaymentLink() {
     },
     {
       title: en ? 'Link amount' : '链接金额',
-      render: (_: unknown, row: PaymentLink) => {
-        const prices = (row.offers || []).map((offer) => offer.payable).filter((value) => value > 0)
-        if (row.kind === 'deposit_first') return <b>{formatMoney(row.amount, row.currency)}</b>
-        if (row.kind === 'deposit_balance') {
-          return (
-            <div>
-              <b>{formatMoney(row.amount, row.currency)}</b>
-              <div><Typography.Text type="secondary">{en ? `Balance of ${row.sourceLinkId}` : `尾款，关联 ${row.sourceLinkId}`}</Typography.Text></div>
-            </div>
-          )
-        }
-        if (prices.length > 1) {
-          const min = Math.min(...prices)
-          const max = Math.max(...prices)
-          return <b>{min === max ? formatMoney(min, row.currency) : `${formatMoney(min, row.currency)} – ${formatMoney(max, row.currency)}`}</b>
-        }
-        return <b>{formatMoney(prices[0] || row.amount || row.payable, row.currency)}</b>
-      },
+      render: (_: unknown, row: PaymentLink) => amountOf(row),
     },
     {
       title: en ? 'Payment methods' : '包含的支付方式',
@@ -813,54 +847,50 @@ export default function CreatePaymentLink() {
     },
     {
       title: en ? 'Status' : '状态',
-      render: (_: unknown, row: PaymentLink) => {
-        if (row.orderId) {
-          const method = row.paidMethod === 'bank_transfer' ? (en ? 'Bank transfer' : '银行转账') : (row.paidMethod || '')
-          return <Tag color="green">{en ? 'Paid' : '已支付'}{method ? ` · ${method}` : ''}</Tag>
-        }
-        if (hasBankTransfer(row)) return <Tag color="orange">{en ? 'Awaiting manager confirmation' : '待管理员确认支付'}</Tag>
-        return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
-      },
+      render: (_: unknown, row: PaymentLink) => statusOf(row),
     },
     { title: en ? 'Created' : '创建时间', dataIndex: 'createdAt', width: 150 },
     { title: en ? 'Updated' : '更新时间', width: 150, render: (_: unknown, row: PaymentLink) => row.updatedAt || row.createdAt },
     {
       title: en ? 'Actions' : '操作',
       width: 420,
-      render: (_: unknown, row: PaymentLink) => (
-          <Space wrap>
-            <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
-            <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>
-              {row.kind === 'deposit_first' ? (en ? 'Copy first-payment link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
-            </Button>
-            <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
-            {!row.orderId && row.kind !== 'deposit_balance' && (
-              <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
-            )}
-            {canConfirmBank && canMarkBankPaid(row, links) && (
-              <Button size="small" type="primary" onClick={() => markBankPaid(row)}>
-                {row.kind === 'deposit_first'
-                  ? (en ? 'Confirm first transfer' : '确认首款已转账')
-                  : (en ? 'Confirm transfer and open membership' : '确认已转账并开通会员')}
-              </Button>
-            )}
-            {row.orderId && (
-              <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
-            )}
-          </Space>
-      ),
+      render: (_: unknown, row: PaymentLink) => actionsOf(row),
     },
   ]
 
-  const rows = links.filter((row) => {
-    const text = [row.phone, row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase()
-    if (keyword.trim() && !text.includes(keyword.trim().toLowerCase())) return false
-    if (typeFilter && row.kind !== typeFilter) return false
-    if (statusFilter === 'paid' && !row.orderId) return false
-    if (statusFilter === 'bank' && (row.orderId || !hasBankTransfer(row))) return false
-    if (statusFilter === 'callback' && (row.orderId || hasBankTransfer(row))) return false
+  const textMatch = (row: PaymentLink) => {
+    if (!keyword.trim()) return true
+    return [row.phone, row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
+  }
+  const statusMatch = (row: PaymentLink) => {
+    if (statusFilter === 'paid') return !!row.orderId
+    if (statusFilter === 'bank') return !row.orderId && hasBankTransfer(row)
+    if (statusFilter === 'callback') return !row.orderId && !hasBankTransfer(row)
     return true
-  })
+  }
+  const rows: ListRow[] = links
+    .filter((row) => row.kind !== 'deposit_balance')
+    .map((row) => ({
+      ...row,
+      children: links.filter((item) => item.kind === 'deposit_balance' && item.depositPlanId && item.depositPlanId === row.depositPlanId),
+    }))
+    .filter((row) => {
+      const kids = row.children || []
+      const selfText = textMatch(row)
+      const kidText = kids.some(textMatch)
+      const selfStatus = statusMatch(row)
+      const kidStatus = kids.some(statusMatch)
+      if (!selfText && !kidText) return false
+      if (typeFilter === 'full') return row.kind === 'full' && selfStatus
+      if (typeFilter === 'deposit_first') return row.kind === 'deposit_first' && (selfStatus || kidStatus)
+      if (typeFilter === 'deposit_balance') return kids.length > 0 && (selfStatus || kidStatus)
+      if (statusFilter && !selfStatus && !kidStatus) return false
+      return true
+    })
+  const pairKey = rows.filter((row) => row.children?.length).map((row) => row.id).sort().join('|')
+  useEffect(() => {
+    setExpanded(pairKey ? pairKey.split('|') : [])
+  }, [pairKey])
 
   const openCreate = (kind: 'full' | 'deposit') => {
     setEditingId(null)
@@ -924,7 +954,27 @@ export default function CreatePaymentLink() {
           ? 'A deposit plan creates both links at once. Status is only paid, waiting for callback, or awaiting manager confirmation. Bank transfer rows show “Confirm transfer and open membership” for admin, ops, or a sales lead. Regular CC accounts do not see that action.'
           : '定金会一次生成首款和尾款两条链接。状态只有已支付、等待支付回调、待管理员确认支付。包含银行转账的未支付记录，管理员、运营或销售组长会看到「确认已转账并开通会员」。普通 CC 看不到这个按钮。'}
       />
-      <Table rowKey="id" size="middle" columns={columns('full')} dataSource={rows} pagination={false} locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }} />
+      <style>{`
+        .paylink-first td { background: #fff7e6 !important; }
+        .paylink-balance td { background: #fffbe6 !important; }
+        .paylink-table .ant-table-row-indent { padding-left: 28px !important; }
+      `}</style>
+      <Table
+        className="paylink-table"
+        rowKey="id"
+        size="middle"
+        columns={columns}
+        dataSource={rows}
+        pagination={false}
+        indentSize={28}
+        expandable={{
+          expandedRowKeys: expanded,
+          onExpandedRowsChange: (keys) => setExpanded(keys.map(String)),
+          rowExpandable: (row: ListRow) => !!row.children?.length,
+        }}
+        rowClassName={(row) => row.kind === 'deposit_first' ? 'paylink-first' : row.kind === 'deposit_balance' ? 'paylink-balance' : ''}
+        locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }}
+      />
       <Modal
         title={en ? 'Payment link QR code' : '支付链接二维码'}
         open={!!qrTarget}
