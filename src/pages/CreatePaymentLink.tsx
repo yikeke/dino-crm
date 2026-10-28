@@ -5,22 +5,19 @@ import {
   AutoComplete,
   Button,
   Card,
-  Form,
   Input,
   InputNumber,
   Checkbox,
   Modal,
-  Radio,
   Segmented,
   Select,
   Space,
   Table,
-  Tabs,
   Tag,
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CopyOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -702,166 +699,303 @@ export default function CreatePaymentLink() {
       : (en ? 'Marked paid and membership opened' : '已确认转账并开通会员'))
   }
 
-  const formCard = (mode: 'full' | 'deposit') => (
-    <Card>
-      <Form layout="vertical">
-        <Space size={16} align="start" wrap style={{ width: '100%' }}>
-          <Form.Item label={en ? 'Business line' : '业务线'} style={{ minWidth: 180 }}>
-            <Select
-              value={activeLine || undefined}
-              placeholder={en ? 'Select a line' : '选择业务线'}
-              options={lines.map((item) => ({ value: item, label: item }))}
-              onChange={onLine}
-            />
-          </Form.Item>
-          <Form.Item label={en ? 'Channel' : '渠道'} required style={{ minWidth: 360 }}>
-            <Select
-              value={activeChannel?.channel.id}
-              options={lineChannels.map((item) => ({
-                value: item.channel.id,
-                disabled: !item.plan,
-                label: `${item.channel.name} · ${item.channel.channelCode || '—'} · ${item.channel.type || ''}${item.plan ? '' : (en ? ' · no price plan' : ' · 无价格方案')}`,
-              }))}
-              onChange={onChannel}
-            />
-          </Form.Item>
-        </Space>
-        <Form.Item
-          label={en ? 'Channel SKU price plan' : '渠道 SKU 价格方案'}
-          required
-          extra={mode === 'deposit'
-            ? (en
-              ? 'A deposit link includes one SKU. If the customer wants another package, create a new link.'
-              : '定金链接只能选一个 SKU。客户要换套餐时，新建一条链接，不要改这条。')
-            : (en
-              ? 'Every SKU on this channel plan is included. Choose whether the whole page uses the plan promo or list price.'
-              : '价格方案里有几个 SKU 就全部展示。只选择整页使用优惠，或全部按原价。')}
-        >
-          {activeChannel?.plan ? (
-            <div>
-              <Select
-                style={{ minWidth: 320, marginBottom: 12 }}
-                disabled={!hasDiscount}
-                value={hasDiscount && usePromo ? 'yes' : 'no'}
-                options={hasDiscount
-                  ? [
-                    { value: 'yes', label: en ? `Use promo · ${activeChannel.plan.promoCode}` : `使用优惠 · ${activeChannel.plan.promoCode}` },
-                    { value: 'no', label: en ? 'No promo (list price for every SKU)' : '不使用优惠（全部按原价）' },
-                  ]
-                  : [{ value: 'no', label: en ? 'No promo on this plan. Every SKU stays at list price.' : '当前方案无优惠，全部按原价售卖' }]}
-                onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
-              />
-              {mode === 'deposit' ? (
-                <Radio.Group
-                  value={chosenDeposit?.skuId}
-                  disabled={!!editingId}
-                  onChange={(event) => { setDepositSkuId(event.target.value); setFirstAmount(null) }}
-                >
-                  <Space direction="vertical" size={4}>
-                    {shown.map((offer) => (
-                      <Radio key={offer.skuId} value={offer.skuId}>
-                        <Tag color={offer.memberLevel === 'Max' ? 'gold' : 'purple'}>{offer.memberLevel}</Tag>
-                        <b>{offer.skuName}</b>
-                        {' · '}
-                        {offer.payable !== offer.listPrice
-                          ? <>{formatMoney(offer.listPrice, offer.currency)} → {formatMoney(offer.payable, offer.currency)}（{offer.ruleLabel}）</>
-                          : <>{formatMoney(offer.listPrice, offer.currency)} · List price</>}
-                      </Radio>
-                    ))}
-                  </Space>
-                </Radio.Group>
-              ) : (
-              <Space direction="vertical" size={4}>
-                {shown.map((offer) => (
-                  <div key={offer.skuId}>
-                    <Tag color={offer.memberLevel === 'Max' ? 'gold' : 'purple'}>{offer.memberLevel}</Tag>
-                    <b>{offer.skuName}</b>
-                    {' · '}
-                    {offer.payable !== offer.listPrice
-                      ? <>{formatMoney(offer.listPrice, offer.currency)} → {formatMoney(offer.payable, offer.currency)}（{offer.ruleLabel}）</>
-                      : <>{formatMoney(offer.listPrice, offer.currency)} · List price</>}
-                  </div>
-                ))}
-              </Space>
-              )}
-            </div>
-          ) : (
-            <Typography.Text type="secondary">{en ? 'Pick a channel that already has a price plan.' : '请选择已经配好价格方案的渠道。'}</Typography.Text>
-          )}
-        </Form.Item>
-        <Space size={16} align="start" wrap>
-          <Form.Item
-            label="User ID"
-            required
-            style={{ minWidth: 320 }}
-            extra={en
-              ? 'Enter a phone number or a User ID. Matches are User IDs from the user database, and the saved value is the User ID.'
-              : '可输入手机号或 User ID。输入时会匹配用户库里的 User ID，选中后保存的是 User ID。'}
-          >
+  const linkedStudent = students.find((student) => student.studentId === linkedUserId)
+  const lineMethods = (mode: 'full' | 'deposit') => (mode === 'deposit' ? depositMethods(activeLine) : methodsForLine(activeLine))
+  const firstValue = Math.round(Number(firstAmount) || 0)
+  const depositPayable = chosenDeposit?.payable || 0
+  const floor = depositFloor(activeLine, depositPayable)
+  const firstValid = !!chosenDeposit && firstValue >= floor.min && firstValue < depositPayable
+  const roundFor = (value: number, currency: string) => (['VND', 'KRW', 'IDR'].includes(currency) ? Math.round(value / 1000) * 1000 : Math.round(value))
+  const quickFirst = chosenDeposit
+    ? [
+      ...(floor.min > 1 ? [{ label: en ? 'Minimum' : '最低', value: floor.min }] : []),
+      { label: '30%', value: Math.max(floor.min, roundFor(depositPayable * 0.3, chosenDeposit.currency)) },
+      { label: '50%', value: Math.max(floor.min, roundFor(depositPayable * 0.5, chosenDeposit.currency)) },
+    ].filter((item, index, all) => item.value < depositPayable && all.findIndex((other) => other.value === item.value) === index)
+    : []
+
+  const previewDraft = (mode: 'full' | 'deposit') => {
+    const kind: LinkKind = mode === 'full' ? 'full' : 'deposit_first'
+    const amount = mode === 'full' ? (shown.length === 1 ? shown[0].payable : 0) : firstValue
+    const draft = baseFields(kind, amount, mode === 'full' ? '' : 'DP-PREVIEW', 'PL-PREVIEW')
+    window.open(`${buildUrl(draft)}&preview=1`, '_blank')
+  }
+
+  const offerPrice = (item: LinkOffer) => (
+    <span className="pl-offer__price">
+      {item.payable !== item.listPrice && <s>{formatMoney(item.listPrice, item.currency)}</s>}
+      <b>{formatMoney(item.payable, item.currency)}</b>
+    </span>
+  )
+
+  const offerCard = (item: LinkOffer, mode: 'full' | 'deposit') => {
+    const selected = mode === 'full' || item.skuId === chosenDeposit?.skuId
+    const body = (
+      <>
+        <span className="pl-offer__head">
+          <Tag color={item.memberLevel === 'Max' ? 'gold' : 'purple'} bordered={false}>{item.memberLevel}</Tag>
+          <b>{item.skuName}</b>
+        </span>
+        {offerPrice(item)}
+        <span className="pl-offer__rule">{item.ruleLabel === 'List price' ? (en ? 'List price' : '原价') : item.ruleLabel}</span>
+      </>
+    )
+    if (mode === 'full') return <div key={item.skuId} className="pl-offer is-included">{body}</div>
+    return (
+      <button
+        key={item.skuId}
+        type="button"
+        className={`pl-offer${selected ? ' is-selected' : ''}`}
+        disabled={!!editingId && !selected}
+        onClick={() => { setDepositSkuId(item.skuId); setFirstAmount(null) }}
+      >
+        {body}
+      </button>
+    )
+  }
+
+  const step = (no: number, title: string, hint?: string) => (
+    <span className="pl-step-title">
+      <span className="pl-step-title__no">{no}</span>
+      <span>
+        {title}
+        {hint && <Typography.Text type="secondary" className="pl-step-title__hint">{hint}</Typography.Text>}
+      </span>
+    </span>
+  )
+
+  const formCard = (mode: 'full' | 'deposit') => {
+    const methodList = lineMethods(mode)
+    const pickedMethods = methodList.filter((method) => payMethods.includes(method.code))
+    const promo = usePromo && hasDiscount ? activeChannel?.plan?.promoCode : ''
+    const balanceValue = Math.max(depositPayable - firstValue, 0)
+    const firstShare = depositPayable ? Math.min(100, Math.max(0, (firstValue / depositPayable) * 100)) : 0
+    const ready = !!linkedUserId && !!activeChannel?.plan && pickedMethods.length > 0 && (mode === 'full' ? shown.length > 0 : firstValid)
+    let stepNo = 0
+    return (
+      <div className="pl-form">
+        <div className="pl-form__main">
+          <Card size="small" title={step(++stepNo, en ? 'Customer' : '客户', en ? 'Phone number or User ID' : '手机号或 User ID')}>
             <AutoComplete
               value={userQuery}
-              options={userMatches.map((student) => ({ value: student.studentId }))}
+              options={userMatches.map((student) => ({
+                value: student.studentId,
+                label: (
+                  <span className="pl-user-option">
+                    <b>{student.studentId}</b>
+                    <Typography.Text type="secondary">{student.name} · {student.phone || student.account}</Typography.Text>
+                  </span>
+                ),
+              }))}
               onChange={setUserQuery}
               onSelect={setUserQuery}
-              placeholder={en ? 'Phone or User ID' : '手机号或 User ID'}
+              placeholder={en ? 'Type at least 2 characters' : '至少输入 2 个字符'}
               style={{ width: '100%' }}
+              status={userQuery.trim().length >= 2 && !linkedUserId ? 'warning' : undefined}
             />
-          </Form.Item>
+            {linkedStudent ? (
+              <div className="pl-user">
+                <span className="pl-user__avatar">{(linkedStudent.name || '?').slice(0, 1)}</span>
+                <span className="pl-user__info">
+                  <b>{linkedStudent.name}</b>
+                  <Typography.Text type="secondary">{linkedStudent.studentId} · {linkedStudent.phone || linkedStudent.account} · {enValue(linkedStudent.businessLine)}</Typography.Text>
+                </span>
+                <Tag color="success" bordered={false}>{en ? 'Matched' : '已匹配'}</Tag>
+              </div>
+            ) : (
+              <Typography.Text type="secondary" className="pl-field-hint">
+                {userQuery.trim().length >= 2
+                  ? (en ? 'Pick a user from the matches. The link saves the User ID.' : '请从下拉结果里选中一个用户，链接保存的是 User ID。')
+                  : (en ? 'The link is tied to one user. Only that user can pay with it.' : '链接绑定一个用户，只给这个用户付款。')}
+              </Typography.Text>
+            )}
+          </Card>
+
+          <Card size="small" title={step(++stepNo, en ? 'Channel and price plan' : '渠道与价格方案')}>
+            <div className="pl-grid-2">
+              <div>
+                <div className="pl-label">{en ? 'Business line' : '业务线'}</div>
+                <Select
+                  style={{ width: '100%' }}
+                  value={activeLine || undefined}
+                  placeholder={en ? 'Select a line' : '选择业务线'}
+                  options={lines.map((item) => ({ value: item, label: item }))}
+                  onChange={onLine}
+                />
+              </div>
+              <div>
+                <div className="pl-label">{en ? 'Channel' : '渠道'}</div>
+                <Select
+                  style={{ width: '100%' }}
+                  value={activeChannel?.channel.id}
+                  options={lineChannels.map((item) => ({
+                    value: item.channel.id,
+                    disabled: !item.plan,
+                    label: `${item.channel.name} · ${item.channel.channelCode || '—'}${item.plan ? '' : (en ? ' · no price plan' : ' · 无价格方案')}`,
+                  }))}
+                  onChange={onChannel}
+                />
+              </div>
+            </div>
+            {activeChannel?.plan ? (
+              <>
+                <div className="pl-plan-bar">
+                  <span className="pl-label">{en ? 'Promo' : '优惠'}</span>
+                  {hasDiscount ? (
+                    <Segmented
+                      size="small"
+                      value={usePromo ? 'yes' : 'no'}
+                      onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
+                      options={[
+                        { value: 'yes', label: `${en ? 'Use' : '使用'} ${activeChannel.plan.promoCode}` },
+                        { value: 'no', label: en ? 'List price' : '全部原价' },
+                      ]}
+                    />
+                  ) : (
+                    <Typography.Text type="secondary">{en ? 'This plan has no promo. Every SKU is at list price.' : '当前方案无优惠，全部按原价'}</Typography.Text>
+                  )}
+                </div>
+                <div className="pl-label">
+                  {mode === 'full'
+                    ? (en ? `SKUs on this plan (${shown.length}) · all shown to the customer` : `方案内 SKU（${shown.length} 个）· 全部展示给用户选择`)
+                    : (en ? 'Pick one SKU for this deposit' : '选择这笔定金对应的 1 个 SKU')}
+                </div>
+                <div className="pl-offers">{shown.map((item) => offerCard(item, mode))}</div>
+                {mode === 'deposit' && editingId && (
+                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'The SKU of a saved deposit cannot change. Create a new link instead.' : '已保存的定金不能换 SKU，要换套餐请新建链接。'}</Typography.Text>
+                )}
+              </>
+            ) : (
+              <Alert type="warning" showIcon message={en ? 'This channel has no active price plan. Pick another channel.' : '这个渠道还没有生效中的价格方案，请换一个渠道。'} />
+            )}
+          </Card>
+
           {mode === 'deposit' && chosenDeposit && (
-            <Form.Item
-              label={en ? 'First payment' : '首款金额'}
-              required
-              style={{ minWidth: 220 }}
-              extra={depositFloor(activeLine, chosenDeposit.payable).label || (en ? 'Greater than 0 and below the package price' : '大于 0，且小于套餐应付')}
-            >
-              <InputNumber
-                min={depositFloor(activeLine, chosenDeposit.payable).min}
-                max={Math.max(chosenDeposit.payable - 1, 1)}
-                value={firstAmount}
-                onChange={(value) => setFirstAmount(typeof value === 'number' ? value : null)}
-                style={{ width: '100%' }}
-                addonAfter={chosenDeposit.currency}
-              />
-            </Form.Item>
+            <Card size="small" title={step(++stepNo, en ? 'First payment' : '首款金额', floor.label || (en ? 'Greater than 0 and below the package price' : '大于 0，且小于套餐应付'))}>
+              <div className="pl-first">
+                <InputNumber
+                  size="large"
+                  min={floor.min}
+                  max={Math.max(depositPayable - 1, 1)}
+                  value={firstAmount}
+                  onChange={(value) => setFirstAmount(typeof value === 'number' ? value : null)}
+                  formatter={(value) => (value === undefined || value === null || String(value) === '' ? '' : Number(value).toLocaleString('en-US'))}
+                  parser={(value) => Number((value || '').replace(/[^\d.]/g, ''))}
+                  addonAfter={chosenDeposit.currency}
+                  status={firstAmount !== null && !firstValid ? 'error' : undefined}
+                  style={{ width: 260 }}
+                />
+                <Space size={6}>
+                  {quickFirst.map((item) => (
+                    <Button key={item.label} size="small" onClick={() => setFirstAmount(item.value)}>{item.label}</Button>
+                  ))}
+                </Space>
+              </div>
+              <div className="pl-split">
+                <div className="pl-split__bar">
+                  <span className="pl-split__first" style={{ width: `${firstShare}%` }} />
+                </div>
+                <div className="pl-split__legend">
+                  <span><i className="is-first" />{en ? 'First' : '首款'} <b>{formatMoney(firstValue, chosenDeposit.currency)}</b></span>
+                  <span><i className="is-balance" />{en ? 'Balance' : '尾款'} <b>{formatMoney(balanceValue, chosenDeposit.currency)}</b></span>
+                  <span className="pl-split__total">{en ? 'Package' : '套餐应付'} {formatMoney(depositPayable, chosenDeposit.currency)}</span>
+                </div>
+              </div>
+            </Card>
           )}
-        </Space>
-        <Form.Item
-          label={en ? 'Payment methods' : '支付方式'}
-          required
-          extra={mode === 'deposit'
-            ? (en
-              ? 'Both the first payment and the balance offer these methods. The customer picks a method for each payment separately. Instalment methods are not available for deposits.'
-              : '首款和尾款都提供这些方式，用户每一笔单独选择，可以不一样。定金不支持分期类支付方式。')
-            : (en ? 'Pick one method, or several. The customer page only shows the methods checked here.' : '可以只选一种，也可以多选。用户打开链接后，只会看到这里勾选的方式。')}
-        >
-          <Checkbox.Group value={payMethods} onChange={(value) => setPayMethods(value as string[])}>
-            <Space size={[16, 8]} wrap>
-              {(mode === 'deposit' ? depositMethods(activeLine) : methodsForLine(activeLine)).map((method) => (
-                <Checkbox key={method.code} value={method.code}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <img src={method.icon} alt="" width={22} height={22} style={{ objectFit: 'contain' }} />
-                    {method.name}
-                  </span>
-                </Checkbox>
-              ))}
-            </Space>
-          </Checkbox.Group>
-        </Form.Item>
-        {mode === 'deposit' && chosenDeposit && (
-          <Typography.Paragraph type="secondary">
-            {en ? 'Balance after this first payment: ' : '付完这笔首款后，尾款为 '}
-            <b>{formatMoney(Math.max(chosenDeposit.payable - Math.round(Number(firstAmount) || 0), 0), chosenDeposit.currency)}</b>
-            {en ? '. Saving creates both the first-payment link and the balance link.' : '。保存后会同时生成首款链接和尾款链接。'}
-          </Typography.Paragraph>
-        )}
-        <Button type="primary" icon={<LinkOutlined />} onClick={mode === 'full' ? createFull : createDepositFirst}>
-          {editingId
-            ? (en ? 'Save changes' : '保存修改')
-            : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first and balance links' : '生成首款和尾款链接')}
-        </Button>
-      </Form>
-    </Card>
-  )
+
+          <Card
+            size="small"
+            title={step(++stepNo, en ? 'Payment methods' : '支付方式', mode === 'deposit'
+              ? (en ? 'Offered on both links; chosen per payment; no instalments' : '首款、尾款都提供，用户每笔单独选；不含分期')
+              : (en ? 'The customer only sees the methods checked here' : '用户只会看到这里勾选的方式'))}
+          >
+            <div className="pl-method-tiles">
+              {methodList.map((method) => {
+                const on = payMethods.includes(method.code)
+                return (
+                  <button
+                    key={method.code}
+                    type="button"
+                    className={`pl-method-tile${on ? ' is-on' : ''}`}
+                    onClick={() => setPayMethods(on ? payMethods.filter((code) => code !== method.code) : [...payMethods, method.code])}
+                  >
+                    <Checkbox checked={on} tabIndex={-1} />
+                    <img src={method.icon} alt="" />
+                    <span>{methodDisplayName(method, en ? 'en' : 'zh')}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+        </div>
+
+        <div className="pl-form__side">
+          <Card size="small" title={en ? 'Summary' : '链接摘要'} className="pl-summary">
+            <div className="pl-summary__type">
+              <Tag color={mode === 'full' ? 'green' : 'blue'} bordered={false}>
+                {mode === 'full' ? (en ? 'Full payment' : '全款') : (en ? 'Deposit · 2 links' : '定金 · 2 条链接')}
+              </Tag>
+              {editingId && <Tag bordered={false}>{en ? 'Editing' : '编辑中'} {editingId}</Tag>}
+            </div>
+            <dl className="pl-summary__list">
+              <dt>{en ? 'Customer' : '客户'}</dt>
+              <dd>{linkedStudent ? <>{linkedStudent.name}<br /><Typography.Text type="secondary">{linkedStudent.studentId}</Typography.Text></> : <Typography.Text type="secondary">{en ? 'Not selected' : '未选择'}</Typography.Text>}</dd>
+              <dt>{en ? 'Channel' : '渠道'}</dt>
+              <dd>{activeChannel ? `${activeChannel.channel.name} · ${activeLine}` : '—'}</dd>
+              <dt>{en ? 'Promo' : '优惠'}</dt>
+              <dd>{promo || (en ? 'None' : '无')}</dd>
+              <dt>SKU</dt>
+              <dd>
+                {mode === 'full'
+                  ? shown.map((item) => <div key={item.skuId} className="pl-summary__sku"><span>{item.skuName}</span><b>{formatMoney(item.payable, item.currency)}</b></div>)
+                  : chosenDeposit && <div className="pl-summary__sku"><span>{chosenDeposit.skuName}</span><b>{formatMoney(chosenDeposit.payable, chosenDeposit.currency)}</b></div>}
+              </dd>
+              {mode === 'deposit' && chosenDeposit && (
+                <>
+                  <dt>{en ? 'Links' : '生成链接'}</dt>
+                  <dd>
+                    <div className="pl-summary__sku"><span>① {en ? 'First' : '首款'}</span><b>{firstValid ? formatMoney(firstValue, chosenDeposit.currency) : '—'}</b></div>
+                    <div className="pl-summary__sku"><span>② {en ? 'Balance' : '尾款'}</span><b>{firstValid ? formatMoney(balanceValue, chosenDeposit.currency) : '—'}</b></div>
+                  </dd>
+                </>
+              )}
+              <dt>{en ? 'Methods' : '支付方式'}</dt>
+              <dd>
+                {pickedMethods.length
+                  ? <span className="pl-summary__methods">{pickedMethods.map((method) => <img key={method.code} src={method.icon} alt={method.name} title={method.name} />)}</span>
+                  : <Typography.Text type="danger">{en ? 'None selected' : '未选择'}</Typography.Text>}
+              </dd>
+            </dl>
+            <Typography.Paragraph type="secondary" className="pl-summary__note">
+              {mode === 'full'
+                ? (en ? 'One link, one payment. When it lands, one order is created and membership opens.' : '1 条链接对应 1 笔付款。到账后生成 1 张订单并开通会员。')
+                : (en ? 'Saving creates the first and balance links together. Both payments sit under one main order; membership opens after the balance.' : '保存后同时生成首款和尾款链接，两笔都挂在同一张主订单下；尾款到账后开通会员。')}
+            </Typography.Paragraph>
+            <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDepositFirst}>
+              {editingId
+                ? (en ? 'Save changes' : '保存修改')
+                : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first and balance links' : '生成首款和尾款链接')}
+            </Button>
+            <Button block icon={<EyeOutlined />} style={{ marginTop: 8 }} disabled={!activeChannel?.plan || !shown.length} onClick={() => previewDraft(mode)}>
+              {en ? 'Preview customer page' : '预览用户页面'}
+            </Button>
+            {!ready && (
+              <Typography.Text type="secondary" className="pl-summary__todo">
+                {!linkedUserId
+                  ? (en ? 'Select a customer to continue.' : '选中客户后才能生成。')
+                  : !pickedMethods.length
+                    ? (en ? 'Select at least one payment method.' : '至少选择一种支付方式。')
+                    : mode === 'deposit' && !firstValid
+                      ? (en ? 'Enter a valid first payment.' : '请填写有效的首款金额。')
+                      : ''}
+              </Typography.Text>
+            )}
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   type ListRow = PaymentLink & { balance?: PaymentLink }
 
@@ -1184,22 +1318,33 @@ export default function CreatePaymentLink() {
 
   if (screen === 'form') {
     return (
-      <div style={{ display: 'grid', gap: 16 }}>
-        <Space>
-          <Button onClick={() => { setEditingId(null); setScreen('list') }}>{en ? 'Back to list' : '返回列表'}</Button>
-          <Typography.Text strong>
-            {tab === 'full' ? (en ? 'Full payment link' : '全款支付链接') : (en ? 'Deposit payment link' : '定金支付链接')}
-          </Typography.Text>
-        </Space>
-        {tab === 'deposit' && (
-          <Alert
-            type="info"
-            showIcon
-            message={en
-              ? 'Saving creates the first-payment link and the balance link together. First payment opens one order as unpaid. Balance payment updates that same order. No second order is created.'
-              : '保存后会同时生成首款链接和尾款链接。首款到账后只开一张待支付订单，尾款到账后回写同一张订单，不另开订单。'}
-          />
-        )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
+        <div className="pl-form-head">
+          <Button icon={<ArrowLeftOutlined />} onClick={() => { setEditingId(null); setScreen('list') }}>{en ? 'Back to list' : '返回列表'}</Button>
+          <div className="pl-form-head__title">
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              {editingId
+                ? (tab === 'full' ? (en ? 'Edit full payment link' : '编辑全款支付链接') : (en ? 'Edit deposit links' : '编辑定金支付链接'))
+                : (tab === 'full' ? (en ? 'New full payment link' : '新建全款支付链接') : (en ? 'New deposit links' : '新建定金支付链接'))}
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              {tab === 'full'
+                ? (en ? 'The customer pays the package in one payment.' : '用户一次付清套餐。')
+                : (en ? 'The customer pays a first payment now and the balance later.' : '用户先付首款，之后再付尾款。')}
+            </Typography.Text>
+          </div>
+          {!editingId && (
+            <Segmented
+              className="pl-form-head__switch"
+              value={tab}
+              onChange={(value) => { setTab(value as 'full' | 'deposit'); setFirstAmount(null) }}
+              options={[
+                { value: 'full', label: en ? 'Full payment' : '全款' },
+                { value: 'deposit', label: en ? 'Deposit' : '定金' },
+              ]}
+            />
+          )}
+        </div>
         {formCard(tab)}
       </div>
     )

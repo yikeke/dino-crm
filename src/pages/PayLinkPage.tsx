@@ -39,6 +39,7 @@ export default function PayLinkPage() {
   const bank = bankCopy(lang)
   const userId = params.get('user_id') || ''
   const payLink = params.get('pay_link') || ''
+  const preview = params.get('preview') === '1'
   const offerKey = params.get('offers') || ''
   const offers = useMemo(() => {
     try {
@@ -96,6 +97,10 @@ export default function PayLinkPage() {
 
   const pay = (methodName: string) => {
     if (paidOrderId) return
+    if (preview) {
+      setHost(null)
+      return
+    }
     if (!picked && offers.length > 0) return
     const stored = readPaymentLinks().find((item) => item.id === payLink)
     const leg = stored?.kind === 'deposit_balance' || stored?.kind === 'deposit_first' ? stored.kind : 'full'
@@ -161,11 +166,12 @@ export default function PayLinkPage() {
   return (
     <div className="pay-link-page" dir={copy.dir}>
       <ReviewSwitch lang={lang} line={line} onChange={setLang} />
+      {preview && <div className="pay-preview">预览模式，不会产生订单 · Preview only, no payment is recorded</div>}
       <div className="pay-shell">
         <header className="pay-top">
           <span className="pay-brand">
             <span className="pay-brand__mark">D</span>
-            Dino English
+            Dino AI
           </span>
           <span className="pay-secure">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 1 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7h.5Zm1.5 0h4V5a2 2 0 1 0-4 0v2Z" /></svg>
@@ -339,7 +345,7 @@ export default function PayLinkPage() {
             </div>
             {copied && <p className="bank-copied">{bank.copied}</p>}
             {!acked ? (
-              <button className="pay-continue" type="button" onClick={() => { declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
+              <button className="pay-continue" type="button" onClick={() => { if (!preview) declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
             ) : (
               <div className="bank-noted">
                 <h2>{bank.notedTitle}</h2>

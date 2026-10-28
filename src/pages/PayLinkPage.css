@@ -697,3 +697,11 @@
   font-size: 14px;
   cursor: pointer;
 }
+
+.pay-preview {
+  padding: 8px 16px;
+  background: #fff7e6;
+  color: #ad6800;
+  font-size: 12px;
+  text-align: center;
+}
