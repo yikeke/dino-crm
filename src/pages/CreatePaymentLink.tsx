@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CopyOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined } from '@ant-design/icons'
+import { CopyOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -33,7 +33,8 @@ import {
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
-import { methodsForLine } from '../paymentMethods'
+import { methodDisplayName, methodsForLine } from '../paymentMethods'
+import './CreatePaymentLink.css'
 
 const STORE_KEY = 'dino-cc-payment-links-v3'
 
@@ -760,107 +761,222 @@ export default function CreatePaymentLink() {
     </Card>
   )
 
-  type ListRow = PaymentLink & { children?: PaymentLink[] }
+  type ListRow = PaymentLink & { balance?: PaymentLink }
 
-  const statusOf = (row: PaymentLink) => {
-    if (row.orderId) {
-      const method = row.paidMethod === 'bank_transfer' ? (en ? 'Bank transfer' : '银行转账') : (row.paidMethod || '')
-      return <Tag color="green">{en ? 'Paid' : '已支付'}{method ? ` · ${method}` : ''}</Tag>
-    }
-    if (hasBankTransfer(row)) return <Tag color="orange">{en ? 'Awaiting manager confirmation' : '待管理员确认支付'}</Tag>
-    return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
+  const legStatus = (row: PaymentLink) => {
+    if (row.orderId) return <Tag color="success" bordered={false}>{en ? 'Paid' : '已支付'}</Tag>
+    if (hasBankTransfer(row)) return <Tag color="warning" bordered={false}>{en ? 'Awaiting manager' : '待管理员确认'}</Tag>
+    return <Tag color="processing" bordered={false}>{en ? 'Waiting for callback' : '等待支付回调'}</Tag>
   }
 
-  const amountOf = (row: PaymentLink) => {
-    const prices = (row.offers || []).map((offer) => offer.payable).filter((value) => value > 0)
-    if (row.kind === 'deposit_first' || row.kind === 'deposit_balance') return <b>{formatMoney(row.amount, row.currency)}</b>
-    if (prices.length > 1) {
-      const min = Math.min(...prices)
-      const max = Math.max(...prices)
-      return <b>{min === max ? formatMoney(min, row.currency) : `${formatMoney(min, row.currency)} – ${formatMoney(max, row.currency)}`}</b>
-    }
-    return <b>{formatMoney(prices[0] || row.amount || row.payable, row.currency)}</b>
+  const paidVia = (row: PaymentLink) => {
+    if (!row.paidMethod) return ''
+    const method = methodsForLine(row.line).find((item) => item.code === row.paidMethod)
+    return method ? methodDisplayName(method, en ? 'en' : 'zh') : row.paidMethod
   }
 
-  const actionsOf = (row: PaymentLink) => (
-    <Space wrap>
-      <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
-      <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>
-        {row.kind === 'deposit_first' ? (en ? 'Copy first-payment link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
-      </Button>
-      <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
-      {!row.orderId && row.kind !== 'deposit_balance' && (
-        <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
-      )}
-      {canConfirmBank && canMarkBankPaid(row, links) && (
-        <Button size="small" type="primary" onClick={() => markBankPaid(row)}>
-          {row.kind === 'deposit_first'
-            ? (en ? 'Confirm first transfer' : '确认首款已转账')
-            : (en ? 'Confirm transfer and open membership' : '确认已转账并开通会员')}
-        </Button>
-      )}
-      {row.orderId && (
-        <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
-      )}
+  const methodsCell = (row: PaymentLink) => {
+    const all = methodsForLine(row.line)
+    const picked = (row.methods || []).map((code) => all.find((item) => item.code === code)).filter((item): item is NonNullable<typeof item> => !!item)
+    if (!picked.length) return '—'
+    return (
+      <div className="pl-methods">
+        {picked.map((method) => (
+          <span key={method.code} className="pl-method">
+            <img src={method.icon} alt="" />
+            {methodDisplayName(method, en ? 'en' : 'zh')}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  const confirmButton = (row: PaymentLink) => (canConfirmBank && canMarkBankPaid(row, links) ? (
+    <Button size="small" type="primary" onClick={() => markBankPaid(row)}>
+      {row.kind === 'deposit_first'
+        ? (en ? 'Confirm first transfer' : '确认首款已转账')
+        : (en ? 'Confirm transfer & open membership' : '确认已转账并开通会员')}
+    </Button>
+  ) : null)
+
+  const linkActions = (row: PaymentLink, copyLabel: string) => (
+    <Space size={4} wrap>
+      <Button size="small" type="link" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{copyLabel}</Button>
+      <Button size="small" type="link" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR' : '二维码'}</Button>
+      <Button size="small" type="link" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Preview' : '预览'}</Button>
     </Space>
   )
+
+  const depositProgress = (row: ListRow) => {
+    const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
+    const paid = legs.filter((item) => item.orderId).length
+    const label = paid === legs.length
+      ? (en ? 'Fully paid' : '已付清')
+      : paid === 0
+        ? (en ? 'First payment pending' : '待付首款')
+        : (en ? 'Balance pending' : '待付尾款')
+    return (
+      <div className="pl-progress">
+        <div className="pl-progress__bar">
+          {legs.map((item) => <span key={item.id} className={item.orderId ? 'is-done' : ''} />)}
+        </div>
+        <span className="pl-progress__text">{label} · {paid}/{legs.length}</span>
+      </div>
+    )
+  }
 
   const columns = [
     {
       title: en ? 'Type' : '类型',
-      dataIndex: 'kind',
-      width: 110,
-      render: (kind: LinkKind) => {
-        if (kind === 'full') return <Tag color="green">{en ? 'Full' : '全款'}</Tag>
-        if (kind === 'deposit_first') return <Tag color="orange">{en ? 'Deposit first' : '定金首款'}</Tag>
-        return (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ color: '#d48806', fontFamily: 'monospace' }}>└</span>
-            <Tag color="gold">{en ? 'Deposit balance' : '定金尾款'}</Tag>
-          </span>
-        )
-      },
+      key: 'kind',
+      width: 96,
+      render: (_: unknown, row: ListRow) => (row.kind === 'full'
+        ? <Tag color="green">{en ? 'Full' : '全款'}</Tag>
+        : <Tag color="orange">{en ? 'Deposit' : '定金'}</Tag>),
     },
     {
       title: 'User ID',
       dataIndex: 'userId',
-      render: (userId: string | undefined) => userId || '—',
+      width: 190,
+      render: (userId: string | undefined) => <Typography.Text copyable={!!userId}>{userId || '—'}</Typography.Text>,
     },
     {
       title: en ? 'Channel / SKU' : '渠道 / SKU',
-      render: (_: unknown, row: PaymentLink) => (
-        <div>
-          <div>{row.channelName || '—'}{row.channelCode ? ` · ${row.channelCode}` : ''}</div>
-          <Typography.Text type="secondary">
-            {(row.offers || []).map((offer) => offer.skuName).join(' / ') || row.skuName}
-          </Typography.Text>
+      width: 230,
+      render: (_: unknown, row: ListRow) => (
+        <div className="pl-two-line">
+          <span>{row.channelName || '—'}</span>
+          <Typography.Text type="secondary">{(row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName}</Typography.Text>
         </div>
       ),
     },
     {
-      title: en ? 'Link amount' : '链接金额',
-      render: (_: unknown, row: PaymentLink) => amountOf(row),
+      title: en ? 'Amount' : '金额',
+      width: 210,
+      render: (_: unknown, row: ListRow) => {
+        if (row.kind === 'deposit_first') {
+          return (
+            <div className="pl-two-line">
+              <b>{formatMoney(row.payable, row.currency)}</b>
+              <Typography.Text type="secondary">
+                {en ? 'First' : '首款'} {formatMoney(row.amount, '')} + {en ? 'balance' : '尾款'} {formatMoney(row.balance?.amount || 0, '')}
+              </Typography.Text>
+            </div>
+          )
+        }
+        const prices = (row.offers || []).map((item) => item.payable).filter((value) => value > 0)
+        if (prices.length > 1) {
+          return (
+            <div className="pl-two-line">
+              <b>{formatMoney(Math.min(...prices), '')} – {formatMoney(Math.max(...prices), row.currency)}</b>
+              <Typography.Text type="secondary">{en ? `${prices.length} SKUs, customer picks one` : `${prices.length} 个 SKU，用户选一个`}</Typography.Text>
+            </div>
+          )
+        }
+        return <b>{formatMoney(prices[0] || row.amount || row.payable, row.currency)}</b>
+      },
     },
     {
-      title: en ? 'Payment methods' : '包含的支付方式',
-      render: (_: unknown, row: PaymentLink) => (row.methods || []).join(' / ') || '—',
+      title: en ? 'Payment methods' : '支付方式',
+      width: 200,
+      render: (_: unknown, row: ListRow) => methodsCell(row),
     },
     {
       title: en ? 'Status' : '状态',
-      render: (_: unknown, row: PaymentLink) => statusOf(row),
+      width: 170,
+      render: (_: unknown, row: ListRow) => {
+        if (row.kind === 'deposit_first') return depositProgress(row)
+        return (
+          <div className="pl-two-line">
+            {legStatus(row)}
+            {row.orderId && <Typography.Text type="secondary">{paidVia(row)}</Typography.Text>}
+          </div>
+        )
+      },
     },
-    { title: en ? 'Created' : '创建时间', dataIndex: 'createdAt', width: 150 },
-    { title: en ? 'Updated' : '更新时间', width: 150, render: (_: unknown, row: PaymentLink) => row.updatedAt || row.createdAt },
+    {
+      title: en ? 'Order' : '订单',
+      width: 190,
+      render: (_: unknown, row: ListRow) => (row.orderId
+        ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
+        : <Typography.Text type="secondary">{en ? 'Created on first payment' : '首笔到账后生成'}</Typography.Text>),
+    },
+    {
+      title: en ? 'Created / Updated' : '创建 / 更新',
+      width: 150,
+      render: (_: unknown, row: ListRow) => {
+        const updated = [row.updatedAt, row.balance?.updatedAt].filter(Boolean).sort().pop() || row.createdAt
+        return (
+          <div className="pl-two-line">
+            <span>{row.createdAt}</span>
+            <Typography.Text type="secondary">{updated}</Typography.Text>
+          </div>
+        )
+      },
+    },
     {
       title: en ? 'Actions' : '操作',
-      width: 420,
-      render: (_: unknown, row: PaymentLink) => actionsOf(row),
+      key: 'actions',
+      width: 230,
+      fixed: 'right' as const,
+      render: (_: unknown, row: ListRow) => {
+        if (row.kind === 'deposit_first') {
+          return !row.orderId
+            ? <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit deposit' : '编辑定金'}</Button>
+            : <Typography.Text type="secondary">{en ? 'Expand for each payment' : '展开查看两笔收款'}</Typography.Text>
+        }
+        return (
+          <Space direction="vertical" size={4}>
+            {linkActions(row, en ? 'Copy link' : '复制链接')}
+            <Space size={4}>
+              {!row.orderId && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
+              {confirmButton(row)}
+            </Space>
+          </Space>
+        )
+      },
     },
   ]
 
+  const depositLegs = (row: ListRow) => {
+    const legs: { leg: PaymentLink; name: string; copy: string }[] = [
+      { leg: row, name: en ? 'First payment' : '首款', copy: en ? 'Copy first-payment link' : '复制定金收款链接' },
+      ...(row.balance ? [{ leg: row.balance, name: en ? 'Balance' : '尾款', copy: en ? 'Copy balance link' : '复制尾款链接' }] : []),
+    ]
+    return (
+      <div className="pl-legs">
+        {legs.map(({ leg, name, copy }, index) => (
+          <div key={leg.id} className={`pl-leg${leg.orderId ? ' is-paid' : ''}`}>
+            <div className="pl-leg__step">
+              <span className="pl-leg__dot">{leg.orderId ? '✓' : index + 1}</span>
+            </div>
+            <div className="pl-leg__name">
+              <b>{name}</b>
+              <Typography.Text type="secondary" className="pl-leg__id">{leg.id}</Typography.Text>
+            </div>
+            <div className="pl-leg__amount">{formatMoney(leg.amount, leg.currency)}</div>
+            <div className="pl-leg__status">
+              {legStatus(leg)}
+              {leg.orderId && <Typography.Text type="secondary">{paidVia(leg)}</Typography.Text>}
+            </div>
+            <div className="pl-leg__actions">
+              {linkActions(leg, copy)}
+              {confirmButton(leg)}
+            </div>
+          </div>
+        ))}
+        <div className="pl-legs__note">
+          {row.orderId
+            ? (en ? `Both payments post to order ${row.orderId}. No second order is created.` : `两笔收款都记在订单 ${row.orderId} 上，不另开订单。`)
+            : (en ? 'The order is created when the first payment lands. The balance updates that same order.' : '首款到账后生成订单，尾款到账后回写同一张订单。')}
+        </div>
+      </div>
+    )
+  }
+
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
-    return [row.phone, row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
+    return [row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
   const statusMatch = (row: PaymentLink) => {
     if (statusFilter === 'paid') return !!row.orderId
@@ -872,25 +988,22 @@ export default function CreatePaymentLink() {
     .filter((row) => row.kind !== 'deposit_balance')
     .map((row) => ({
       ...row,
-      children: links.filter((item) => item.kind === 'deposit_balance' && item.depositPlanId && item.depositPlanId === row.depositPlanId),
+      balance: row.kind === 'deposit_first'
+        ? links.find((item) => item.kind === 'deposit_balance' && !!item.depositPlanId && item.depositPlanId === row.depositPlanId)
+        : undefined,
     }))
     .filter((row) => {
-      const kids = row.children || []
-      const selfText = textMatch(row)
-      const kidText = kids.some(textMatch)
-      const selfStatus = statusMatch(row)
-      const kidStatus = kids.some(statusMatch)
-      if (!selfText && !kidText) return false
-      if (typeFilter === 'full') return row.kind === 'full' && selfStatus
-      if (typeFilter === 'deposit_first') return row.kind === 'deposit_first' && (selfStatus || kidStatus)
-      if (typeFilter === 'deposit_balance') return kids.length > 0 && (selfStatus || kidStatus)
-      if (statusFilter && !selfStatus && !kidStatus) return false
+      const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
+      if (!legs.some(textMatch)) return false
+      if (typeFilter === 'full' && row.kind !== 'full') return false
+      if (typeFilter === 'deposit' && row.kind !== 'deposit_first') return false
+      if (statusFilter && !legs.some(statusMatch)) return false
       return true
     })
-  const pairKey = rows.filter((row) => row.children?.length).map((row) => row.id).sort().join('|')
+  const depositKey = rows.filter((row) => row.kind === 'deposit_first').map((row) => row.id).sort().join('|')
   useEffect(() => {
-    setExpanded(pairKey ? pairKey.split('|') : [])
-  }, [pairKey])
+    setExpanded(depositKey ? depositKey.split('|') : [])
+  }, [depositKey])
 
   const openCreate = (kind: 'full' | 'deposit') => {
     setEditingId(null)
@@ -930,8 +1043,7 @@ export default function CreatePaymentLink() {
           <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}
             options={[
               { value: 'full', label: en ? 'Full' : '全款' },
-              { value: 'deposit_first', label: en ? 'Deposit first' : '定金首款' },
-              { value: 'deposit_balance', label: en ? 'Deposit balance' : '定金尾款' },
+              { value: 'deposit', label: en ? 'Deposit' : '定金' },
             ]}
           />
           <Select allowClear placeholder={en ? 'Status' : '状态'} value={statusFilter} onChange={setStatusFilter} style={{ width: 180 }}
@@ -951,28 +1063,32 @@ export default function CreatePaymentLink() {
         type="info"
         showIcon
         message={en
-          ? 'A deposit plan creates both links at once. Status is only paid, waiting for callback, or awaiting manager confirmation. Bank transfer rows show “Confirm transfer and open membership” for admin, ops, or a sales lead. Regular CC accounts do not see that action.'
-          : '定金会一次生成首款和尾款两条链接。状态只有已支付、等待支付回调、待管理员确认支付。包含银行转账的未支付记录，管理员、运营或销售组长会看到「确认已转账并开通会员」。普通 CC 看不到这个按钮。'}
+          ? 'A deposit creates a first-payment link and a balance link together. Expand a deposit to copy each link. Bank transfers are confirmed by an admin, ops, or a sales lead.'
+          : '定金会同时生成首款和尾款两条链接，展开即可分别复制。银行转账由管理员、运营或销售组长确认到账。'}
       />
-      <style>{`
-        .paylink-first td { background: #fff7e6 !important; }
-        .paylink-balance td { background: #fffbe6 !important; }
-        .paylink-table .ant-table-row-indent { padding-left: 28px !important; }
-      `}</style>
       <Table
-        className="paylink-table"
+        className="pl-table"
         rowKey="id"
         size="middle"
         columns={columns}
         dataSource={rows}
         pagination={false}
-        indentSize={28}
+        scroll={{ x: 1660 }}
         expandable={{
           expandedRowKeys: expanded,
           onExpandedRowsChange: (keys) => setExpanded(keys.map(String)),
-          rowExpandable: (row: ListRow) => !!row.children?.length,
+          rowExpandable: (row: ListRow) => row.kind === 'deposit_first',
+          expandedRowRender: (row: ListRow) => depositLegs(row),
+          expandIcon: ({ expanded: open, expandable, record, onExpand }) => (expandable ? (
+            <Button
+              type="text"
+              size="small"
+              icon={open ? <DownOutlined /> : <RightOutlined />}
+              onClick={(event) => onExpand(record, event)}
+            />
+          ) : null),
         }}
-        rowClassName={(row) => row.kind === 'deposit_first' ? 'paylink-first' : row.kind === 'deposit_balance' ? 'paylink-balance' : ''}
+        rowClassName={(row: ListRow) => (row.kind === 'deposit_first' && expanded.includes(row.id) ? 'pl-row--open' : '')}
         locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }}
       />
       <Modal
