@@ -22,7 +22,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CheckOutlined, DownOutlined, DownloadOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined } from '@ant-design/icons'
+import { CheckOutlined, DownOutlined, DownloadOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined, LinkOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { genCallId, setState, uid, updateSalesSettings, useStore } from '../store'
@@ -848,6 +848,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                   trigger={['click']}
                   menu={{
                     items: [
+                      { key: 'paymentLink', icon: <LinkOutlined />, label: text('创建支付链接', 'Create payment link'), onClick: () => navigate(`/marketing-center-v5/payment-links?user_id=${encodeURIComponent(r.studentId)}`) },
                       ...(canEdit ? [{ key: 'follow', icon: <EditOutlined />, label: t('sales.update'), onClick: () => openFollow(r) }] : []),
                       ...(canReassign ? [{ key: 'reassign', icon: <SwapOutlined />, label: t('sales.reassign.title'), onClick: () => openReassign(r) }] : []),
                       ...(canViewReport && latestTrialReport(lessons, r.studentId)

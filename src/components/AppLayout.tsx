@@ -157,6 +157,7 @@ export default function AppLayout() {
 
   const NAV = [
     { key: '/users', icon: <TeamOutlined />, label: lang === 'en' ? 'User Center' : '用户中心' },
+    { key: '/sales-v3', icon: <SolutionOutlined />, label: lang === 'en' ? 'Sales Center' : '销售中心' },
     { key: '/orders', icon: <ProfileOutlined />, label: lang === 'en' ? 'Order Center' : '订单中心' },
     {
       key: 'marketing-v5',

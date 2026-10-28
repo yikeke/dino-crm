@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   AutoComplete,
@@ -10,16 +10,17 @@ import {
   InputNumber,
   Checkbox,
   Modal,
+  Radio,
   Select,
   Space,
   Table,
   Tabs,
   Tag,
   Typography,
-  Upload,
   message,
 } from 'antd'
-import { CopyOutlined, EditOutlined, EyeOutlined, InboxOutlined, LinkOutlined } from '@ant-design/icons'
+import { CopyOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined } from '@ant-design/icons'
+import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -30,6 +31,7 @@ import {
   type LinkOffer,
 } from '../paymentLinkCatalog'
 import { useStore } from '../store'
+import { useCurrentAccount } from '../perm'
 import { settlePaymentLink } from '../paymentLinkStore'
 import { methodsForLine } from '../paymentMethods'
 
@@ -100,6 +102,16 @@ function canMarkBankPaid(row: PaymentLink) {
   return bankTransferOnly(row) || row.transferDeclared || row.paidMethod === 'bank_transfer'
 }
 
+function depositFloor(line: string, payable: number) {
+  if (line === 'Vietnam' || line === '越南') {
+    return { min: 500_000, label: '越南首款不低于 500,000 VND' }
+  }
+  if (line === 'Thailand' || line === '泰国') {
+    return { min: Math.max(1, Math.ceil(payable * 0.1)), label: '泰国首款不低于套餐应付的 10%' }
+  }
+  return { min: 1, label: '' }
+}
+
 function nowText() {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
@@ -145,25 +157,29 @@ async function copyText(value: string) {
 export default function CreatePaymentLink() {
   const { lang } = useI18n()
   const en = lang === 'en'
+  const [searchParams, setSearchParams] = useSearchParams()
+  const presetUserId = searchParams.get('user_id') || ''
   const [catalog, setCatalog] = useState(() => loadMarketingCatalog())
   const [links, setLinks] = useState<PaymentLink[]>(() => loadLinks())
   const [line, setLine] = useState('')
   const [channelId, setChannelId] = useState('')
   const [usePromo, setUsePromo] = useState(true)
-  const [userQuery, setUserQuery] = useState('')
+  const [userQuery, setUserQuery] = useState(presetUserId)
+  const [depositSkuId, setDepositSkuId] = useState('')
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [screen, setScreen] = useState<'list' | 'form'>('list')
+  const [screen, setScreen] = useState<'list' | 'form'>(presetUserId ? 'form' : 'list')
   const [keyword, setKeyword] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
-  const [marking, setMarking] = useState<PaymentLink | null>(null)
-  const [paidNote, setPaidNote] = useState('')
-  const [proof, setProof] = useState<File | null>(null)
+  const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
+  const [qrImage, setQrImage] = useState('')
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
+  const { role } = useCurrentAccount()
+  const canConfirmBank = role?.id === 'role_admin' || role?.id === 'role_ops' || role?.id === 'role_sales_leader'
   const students = useStore((s) => s.students)
   const userMatches = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
@@ -203,8 +219,30 @@ export default function CreatePaymentLink() {
   const shown = planOffers.map((offer) => (
     usePromo && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }
   ))
-  const currency = shown[0]?.currency || ''
-  const lowestPayable = shown.reduce((min, offer) => Math.min(min, offer.payable), shown[0]?.payable || 0)
+  const chosenDeposit = shown.find((offer) => offer.skuId === depositSkuId) || shown[0]
+  const planKey = shown.map((offer) => offer.skuId).join(',')
+
+  useEffect(() => {
+    if (!presetUserId) return
+    setSearchParams({}, { replace: true })
+  }, [presetUserId, setSearchParams])
+
+  useEffect(() => {
+    if (!qrTarget?.url) {
+      setQrImage('')
+      return
+    }
+    let cancelled = false
+    QRCode.toDataURL(qrTarget.url, { width: 320, margin: 1 }).then((image) => {
+      if (!cancelled) setQrImage(image)
+    })
+    return () => { cancelled = true }
+  }, [qrTarget])
+
+  useEffect(() => {
+    if (!planKey) return
+    if (!planKey.split(',').includes(depositSkuId)) setDepositSkuId(planKey.split(',')[0])
+  }, [planKey, depositSkuId])
 
   useEffect(() => {
     if (holdLineReset.current) {
@@ -261,7 +299,8 @@ export default function CreatePaymentLink() {
   }
 
   const baseFields = (kind: LinkKind, amount: number, depositPlanId: string, id: string): PaymentLink => {
-    const offer = shown[0]
+    const picked = kind === 'full' ? shown : shown.filter((offer) => offer.skuId === depositSkuId).slice(0, 1)
+    const offer = picked[0]
     const promo = usePromo && hasDiscount ? (activeChannel?.plan?.promoCode || '') : ''
     return {
       id,
@@ -272,14 +311,14 @@ export default function CreatePaymentLink() {
       channelName: activeChannel?.channel.name || '',
       channelCode: activeChannel?.channel.channelCode || '',
       planId: activeChannel?.plan?.id || '',
-      offers: shown,
-      skuId: shown.map((item) => item.skuId).join(','),
-      skuName: shown.map((item) => item.skuName).join(' / '),
+      offers: picked,
+      skuId: picked.map((item) => item.skuId).join(','),
+      skuName: picked.map((item) => item.skuName).join(' / '),
       currency: offer?.currency || '',
       listPrice: offer?.listPrice || 0,
       promoCode: promo,
       promoLabel: promo,
-      payable: shown.length === 1 ? offer.payable : 0,
+      payable: offer?.payable || 0,
       amount,
       phone: '',
       customerName: '',
@@ -319,9 +358,17 @@ export default function CreatePaymentLink() {
 
   const createDepositFirst = () => {
     if (!requireCustomer()) return
+    const payable = chosenDeposit?.payable || 0
+    const floor = depositFloor(activeLine, payable)
     const amount = Math.round(Number(firstAmount) || 0)
-    if (amount <= 0 || amount >= lowestPayable) {
-      message.warning(en ? 'First payment must be greater than 0 and less than every package price on this plan' : '首款必须大于 0，且小于方案里每一个套餐的应付金额')
+    if (!chosenDeposit) {
+      message.warning(en ? 'Select one SKU' : '请选择一个 SKU')
+      return
+    }
+    if (floor.min >= payable || amount < floor.min || amount >= payable) {
+      message.warning(floor.label
+        ? `${floor.label}，且必须小于套餐应付 ${formatMoney(payable, chosenDeposit.currency)}`
+        : (en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于这个套餐的应付金额'))
       return
     }
     const id = editingId || newId('PL')
@@ -370,42 +417,30 @@ export default function CreatePaymentLink() {
     setChannelId(row.channelId)
     setUsePromo(!!row.promoCode)
     setUserQuery(row.userId || '')
+    setDepositSkuId(row.offers?.[0]?.skuId || row.skuId.split(',')[0] || '')
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
     setTab(row.kind === 'full' ? 'full' : 'deposit')
     setScreen('form')
   }
 
-  const openMarkPaid = (row: PaymentLink) => {
-    setMarking(row)
-    setPaidNote('')
-    setProof(null)
-  }
-
-  const confirmMarkPaid = () => {
-    if (!marking || !proof) {
-      message.warning(en ? 'Upload the payment screenshot' : '请上传用户支付截图')
-      return
-    }
-    const first = marking.kind === 'deposit_balance'
-      ? links.find((item) => item.kind === 'deposit_first' && item.depositPlanId === marking.depositPlanId)
+  const markBankPaid = (row: PaymentLink) => {
+    const first = row.kind === 'deposit_balance'
+      ? links.find((item) => item.kind === 'deposit_first' && item.depositPlanId === row.depositPlanId)
       : undefined
-    const offer = marking.offers?.[0]
-    settlePaymentLink(marking.id, {
+    const offer = row.offers?.[0]
+    settlePaymentLink(row.id, {
       methodName: 'bank_transfer',
-      skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : marking.skuName,
-      amount: marking.amount || offer?.payable || marking.payable,
-      packageAmount: offer?.payable || marking.payable,
-      currency: marking.currency,
-      userId: marking.userId,
-      note: paidNote.trim(),
-      proofName: proof.name,
-      leg: marking.kind,
+      skuName: offer ? `${offer.memberLevel} · ${offer.skuName}` : row.skuName,
+      amount: row.amount || offer?.payable || row.payable,
+      packageAmount: offer?.payable || row.payable,
+      currency: row.currency,
+      userId: row.userId,
+      leg: row.kind,
       existingOrderId: first?.orderId,
     })
     setLinks(loadLinks())
-    setMarking(null)
-    message.success(en ? 'Marked paid' : '已标记为已支付')
+    message.success(en ? 'Marked paid and membership opened' : '已标记已支付，并开通会员')
   }
 
   const formCard = (mode: 'full' | 'deposit') => (
@@ -435,9 +470,13 @@ export default function CreatePaymentLink() {
         <Form.Item
           label={en ? 'Channel SKU price plan' : '渠道 SKU 价格方案'}
           required
-          extra={en
-            ? 'Every SKU on this channel plan is included. Choose whether the whole page uses the plan promo or list price.'
-            : '价格方案里有几个 SKU 就全部展示。只选择整页使用优惠，或全部按原价。'}
+          extra={mode === 'deposit'
+            ? (en
+              ? 'A deposit link includes one SKU. If the customer wants another package, create a new link.'
+              : '定金链接只能选一个 SKU。客户要换套餐时，新建一条链接，不要改这条。')
+            : (en
+              ? 'Every SKU on this channel plan is included. Choose whether the whole page uses the plan promo or list price.'
+              : '价格方案里有几个 SKU 就全部展示。只选择整页使用优惠，或全部按原价。')}
         >
           {activeChannel?.plan ? (
             <div>
@@ -453,6 +492,26 @@ export default function CreatePaymentLink() {
                   : [{ value: 'no', label: en ? 'No promo on this plan. Every SKU stays at list price.' : '当前方案无优惠，全部按原价售卖' }]}
                 onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
               />
+              {mode === 'deposit' ? (
+                <Radio.Group
+                  value={chosenDeposit?.skuId}
+                  disabled={!!editingId}
+                  onChange={(event) => { setDepositSkuId(event.target.value); setFirstAmount(null) }}
+                >
+                  <Space direction="vertical" size={4}>
+                    {shown.map((offer) => (
+                      <Radio key={offer.skuId} value={offer.skuId}>
+                        <Tag color={offer.memberLevel === 'Max' ? 'gold' : 'purple'}>{offer.memberLevel}</Tag>
+                        <b>{offer.skuName}</b>
+                        {' · '}
+                        {offer.payable !== offer.listPrice
+                          ? <>{formatMoney(offer.listPrice, offer.currency)} → {formatMoney(offer.payable, offer.currency)}（{offer.ruleLabel}）</>
+                          : <>{formatMoney(offer.listPrice, offer.currency)} · List price</>}
+                      </Radio>
+                    ))}
+                  </Space>
+                </Radio.Group>
+              ) : (
               <Space direction="vertical" size={4}>
                 {shown.map((offer) => (
                   <div key={offer.skuId}>
@@ -465,6 +524,7 @@ export default function CreatePaymentLink() {
                   </div>
                 ))}
               </Space>
+              )}
             </div>
           ) : (
             <Typography.Text type="secondary">{en ? 'Pick a channel that already has a price plan.' : '请选择已经配好价格方案的渠道。'}</Typography.Text>
@@ -488,15 +548,20 @@ export default function CreatePaymentLink() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          {mode === 'deposit' && shown.length > 0 && (
-            <Form.Item label={en ? 'First payment' : '首款金额'} required style={{ minWidth: 180 }}>
+          {mode === 'deposit' && chosenDeposit && (
+            <Form.Item
+              label={en ? 'First payment' : '首款金额'}
+              required
+              style={{ minWidth: 220 }}
+              extra={depositFloor(activeLine, chosenDeposit.payable).label || (en ? 'Greater than 0 and below the package price' : '大于 0，且小于套餐应付')}
+            >
               <InputNumber
-                min={1}
-                max={Math.max(lowestPayable - 1, 1)}
+                min={depositFloor(activeLine, chosenDeposit.payable).min}
+                max={Math.max(chosenDeposit.payable - 1, 1)}
                 value={firstAmount}
                 onChange={(value) => setFirstAmount(typeof value === 'number' ? value : null)}
                 style={{ width: '100%' }}
-                addonAfter={currency}
+                addonAfter={chosenDeposit.currency}
               />
             </Form.Item>
           )}
@@ -519,11 +584,11 @@ export default function CreatePaymentLink() {
             </Space>
           </Checkbox.Group>
         </Form.Item>
-        {mode === 'deposit' && shown.length > 0 && (
+        {mode === 'deposit' && chosenDeposit && (
           <Typography.Paragraph type="secondary">
             {en ? 'Balance after this first payment: ' : '付完这笔首款后，尾款为 '}
-            <b>{formatMoney(Math.max(lowestPayable - Math.round(Number(firstAmount) || 0), 0), currency)}</b>
-            {en ? '. This first payment stays below every package, so the customer can still choose a SKU on the page.' : '。这笔首款低于方案里每一个套餐，用户仍可在页面上选择 SKU。'}
+            <b>{formatMoney(Math.max(chosenDeposit.payable - Math.round(Number(firstAmount) || 0), 0), chosenDeposit.currency)}</b>
+            {en ? '. One package is split into at most two payments.' : '。一个套餐最多拆成首款和尾款两笔。'}
           </Typography.Paragraph>
         )}
         <Button type="primary" icon={<LinkOutlined />} onClick={mode === 'full' ? createFull : createDepositFirst}>
@@ -602,11 +667,12 @@ export default function CreatePaymentLink() {
           <Space wrap>
             <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
             <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{en ? 'Copy' : '复制链接'}</Button>
+            <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
             {!row.orderId && (
               <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
             )}
-            {canMarkBankPaid(row) && (
-              <Button size="small" onClick={() => openMarkPaid(row)}>{en ? 'Mark paid' : '标记已支付'}</Button>
+            {canConfirmBank && canMarkBankPaid(row) && (
+              <Button size="small" onClick={() => markBankPaid(row)}>{en ? 'Mark paid and open membership' : '标记已支付并开通会员'}</Button>
             )}
             {row.orderId && (
               <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
@@ -656,34 +722,6 @@ export default function CreatePaymentLink() {
           />
         )}
         {formCard(tab)}
-        <Modal
-          title={en ? 'Confirm bank transfer received' : '确认银行转账已支付'}
-          open={!!marking}
-          okText={en ? 'Confirm paid' : '确认已支付'}
-          cancelText={en ? 'Cancel' : '取消'}
-          okButtonProps={{ disabled: !proof }}
-          onOk={confirmMarkPaid}
-          onCancel={() => setMarking(null)}
-          destroyOnClose
-        >
-          <Form layout="vertical">
-            <Form.Item label={en ? 'Note' : '备注'}>
-              <Input.TextArea rows={3} value={paidNote} onChange={(event) => setPaidNote(event.target.value)} placeholder={en ? 'Optional note for this transfer' : '可填写这笔转账的说明'} />
-            </Form.Item>
-            <Form.Item label={en ? 'Payment screenshot' : '用户支付截图'} required>
-              <Upload.Dragger
-                accept="image/*"
-                maxCount={1}
-                fileList={proof ? [{ uid: 'proof', name: proof.name, status: 'done' }] : []}
-                beforeUpload={(file) => { setProof(file); return false }}
-                onRemove={() => { setProof(null); return true }}
-              >
-                <p><InboxOutlined /></p>
-                <p>{en ? 'Upload the customer’s transfer screenshot' : '上传用户的转账截图，确认后才会标记已支付'}</p>
-              </Upload.Dragger>
-            </Form.Item>
-          </Form>
-        </Modal>
       </div>
     )
   }
@@ -713,34 +751,37 @@ export default function CreatePaymentLink() {
           <Button icon={<LinkOutlined />} onClick={() => openCreate('deposit')}>{en ? 'New deposit link' : '新建定金支付链接'}</Button>
         </Space>
       </div>
+      <Alert
+        type="info"
+        showIcon
+        message={en
+          ? 'Bank transfer is confirmed by an admin, ops, or sales lead. They mark it paid and open membership directly. Regular CC accounts do not see that action. The screenshot stays in the business group.'
+          : '银行转账由管理员、运营或销售组长直接标记已支付并开通会员。普通 CC 看不到这个操作。转账截图仍在业务群里核对，这里不再上传。'}
+      />
       <Table rowKey="id" size="middle" columns={columns('full')} dataSource={rows} pagination={false} locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }} />
       <Modal
-        title={en ? 'Confirm bank transfer received' : '确认银行转账已支付'}
-        open={!!marking}
-        okText={en ? 'Confirm paid' : '确认已支付'}
-        cancelText={en ? 'Cancel' : '取消'}
-        okButtonProps={{ disabled: !proof }}
-        onOk={confirmMarkPaid}
-        onCancel={() => setMarking(null)}
-        destroyOnClose
+        title={en ? 'Payment link QR code' : '支付链接二维码'}
+        open={!!qrTarget}
+        onCancel={() => setQrTarget(null)}
+        footer={[
+          <Button key="close" onClick={() => setQrTarget(null)}>{en ? 'Close' : '关闭'}</Button>,
+          <Button
+            key="download"
+            type="primary"
+            disabled={!qrImage}
+            onClick={() => {
+              const link = document.createElement('a')
+              link.href = qrImage
+              link.download = `${qrTarget?.id || 'payment-link'}.png`
+              link.click()
+            }}
+          >{en ? 'Download QR code' : '下载二维码'}</Button>,
+        ]}
       >
-        <Form layout="vertical">
-          <Form.Item label={en ? 'Note' : '备注'}>
-            <Input.TextArea rows={3} value={paidNote} onChange={(event) => setPaidNote(event.target.value)} placeholder={en ? 'Optional note for this transfer' : '可填写这笔转账的说明'} />
-          </Form.Item>
-          <Form.Item label={en ? 'Payment screenshot' : '用户支付截图'} required>
-            <Upload.Dragger
-              accept="image/*"
-              maxCount={1}
-              fileList={proof ? [{ uid: 'proof', name: proof.name, status: 'done' }] : []}
-              beforeUpload={(file) => { setProof(file); return false }}
-              onRemove={() => { setProof(null); return true }}
-            >
-              <p><InboxOutlined /></p>
-              <p>{en ? 'Upload the customer’s transfer screenshot' : '上传用户的转账截图，确认后才会标记已支付'}</p>
-            </Upload.Dragger>
-          </Form.Item>
-        </Form>
+        <Space direction="vertical" align="center" style={{ width: '100%' }}>
+          {qrImage && <img src={qrImage} alt="" width={280} height={280} />}
+          <Typography.Text type="secondary">{en ? 'Scanning opens the same payment page as the link.' : '扫码打开的页面和复制链接是同一个。'}</Typography.Text>
+        </Space>
       </Modal>
     </div>
   )
