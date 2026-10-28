@@ -8,7 +8,7 @@ export function useDashboardContext() {
  const location = useLocation()
  const state = location.state as { dashboardReturn?: string; ordersReturn?: string; dashboardScope?: DashboardListScope } | null
  const dashboardReturn = state?.dashboardReturn && /^\/management-dashboard(?:\?|$)/.test(state.dashboardReturn) ? state.dashboardReturn : undefined
- const ordersReturn = state?.ordersReturn && /^\/orders-v3(?:\?|$)/.test(state.ordersReturn) ? state.ordersReturn : undefined
+ const ordersReturn = state?.ordersReturn && /^\/orders(?:-v3)?(?:\?|$)/.test(state.ordersReturn) ? state.ordersReturn : undefined
  const candidate = state?.dashboardScope
  const dashboardScope = dashboardReturn && candidate && typeof candidate.label === 'string' && Array.isArray(candidate.studentIds) && candidate.studentIds.every(id => typeof id === 'string') && (candidate.orderIds === undefined || (Array.isArray(candidate.orderIds) && candidate.orderIds.every(id => typeof id === 'string'))) ? candidate : undefined
  return { dashboardReturn, ordersReturn, dashboardScope, state: { dashboardReturn, ordersReturn, dashboardScope } }

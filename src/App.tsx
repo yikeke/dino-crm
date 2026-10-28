@@ -125,7 +125,7 @@ export default function App() {
           <Route path="users-v2/:studentId" element={<Guard module="usersV2"><UserDetail /></Guard>} />
           <Route path="users-v6" element={<Guard module="usersV2"><UserCenterP6 /></Guard>} />
           <Route path="users-v6/:studentId" element={<Guard module="usersV2"><UserDetail backPath="/users-v6" backText="返回用户中心" /></Guard>} />
-          <Route path="orders" element={<Guard module="orders"><OrderCenter /></Guard>} />
+          <Route path="orders" element={<Guard module="orders"><OrderCenter detailsPath="/orders" /></Guard>} />
           <Route path="orders/:orderId" element={<Guard module="orders"><OrderDetail /></Guard>} />
           <Route path="orders-v3" element={<Guard module="ordersV3"><OrderCenterP3 /></Guard>} />
           <Route path="orders-v3/:orderId" element={<Guard module="ordersV3"><OrderDetail backPath="/orders-v3" /></Guard>} />
