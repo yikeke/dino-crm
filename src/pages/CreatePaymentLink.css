@@ -1,3 +1,25 @@
+.pl-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-scene__count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.pl-scene__count.is-alert {
+  background: #fa8c16;
+  color: #fff;
+}
+
 .pl-two-line {
   display: flex;
   flex-direction: column;

@@ -11,6 +11,7 @@ import {
   Checkbox,
   Modal,
   Radio,
+  Segmented,
   Select,
   Space,
   Table,
@@ -32,11 +33,13 @@ import {
 } from '../paymentLinkCatalog'
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
-import { ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
+import { useSession } from '../auth'
+import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
+import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
-const STORE_KEY = 'dino-cc-payment-links-v3'
+const STORE_KEY = PAYMENT_LINK_KEY
 
 type LinkKind = 'full' | 'deposit_first' | 'deposit_balance'
 
@@ -74,7 +77,10 @@ type PaymentLink = {
   createdAt: string
   updatedAt: string
   sourceLinkId?: string
+  createdBy?: string
 }
+
+type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done'
 
 function offer(skuId: string, skuName: string, memberLevel: 'Pro' | 'Max', listPrice: number, payable: number, currency: string, ruleLabel: string): LinkOffer {
   return { skuId, skuName, memberLevel, listPrice, payable, currency, ruleLabel }
@@ -222,19 +228,44 @@ export const PAYMENT_LINK_DEMO_ORDERS = [
   },
 ]
 
-function loadLinks(): PaymentLink[] {
+function readArray(key: string): PaymentLink[] {
   try {
-    const raw = localStorage.getItem(STORE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length) return parsed
-    }
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]')
+    return Array.isArray(parsed) ? parsed : []
   } catch {
-    /* seed below */
+    return []
   }
-  const seeded = buildSeedLinks()
-  saveLinks(seeded)
-  return seeded
+}
+
+const SEED_ID = /^PL-(DEP|BAL|FULL)-/
+
+function legacyLinks(): PaymentLink[] {
+  return LEGACY_PAYMENT_LINK_KEYS.flatMap(readArray)
+    .filter((row) => row?.id && !SEED_ID.test(row.id))
+    .map((row) => ({
+      ...row,
+      kind: row.kind || 'full',
+      line: enValue(row.line),
+      channelName: enValue(row.channelName),
+      skuName: enValue(row.skuName),
+      offers: (row.offers || []).map((item) => ({ ...item, skuName: enValue(item.skuName) })),
+      methods: row.methods || [],
+    }))
+}
+
+function loadLinks(): PaymentLink[] {
+  const current = readArray(STORE_KEY)
+  const base = current.length ? current : buildSeedLinks()
+  const known = new Set(base.map((row) => row.id))
+  const recovered = legacyLinks().filter((row) => {
+    if (known.has(row.id)) return false
+    known.add(row.id)
+    return true
+  })
+  const next = [...recovered, ...base]
+  if (!current.length || recovered.length) saveLinks(next)
+  LEGACY_PAYMENT_LINK_KEYS.forEach((key) => localStorage.removeItem(key))
+  return next
 }
 
 function saveLinks(links: PaymentLink[]) {
@@ -330,13 +361,18 @@ export default function CreatePaymentLink() {
   const [screen, setScreen] = useState<'list' | 'form'>(presetUserId ? 'form' : 'list')
   const [keyword, setKeyword] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
-  const [statusFilter, setStatusFilter] = useState<string | undefined>()
+  const [scene, setScene] = useState<Scene>('all')
+  const [lineFilter, setLineFilter] = useState<string | undefined>()
+  const [channelFilter, setChannelFilter] = useState<string | undefined>()
+  const [onlyMine, setOnlyMine] = useState(false)
   const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
   const [qrImage, setQrImage] = useState('')
   const [expanded, setExpanded] = useState<string[]>([])
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
-  const { role } = useCurrentAccount()
+  const { account, role } = useCurrentAccount()
+  const session = useSession()
+  const myEmail = account?.email || session?.email || ''
   const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
   const students = useStore((s) => s.students)
   const userMatches = useMemo(() => {
@@ -493,6 +529,7 @@ export default function CreatePaymentLink() {
       createdAt: editingId ? (links.find((item) => item.id === editingId)?.createdAt || nowText()) : nowText(),
       updatedAt: nowText(),
       sourceLinkId: editingId ? links.find((item) => item.id === editingId)?.sourceLinkId : undefined,
+      createdBy: editingId ? links.find((item) => item.id === editingId)?.createdBy : myEmail,
     }
   }
 
@@ -837,7 +874,7 @@ export default function CreatePaymentLink() {
     {
       title: 'User ID',
       dataIndex: 'userId',
-      width: 190,
+      width: 220,
       render: (userId: string | undefined) => <Typography.Text copyable={!!userId}>{userId || '—'}</Typography.Text>,
     },
     {
@@ -978,13 +1015,17 @@ export default function CreatePaymentLink() {
     if (!keyword.trim()) return true
     return [row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
-  const statusMatch = (row: PaymentLink) => {
-    if (statusFilter === 'paid') return !!row.orderId
-    if (statusFilter === 'bank') return !row.orderId && hasBankTransfer(row)
-    if (statusFilter === 'callback') return !row.orderId && !hasBankTransfer(row)
+  const sceneMatch = (row: ListRow, value: Scene) => {
+    const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
+    const isDeposit = row.kind === 'deposit_first'
+    if (value === 'confirm') return legs.some((item) => canMarkBankPaid(item, links))
+    if (value === 'first') return isDeposit && !row.orderId
+    if (value === 'balance') return isDeposit && !!row.orderId && !!row.balance && !row.balance.orderId
+    if (value === 'full_wait') return row.kind === 'full' && !row.orderId
+    if (value === 'done') return legs.every((item) => item.orderId)
     return true
   }
-  const rows: ListRow[] = links
+  const allRows: ListRow[] = links
     .filter((row) => row.kind !== 'deposit_balance')
     .map((row) => ({
       ...row,
@@ -992,14 +1033,39 @@ export default function CreatePaymentLink() {
         ? links.find((item) => item.kind === 'deposit_balance' && !!item.depositPlanId && item.depositPlanId === row.depositPlanId)
         : undefined,
     }))
-    .filter((row) => {
-      const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
-      if (!legs.some(textMatch)) return false
-      if (typeFilter === 'full' && row.kind !== 'full') return false
-      if (typeFilter === 'deposit' && row.kind !== 'deposit_first') return false
-      if (statusFilter && !legs.some(statusMatch)) return false
-      return true
-    })
+  const baseRows = allRows.filter((row) => {
+    const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
+    if (!legs.some(textMatch)) return false
+    if (typeFilter === 'full' && row.kind !== 'full') return false
+    if (typeFilter === 'deposit' && row.kind !== 'deposit_first') return false
+    if (lineFilter && row.line !== lineFilter) return false
+    if (channelFilter && row.channelId !== channelFilter) return false
+    if (onlyMine && row.createdBy !== myEmail) return false
+    return true
+  })
+  const rows = baseRows.filter((row) => sceneMatch(row, scene))
+  const sceneOptions: { value: Scene; label: string }[] = [
+    { value: 'all', label: en ? 'All' : '全部' },
+    { value: 'confirm', label: en ? 'Transfer to confirm' : '待确认转账' },
+    { value: 'first', label: en ? 'First payment due' : '待付首款' },
+    { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
+    { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
+    { value: 'done', label: en ? 'Completed' : '已完成' },
+  ]
+  const lineOptions = Array.from(new Set(allRows.map((row) => row.line).filter(Boolean)))
+    .map((value) => ({ value, label: enValue(value) }))
+  const channelOptions = Array.from(
+    new Map(allRows.filter((row) => !lineFilter || row.line === lineFilter).filter((row) => row.channelId).map((row) => [row.channelId, row.channelName])).entries(),
+  ).map(([value, label]) => ({ value, label }))
+  const filtersOn = !!(keyword || typeFilter || lineFilter || channelFilter || onlyMine || scene !== 'all')
+  const clearFilters = () => {
+    setKeyword('')
+    setTypeFilter(undefined)
+    setLineFilter(undefined)
+    setChannelFilter(undefined)
+    setOnlyMine(false)
+    setScene('all')
+  }
   const depositKey = rows.filter((row) => row.kind === 'deposit_first').map((row) => row.id).sort().join('|')
   useEffect(() => {
     setExpanded(depositKey ? depositKey.split('|') : [])
@@ -1036,29 +1102,44 @@ export default function CreatePaymentLink() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <Space wrap>
-          <Input allowClear placeholder={en ? 'User ID / link' : 'User ID / 链接'} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} />
-          <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}
-            options={[
-              { value: 'full', label: en ? 'Full' : '全款' },
-              { value: 'deposit', label: en ? 'Deposit' : '定金' },
-            ]}
-          />
-          <Select allowClear placeholder={en ? 'Status' : '状态'} value={statusFilter} onChange={setStatusFilter} style={{ width: 180 }}
-            options={[
-              { value: 'callback', label: en ? 'Waiting for callback' : '等待支付回调' },
-              { value: 'bank', label: en ? 'Awaiting manager confirmation' : '待管理员确认支付' },
-              { value: 'paid', label: en ? 'Paid' : '已支付' },
-            ]}
-          />
-        </Space>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <Segmented
+          value={scene}
+          onChange={(value) => setScene(value as Scene)}
+          options={sceneOptions.map((item) => {
+            const count = baseRows.filter((row) => sceneMatch(row, item.value)).length
+            return {
+              value: item.value,
+              label: (
+                <span className="pl-scene">
+                  {item.label}
+                  <span className={`pl-scene__count${item.value === 'confirm' && count ? ' is-alert' : ''}`}>{count}</span>
+                </span>
+              ),
+            }
+          })}
+        />
         <Space>
           <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New full payment link' : '新建全款支付链接'}</Button>
           <Button icon={<LinkOutlined />} onClick={() => openCreate('deposit')}>{en ? 'New deposit link' : '新建定金支付链接'}</Button>
         </Space>
       </div>
+      <Space wrap>
+        <Input.Search allowClear placeholder={en ? 'User ID / link ID' : 'User ID / 链接 ID'} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 220 }} />
+        <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 120 }}
+          options={[
+            { value: 'full', label: en ? 'Full' : '全款' },
+            { value: 'deposit', label: en ? 'Deposit' : '定金' },
+          ]}
+        />
+        <Select allowClear placeholder={en ? 'Business line' : '业务线'} value={lineFilter} style={{ width: 150 }} options={lineOptions}
+          onChange={(value) => { setLineFilter(value); setChannelFilter(undefined) }}
+        />
+        <Select allowClear showSearch optionFilterProp="label" placeholder={en ? 'Channel' : '渠道'} value={channelFilter} onChange={setChannelFilter} style={{ width: 200 }} options={channelOptions} />
+        <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>
+        {filtersOn && <Button type="link" onClick={clearFilters}>{en ? 'Clear filters' : '清空筛选'}</Button>}
+      </Space>
       <Alert
         type="info"
         showIcon

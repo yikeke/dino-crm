@@ -256,7 +256,7 @@ export default function AppLayout() {
           }}
         />
       </Sider>
-      <Layout>
+      <Layout style={{ minWidth: 0 }}>
         <Header
           style={{
             background: '#fff',

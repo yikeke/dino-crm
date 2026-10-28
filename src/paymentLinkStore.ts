@@ -1,7 +1,8 @@
 import { setState } from './store'
 import type { Order } from './types'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v1'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v3'
+export const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2']
 
 export type StoredPaymentLink = {
   id: string
