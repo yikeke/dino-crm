@@ -37,6 +37,16 @@ export function writePaymentLinks(links: StoredPaymentLink[]) {
   localStorage.setItem(PAYMENT_LINK_KEY, JSON.stringify(links))
 }
 
+/** Put the demo orders behind the seeded payment links. Existing order ids are left as they are. */
+export function ensurePaymentLinkOrders(orders: Order[]) {
+  setState((prev) => {
+    const known = new Set(prev.orders.map((order) => order.orderId))
+    const missing = orders.filter((order) => !known.has(order.orderId))
+    if (!missing.length) return prev
+    return { ...prev, orders: [...missing, ...prev.orders] }
+  })
+}
+
 function orderIdNow() {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')

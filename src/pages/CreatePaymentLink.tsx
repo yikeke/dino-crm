@@ -32,10 +32,10 @@ import {
 } from '../paymentLinkCatalog'
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
-import { settlePaymentLink } from '../paymentLinkStore'
+import { ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
 import { methodsForLine } from '../paymentMethods'
 
-const STORE_KEY = 'dino-cc-payment-links-v1'
+const STORE_KEY = 'dino-cc-payment-links-v2'
 
 type LinkKind = 'full' | 'deposit_first' | 'deposit_balance'
 
@@ -75,13 +75,149 @@ type PaymentLink = {
   sourceLinkId?: string
 }
 
+function offer(skuId: string, skuName: string, memberLevel: 'Pro' | 'Max', listPrice: number, payable: number, currency: string, ruleLabel: string): LinkOffer {
+  return { skuId, skuName, memberLevel, listPrice, payable, currency, ruleLabel }
+}
+
+function buildSeedLinks(): PaymentLink[] {
+  const koreaOffers = [
+    offer('KR-Q-2026', 'Pro Quarterly', 'Pro', 99000, 89100, 'KRW', '10% off'),
+    offer('KR-H-2026', 'Max 6 Months', 'Max', 178000, 178000, 'KRW', 'List price'),
+    offer('KR-Y-2026', 'Pro Yearly', 'Pro', 298000, 248000, 'KRW', 'Amount off 50,000 KRW'),
+    offer('KR-MY-2026', 'Max Yearly', 'Max', 398000, 338300, 'KRW', '15% off'),
+  ]
+  const vnQuarterly = [offer('VN-Q-2026', 'Pro Quarterly', 'Pro', 990000, 891000, 'VND', '10% off')]
+  const thQuarterly = [offer('TH-Q-2026', 'Pro Quarterly', 'Pro', 9900, 9900, 'THB', 'List price')]
+  const blank = (row: PaymentLink): PaymentLink => ({ ...row, url: buildUrl(row) })
+  return [
+    blank({
+      id: 'PL-BAL-TH', kind: 'deposit_balance', depositPlanId: 'DP-TH', sourceLinkId: 'PL-DEP-TH',
+      line: 'Thailand', channelId: 'th_ground', channelName: 'Bangkok Ground Team', channelCode: 'CH-TH-0001',
+      planId: 'CSP-TH', offers: thQuarterly, skuId: 'TH-Q-2026', skuName: 'Pro Quarterly', currency: 'THB',
+      listPrice: 9900, promoCode: '', promoLabel: '', payable: 9900, amount: 8910, depositPaid: 990,
+      phone: '', customerName: '', note: '', methods: ['KPLUS'], userId: '2060199610824355848',
+      url: '', received: false, createdAt: '2026-10-28 15:40', updatedAt: '2026-10-28 15:40',
+    }),
+    blank({
+      id: 'PL-DEP-TH', kind: 'deposit_first', depositPlanId: 'DP-TH',
+      line: 'Thailand', channelId: 'th_ground', channelName: 'Bangkok Ground Team', channelCode: 'CH-TH-0001',
+      planId: 'CSP-TH', offers: thQuarterly, skuId: 'TH-Q-2026', skuName: 'Pro Quarterly', currency: 'THB',
+      listPrice: 9900, promoCode: '', promoLabel: '', payable: 9900, amount: 990,
+      phone: '', customerName: '', note: '', methods: ['KPLUS'], userId: '2060199610824355848',
+      orderId: 'WEB-PL-TH', paidMethod: 'KPLUS',
+      url: '', received: true, createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 11:20',
+    }),
+    blank({
+      id: 'PL-BAL-VN', kind: 'deposit_balance', depositPlanId: 'DP-VN-DONE', sourceLinkId: 'PL-DEP-VN',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 391000, depositPaid: 500000,
+      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2090031938694049793',
+      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'bank_transfer',
+      url: '', received: true, createdAt: '2026-10-28 14:10', updatedAt: '2026-10-28 16:05',
+    }),
+    blank({
+      id: 'PL-DEP-VN', kind: 'deposit_first', depositPlanId: 'DP-VN-DONE',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
+      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2090031938694049793',
+      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'bank_transfer',
+      url: '', received: true, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05',
+    }),
+    blank({
+      id: 'PL-DEP-READY', kind: 'deposit_first', depositPlanId: 'DP-VN-READY',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
+      phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2060199610824356009',
+      orderId: 'WEB-PL-DEP-PART', paidMethod: 'vietqr',
+      url: '', received: true, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40',
+    }),
+    blank({
+      id: 'PL-DEP-NEW', kind: 'deposit_first', depositPlanId: 'DP-VN-NEW',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
+      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2060199610824355844',
+      url: '', received: false, createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20',
+    }),
+    blank({
+      id: 'PL-FULL-BANK', kind: 'full', depositPlanId: '',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 891000,
+      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2090031938694049794',
+      transferDeclared: true, paidMethod: 'bank_transfer',
+      url: '', received: false, createdAt: '2026-10-28 13:05', updatedAt: '2026-10-28 13:22',
+    }),
+    blank({
+      id: 'PL-FULL-PAID', kind: 'full', depositPlanId: '',
+      line: 'Korea', channelId: 'sales_amy_zhang', channelName: 'Amy Zhang', channelCode: 'CH-KR-0001',
+      planId: 'CSP-AMY', offers: [koreaOffers[0]], skuId: 'KR-Q-2026', skuName: 'Pro Quarterly', currency: 'KRW',
+      listPrice: 99000, promoCode: 'CSP-AMY-PROMO', promoLabel: 'CSP-AMY-PROMO', payable: 89100, amount: 89100,
+      phone: '', customerName: '', note: '', methods: ['card', 'kakaopay'], userId: '2060199610824355846',
+      orderId: 'WEB-PL-FULL-001', paidMethod: 'card',
+      url: '', received: true, createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20',
+    }),
+    blank({
+      id: 'PL-FULL-WAIT', kind: 'full', depositPlanId: '',
+      line: 'Korea', channelId: 'sales_amy_zhang', channelName: 'Amy Zhang', channelCode: 'CH-KR-0001',
+      planId: 'CSP-AMY', offers: koreaOffers, skuId: koreaOffers.map((item) => item.skuId).join(','), skuName: koreaOffers.map((item) => item.skuName).join(' / '), currency: 'KRW',
+      listPrice: 99000, promoCode: 'CSP-AMY-PROMO', promoLabel: 'CSP-AMY-PROMO', payable: 0, amount: 0,
+      phone: '', customerName: '', note: '', methods: ['card', 'kakaopay'], userId: '2060199610824355842',
+      url: '', received: false, createdAt: '2026-10-28 10:12', updatedAt: '2026-10-28 10:12',
+    }),
+  ]
+}
+
+export const PAYMENT_LINK_DEMO_ORDERS = [
+  {
+    orderId: 'WEB-PL-FULL-001', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355846', userStatus: '付费' as const,
+    orderStatus: '已支付' as const, originalPrice: 89100, paidAmount: 89100, payMethod: 'Payment Link' as const, currency: 'KRW',
+    paidTime: '2026-10-27 16:20:00',
+    transactions: [
+      { id: 'TXN-WEB-PL-FULL-001-full', time: '2026-10-27 16:20:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'card', note: 'Payment link PL-FULL-PAID' },
+    ],
+  },
+  {
+    orderId: 'WEB-PL-DEP-PART', productName: 'Pro · Pro Quarterly', studentId: '2060199610824356009', userStatus: '未付费-体验中' as const,
+    orderStatus: '待支付' as const, originalPrice: 891000, paidAmount: 500000, payMethod: 'Payment Link' as const, currency: 'VND',
+    transactions: [
+      { id: 'TXN-WEB-PL-DEP-PART-deposit_first', time: '2026-10-28 09:40:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'vietqr', note: 'Payment link PL-DEP-READY' },
+    ],
+  },
+  {
+    orderId: 'WEB-PL-TH', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355848', userStatus: '未付费-体验中' as const,
+    orderStatus: '待支付' as const, originalPrice: 9900, paidAmount: 990, payMethod: 'Payment Link' as const, currency: 'THB',
+    transactions: [
+      { id: 'TXN-WEB-PL-TH-deposit_first', time: '2026-10-28 11:20:00', event: '定金首款支付成功', status: '已支付' as const, amount: 990, paymentMethod: 'KPLUS', note: 'Payment link PL-DEP-TH' },
+    ],
+  },
+  {
+    orderId: 'WEB-PL-DEP-DONE', productName: 'Pro · Pro Quarterly', studentId: '2090031938694049793', userStatus: '付费' as const,
+    orderStatus: '已支付' as const, originalPrice: 891000, paidAmount: 891000, payMethod: 'Payment Link' as const, currency: 'VND',
+    paidTime: '2026-10-28 16:05:00',
+    transactions: [
+      { id: 'TXN-WEB-PL-DEP-DONE-deposit_first', time: '2026-10-27 18:48:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'bank_transfer', note: 'Payment link PL-DEP-VN' },
+      { id: 'TXN-WEB-PL-DEP-DONE-deposit_balance', time: '2026-10-28 16:05:00', event: '尾款支付成功', status: '已支付' as const, amount: 391000, paymentMethod: 'bank_transfer', note: 'Payment link PL-BAL-VN' },
+    ],
+  },
+]
+
 function loadLinks(): PaymentLink[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '[]')
-    return Array.isArray(raw) ? raw : []
+    const raw = localStorage.getItem(STORE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length) return parsed
+    }
   } catch {
-    return []
+    /* seed below */
   }
+  const seeded = buildSeedLinks()
+  saveLinks(seeded)
+  return seeded
 }
 
 function saveLinks(links: PaymentLink[]) {
@@ -197,6 +333,10 @@ export default function CreatePaymentLink() {
   const linkedUserId = students.find((student) => student.studentId === userQuery.trim())?.studentId || ''
 
   const reloadCatalog = () => setCatalog(loadMarketingCatalog())
+
+  useEffect(() => {
+    ensurePaymentLinkOrders(PAYMENT_LINK_DEMO_ORDERS)
+  }, [])
 
   useEffect(() => {
     const onFocus = () => {
@@ -385,6 +525,7 @@ export default function CreatePaymentLink() {
 
   const createBalance = (first: PaymentLink) => {
     const id = newId('PL')
+    const packageDue = first.payable || first.offers?.[0]?.payable || 0
     const row: PaymentLink = {
       ...first,
       id,
@@ -395,6 +536,8 @@ export default function CreatePaymentLink() {
       transferDeclared: false,
       sourceLinkId: first.id,
       depositPaid: first.amount,
+      amount: Math.max(packageDue - first.amount, 0),
+      payable: packageDue,
       updatedAt: nowText(),
       note: '',
       createdAt: nowText(),
@@ -632,7 +775,14 @@ export default function CreatePaymentLink() {
       render: (_: unknown, row: PaymentLink) => {
         const prices = (row.offers || []).map((offer) => offer.payable).filter((value) => value > 0)
         if (row.kind === 'deposit_first') return <b>{formatMoney(row.amount, row.currency)}</b>
-        if (row.kind === 'deposit_balance') return <span>{en ? 'Balance of ' : '尾款，关联 '}{row.sourceLinkId || row.depositPlanId}</span>
+        if (row.kind === 'deposit_balance') {
+          return (
+            <div>
+              <b>{formatMoney(row.amount, row.currency)}</b>
+              <div><Typography.Text type="secondary">{en ? `Balance of ${row.sourceLinkId}` : `尾款，关联 ${row.sourceLinkId}`}</Typography.Text></div>
+            </div>
+          )
+        }
         if (prices.length > 1) {
           const min = Math.min(...prices)
           const max = Math.max(...prices)
@@ -660,13 +810,15 @@ export default function CreatePaymentLink() {
     { title: en ? 'Updated' : '更新时间', width: 150, render: (_: unknown, row: PaymentLink) => row.updatedAt || row.createdAt },
     {
       title: en ? 'Actions' : '操作',
-      width: 280,
+      width: 420,
       render: (_: unknown, row: PaymentLink) => {
         const balance = links.find((item) => item.kind === 'deposit_balance' && item.depositPlanId === row.depositPlanId)
         return (
           <Space wrap>
             <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
-            <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{en ? 'Copy' : '复制链接'}</Button>
+            <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>
+              {row.kind === 'deposit_first' ? (en ? 'Copy deposit link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
+            </Button>
             <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
             {!row.orderId && (
               <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
