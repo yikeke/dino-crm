@@ -24,6 +24,14 @@ export type PayCopy = {
   installment: string
   forLink: string
   chooseSku: string
+  summary: string
+  dueNow: string
+  paidTag: string
+  laterTag: string
+  secure: string
+  account: string
+  fullTag: string
+  linkPaid: string
   dir: 'ltr' | 'rtl'
 }
 
@@ -72,32 +80,38 @@ const COPY: Record<string, PayCopy> = {
   Korea: {
     title: '결제', discount: '할인', total: '합계', choose: '결제 수단 선택', pay: '결제하기',
     cancel: '언제든 취소 가능 · ', terms: '이용약관', privacy: '개인정보 처리방침',
-    first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택', dir: 'ltr',
+    first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택',
+    summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '계정 ID', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다', dir: 'ltr',
   },
   Vietnam: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
     cancel: 'Hủy bất cứ lúc nào · ', terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
-    first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói', dir: 'ltr',
+    first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói',
+    summary: 'Tóm tắt đơn hàng', dueNow: 'Cần thanh toán', paidTag: 'Đã thanh toán', laterTag: 'Thanh toán sau', secure: 'Thanh toán an toàn', account: 'ID tài khoản', fullTag: 'Thanh toán toàn bộ', linkPaid: 'Liên kết này đã được thanh toán', dir: 'ltr',
   },
   Malaysia: {
     title: 'Pembayaran', discount: 'Diskaun', total: 'Jumlah', choose: 'Pilih kaedah pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batal bila-bila masa · ', terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
-    first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan', dir: 'ltr',
+    first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan',
+    summary: 'Ringkasan pesanan', dueNow: 'Perlu dibayar', paidTag: 'Telah dibayar', laterTag: 'Bayar kemudian', secure: 'Pembayaran selamat', account: 'ID akaun', fullTag: 'Bayaran penuh', linkPaid: 'Pautan ini telah dibayar', dir: 'ltr',
   },
   'Saudi Arabia': {
     title: 'الدفع', discount: 'الخصم', total: 'الإجمالي', choose: 'اختر طريقة الدفع', pay: 'ادفع الآن',
     cancel: 'يمكن الإلغاء في أي وقت · ', terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
-    first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة', dir: 'rtl',
+    first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة',
+    summary: 'ملخص الطلب', dueNow: 'المستحق الآن', paidTag: 'تم الدفع', laterTag: 'يدفع لاحقًا', secure: 'دفع آمن', account: 'معرّف الحساب', fullTag: 'دفع كامل', linkPaid: 'تم دفع هذا الرابط', dir: 'rtl',
   },
   Thailand: {
     title: 'ชำระเงิน', discount: 'ส่วนลด', total: 'ยอดรวม', choose: 'เลือกวิธีชำระเงิน', pay: 'ชำระเงินตอนนี้',
     cancel: 'ยกเลิกได้ทุกเมื่อ · ', terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
-    first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ', dir: 'ltr',
+    first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ',
+    summary: 'สรุปคำสั่งซื้อ', dueNow: 'ชำระตอนนี้', paidTag: 'ชำระแล้ว', laterTag: 'ชำระภายหลัง', secure: 'ชำระเงินอย่างปลอดภัย', account: 'รหัสบัญชี', fullTag: 'ชำระเต็มจำนวน', linkPaid: 'ลิงก์นี้ชำระเงินแล้ว', dir: 'ltr',
   },
   Indonesia: {
     title: 'Pembayaran', discount: 'Diskon', total: 'Total', choose: 'Pilih metode pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batalkan kapan saja · ', terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
-    first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket', dir: 'ltr',
+    first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket',
+    summary: 'Ringkasan pesanan', dueNow: 'Tagihan saat ini', paidTag: 'Sudah dibayar', laterTag: 'Bayar nanti', secure: 'Pembayaran aman', account: 'ID akun', fullTag: 'Pembayaran penuh', linkPaid: 'Tautan ini sudah dibayar', dir: 'ltr',
   },
 }
 
@@ -107,14 +121,16 @@ const ZH: PayCopy = {
   title: '支付', discount: '优惠', total: '合计', choose: '选择支付方式', pay: '立即支付',
   cancel: '可随时取消 · ', terms: '服务条款', privacy: '隐私政策',
   first: '定金首款', balance: '定金尾款', packageDue: '套餐应付', installment: '分期支付需要在 3,000,000 越南盾以上。',
-  forLink: '这条支付链接的客户', chooseSku: '选择套餐', dir: 'ltr',
+  forLink: '这条支付链接的客户', chooseSku: '选择套餐',
+    summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '账号 ID', fullTag: '全款', linkPaid: '这条支付链接已支付', dir: 'ltr',
 }
 
 const EN: PayCopy = {
   title: 'Payment', discount: 'Discount', total: 'Total', choose: 'Choose Payment Method', pay: 'Pay now',
   cancel: 'Cancel anytime · ', terms: 'Terms of Service', privacy: 'Privacy Policy',
   first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: 'Instalments require at least 3,000,000 VND.',
-  forLink: 'Payment link for', chooseSku: 'Choose a plan', dir: 'ltr',
+  forLink: 'Payment link for', chooseSku: 'Choose a plan',
+    summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'Account ID', fullTag: 'Full payment', linkPaid: 'This payment link has been paid', dir: 'ltr',
 }
 
 export function methodsForLine(line: string): PayMethod[] {

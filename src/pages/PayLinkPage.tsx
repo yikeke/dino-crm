@@ -122,11 +122,12 @@ export default function PayLinkPage() {
     if (method.minAmount && amount < method.minAmount) return
     setMethodCode(method.code)
     setAcked(false)
-    if (method.kind === 'manual') {
-      setHost(null)
-      return
-    }
-    setHost(method)
+  }
+
+  const checkout = () => {
+    if (paidOrderId || !activeMethod || activeMethod.kind === 'manual') return
+    if (activeMethod.minAmount && amount < activeMethod.minAmount) return
+    setHost(activeMethod)
   }
 
   if (host) {
@@ -145,92 +146,146 @@ export default function PayLinkPage() {
     )
   }
 
+  const tier = memberTier(picked?.memberLevel)
+  const deposit = type !== 'full'
+  const firstAmount = type === 'deposit_first' ? amount : depositPaid
+  const balanceAmount = type === 'deposit_first' ? Math.max(payable - amount, 0) : amount
+  const kindTag = deposit ? `${chargeLabel} · ${type === 'deposit_first' ? 1 : 2}/2` : copy.fullTag
+  const blocked = !!activeMethod?.minAmount && amount < activeMethod.minAmount
+  const steps = [
+    { key: 'first', name: copy.first, value: firstAmount, state: type === 'deposit_balance' ? 'paid' : 'now' },
+    { key: 'balance', name: copy.balance, value: balanceAmount, state: type === 'deposit_balance' ? 'now' : 'later' },
+  ]
+  const stateLabel = (state: string) => (state === 'paid' ? copy.paidTag : state === 'now' ? copy.dueNow : copy.laterTag)
+
   return (
     <div className="pay-link-page" dir={copy.dir}>
-      <div className="pay-stage">
-        <div className="pay-bg" aria-hidden="true">
-          <img src={asset('bg.png')} alt="" />
-        </div>
-        <ReviewSwitch lang={lang} line={line} onChange={setLang} />
-        <div className="pay-shell">
-          <header className="pay-user">
-            <p>{copy.forLink}</p>
+      <ReviewSwitch lang={lang} line={line} onChange={setLang} />
+      <div className="pay-shell">
+        <header className="pay-top">
+          <span className="pay-brand">
+            <span className="pay-brand__mark">D</span>
+            Dino English
+          </span>
+          <span className="pay-secure">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 1 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7h.5Zm1.5 0h4V5a2 2 0 1 0-4 0v2Z" /></svg>
+            {copy.secure}
+          </span>
+        </header>
+
+        <section className="pay-due">
+          <span className={`pay-due__tag${deposit ? ' is-deposit' : ''}`}>{kindTag}</span>
+          <p className="pay-due__label">{copy.dueNow}</p>
+          <p className="pay-due__amount">{formatMoney(amount, currency)}</p>
+          {skuName && (
+            <p className="pay-due__sku">
+              <span className={`tier-badge tier-${tier.toLowerCase()}`}>{tier}</span>
+              {skuName}
+            </p>
+          )}
+          <div className="pay-due__meta">
+            <span>{copy.account}</span>
             <strong>{userId || '—'}</strong>
-          </header>
-          <section className="pay-hero">
-            <h1 className="pay-hero__title">{copy.title}</h1>
-            <div className="pay-gem" aria-hidden="true">
-              <img src={asset('gem.png')} alt="" />
+          </div>
+        </section>
+
+        {paidOrderId && (
+          <section className="pay-card pay-done">
+            <span className="pay-done__icon">✓</span>
+            <div>
+              <p className="pay-done__title">{copy.linkPaid}</p>
+              <p className="pay-done__order">Order {paidOrderId}</p>
             </div>
           </section>
+        )}
 
-          {offers.length > 0 && (
-            <section className="pay-card">
-              <p className="pay-methods__title">{copy.chooseSku}</p>
-              <div className="pay-method__list">
-                {offers.map((offer) => (
+        {offers.length > 1 && (
+          <section className="pay-card">
+            <p className="pay-card__title">{copy.chooseSku}</p>
+            <div className="pay-options">
+              {offers.map((offer) => {
+                const level = memberTier(offer.memberLevel)
+                const selected = picked?.skuId === offer.skuId
+                return (
                   <button
                     key={offer.skuId}
                     type="button"
-                    className={`pay-method tier-${(offer.memberLevel || 'Pro').toLowerCase()}${picked?.skuId === offer.skuId ? ' is-selected' : ''}`}
+                    className={`pay-option${selected ? ' is-selected' : ''}`}
                     onClick={() => setPickedId(offer.skuId)}
+                    disabled={!!paidOrderId}
                   >
-                    <span className="pay-method__info">
-                      <span className={`tier-badge tier-${(offer.memberLevel || 'Pro').toLowerCase()}`}>{offer.memberLevel || 'Pro'}</span>
+                    <span className="pay-option__radio" aria-hidden="true" />
+                    <span className="pay-option__main">
+                      <span className={`tier-badge tier-${level.toLowerCase()}`}>{level}</span>
                       <span>{offer.skuName}</span>
                     </span>
-                    <span>{formatMoney(offer.payable, offer.currency)}</span>
+                    <span className="pay-option__price">{formatMoney(offer.payable, offer.currency)}</span>
                   </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {picked && (
-          <section className="pay-card">
-            <div className="pay-row">
-              <span>{skuName}</span>
-              <span>{formatMoney(list, currency)}</span>
+                )
+              })}
             </div>
-            {discount > 0 && (
+          </section>
+        )}
+
+        {picked && (
+          <section className="pay-card">
+            <p className="pay-card__title">{copy.summary}</p>
+            <div className="pay-rows">
               <div className="pay-row">
-                <span>{copy.discount}{promo ? ` · ${promo}` : ''}</span>
-                <span className="pay-row__discount">-{formatMoney(discount, currency)}</span>
+                <span>{skuName}</span>
+                <span className={discount > 0 ? 'pay-row__list' : ''}>{formatMoney(list, currency)}</span>
               </div>
-            )}
-            {type !== 'full' && (
-              <div className="pay-row">
-                <span>{copy.packageDue}</span>
-                <span>{formatMoney(payable, currency)}</span>
-              </div>
+              {discount > 0 && (
+                <div className="pay-row">
+                  <span>{copy.discount}{promo ? ` · ${promo}` : ''}</span>
+                  <span className="pay-row__discount">-{formatMoney(discount, currency)}</span>
+                </div>
+              )}
+              {deposit && (
+                <div className="pay-row">
+                  <span>{copy.packageDue}</span>
+                  <span>{formatMoney(payable, currency)}</span>
+                </div>
+              )}
+            </div>
+            {deposit && (
+              <ol className="pay-steps">
+                {steps.map((step, index) => (
+                  <li key={step.key} className={`pay-step is-${step.state}`}>
+                    <span className="pay-step__dot">{step.state === 'paid' ? '✓' : index + 1}</span>
+                    <span className="pay-step__name">{step.name}</span>
+                    <span className="pay-step__state">{stateLabel(step.state)}</span>
+                    <span className="pay-step__amount">{formatMoney(step.value, currency)}</span>
+                  </li>
+                ))}
+              </ol>
             )}
             <div className="pay-row pay-row--total">
               <span>{chargeLabel}</span>
               <span className="pay-row__total">{formatMoney(amount, currency)}</span>
             </div>
           </section>
-          )}
+        )}
 
+        {!paidOrderId && (
           <section className="pay-card">
-            <p className="pay-methods__title">{copy.choose}</p>
-            <div className="pay-method__list">
+            <p className="pay-card__title">{copy.choose}</p>
+            <div className="pay-options">
               {methods.map((method) => {
-                const blocked = !!method.minAmount && amount < method.minAmount
+                const under = !!method.minAmount && amount < method.minAmount
                 const selected = method.code === activeMethod?.code
                 return (
                   <button
                     key={method.code}
                     type="button"
-                    className={`pay-method${selected ? ' is-selected' : ''}${blocked ? ' is-under-min' : ''}`}
+                    className={`pay-option${selected ? ' is-selected' : ''}${under ? ' is-under-min' : ''}`}
                     onClick={() => choose(method)}
                   >
-                    <span className="pay-method__info">
-                      <span className="pay-method__icon"><img src={method.icon} alt="" /></span>
+                    <span className="pay-option__radio" aria-hidden="true" />
+                    <span className="pay-option__main">
+                      <span className="pay-option__icon"><img src={method.icon} alt="" /></span>
                       <span>{methodDisplayName(method, lang)}</span>
                     </span>
-                    {method.kind === 'redirect' && !blocked && (
-                      <img className="pay-method__go" src={asset('icon-arrow-down.png')} alt="" />
-                    )}
                   </button>
                 )
               })}
@@ -239,74 +294,76 @@ export default function PayLinkPage() {
               <p className="pay-hint">{copy.installment}</p>
             )}
           </section>
+        )}
 
-          {showBank && (
-            <section className="pay-card bank-panel" ref={bankRef}>
-              <p className="bank-lead">{bank.instruction}</p>
-              <div className="bank-amount">
-                <span>{bank.amount}</span>
-                <strong>{formatMoney(amount, currency)}</strong>
+        {showBank && !paidOrderId && (
+          <section className="pay-card bank-panel" ref={bankRef}>
+            <p className="bank-lead">{bank.instruction}</p>
+            <div className="bank-amount">
+              <span>{bank.amount}</span>
+              <strong>{formatMoney(amount, currency)}</strong>
+            </div>
+            <div className="bank-ref">
+              <div>
+                <p className="bank-label">{bank.note} <em>{bank.mandatory}</em></p>
+                <p className="bank-ref__value">{note}</p>
               </div>
-              <div className="bank-ref">
-                <div>
-                  <p className="bank-label">{bank.note} <em>{bank.mandatory}</em></p>
-                  <p className="bank-ref__value">{note}</p>
-                </div>
-                <button type="button" className="bank-copy" onClick={() => copyValue('note', note)}>
-                  <img src={asset('copy.svg')} alt="" />
-                </button>
-              </div>
-              <p className="bank-warn">
-                <img src={asset('warn.svg')} alt="" />
-                <span>{bank.warning}</span>
-              </p>
-              <div className="bank-qr">
-                <img src={asset('vcb-qr.jpg')} alt={bank.methodName} />
-                <p>{bank.qrHint}</p>
-              </div>
-              <div className="bank-rows">
-                {[
-                  ['bank', bank.bank, RECEIVER.bank],
-                  ['name', bank.accountName, RECEIVER.name],
-                  ['number', bank.accountNumber, RECEIVER.number],
-                ].map(([key, label, value]) => (
-                  <div className="bank-row" key={key}>
-                    <div>
-                      <p className="bank-label">{label}</p>
-                      <p className="bank-row__value">{value}</p>
-                    </div>
-                    <button type="button" className="bank-copy" onClick={() => copyValue(key, value)}>
-                      <img src={asset('copy.svg')} alt="" />
-                    </button>
+              <button type="button" className="bank-copy" onClick={() => copyValue('note', note)}>
+                <img src={asset('copy.svg')} alt="" />
+              </button>
+            </div>
+            <p className="bank-warn">
+              <img src={asset('warn.svg')} alt="" />
+              <span>{bank.warning}</span>
+            </p>
+            <div className="bank-qr">
+              <img src={asset('vcb-qr.jpg')} alt={bank.methodName} />
+              <p>{bank.qrHint}</p>
+            </div>
+            <div className="bank-rows">
+              {[
+                ['bank', bank.bank, RECEIVER.bank],
+                ['name', bank.accountName, RECEIVER.name],
+                ['number', bank.accountNumber, RECEIVER.number],
+              ].map(([key, label, value]) => (
+                <div className="bank-row" key={key}>
+                  <div>
+                    <p className="bank-label">{label}</p>
+                    <p className="bank-row__value">{value}</p>
                   </div>
-                ))}
-              </div>
-              {copied && <p className="bank-copied">{bank.copied}</p>}
-              {!acked ? (
-                <button className="pay-continue" type="button" onClick={() => { declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
-              ) : (
-                <div className="bank-noted">
-                  <h2>{bank.notedTitle}</h2>
-                  <p>{bank.notedBody}</p>
+                  <button type="button" className="bank-copy" onClick={() => copyValue(key, value)}>
+                    <img src={asset('copy.svg')} alt="" />
+                  </button>
                 </div>
-              )}
-            </section>
-          )}
+              ))}
+            </div>
+            {copied && <p className="bank-copied">{bank.copied}</p>}
+            {!acked ? (
+              <button className="pay-continue" type="button" onClick={() => { declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
+            ) : (
+              <div className="bank-noted">
+                <h2>{bank.notedTitle}</h2>
+                <p>{bank.notedBody}</p>
+              </div>
+            )}
+          </section>
+        )}
 
-          {paidOrderId && (
-            <section className="pay-used">
-              <p>{lang === 'zh' ? '这条支付链接已支付，只能使用一次' : lang === 'en' ? 'This payment link is paid and can only be used once' : 'This payment link is paid and can only be used once'}</p>
-              <strong>Order {paidOrderId}</strong>
-            </section>
-          )}
-          <p className="pay-terms pay-terms--flow">
-            <span>{copy.cancel}</span>
-            <button type="button">{copy.terms}</button>
-            <span> · </span>
-            <button type="button">{copy.privacy}</button>
-          </p>
-        </div>
+        <p className="pay-terms">
+          <span>{copy.cancel}</span>
+          <button type="button">{copy.terms}</button>
+          <span> · </span>
+          <button type="button">{copy.privacy}</button>
+        </p>
       </div>
+
+      {!paidOrderId && activeMethod && !showBank && (
+        <div className="pay-bar">
+          <button className="pay-continue" type="button" disabled={blocked} onClick={checkout}>
+            {copy.pay} · {formatMoney(amount, currency)}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
