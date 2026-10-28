@@ -101,7 +101,7 @@
 .pl-leg {
   position: relative;
   display: grid;
-  grid-template-columns: 32px 220px 160px 200px 1fr;
+  grid-template-columns: 32px 260px 140px 200px 1fr;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
@@ -531,4 +531,28 @@
   margin-top: 8px;
   font-size: 12px;
   text-align: center;
+}
+
+.pl-order-no {
+  padding: 0;
+  height: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.pl-order-no.is-pending {
+  cursor: help;
+  border-bottom: 1px dashed #d9d9d9;
+}
+
+.pl-order-sub,
+.pl-leg__relation {
+  font-size: 12px;
+}
+
+.pl-leg__order {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
 }

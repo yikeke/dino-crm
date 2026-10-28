@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useStore } from '../store'
 import type { OrderStatus, OrderTransaction, UserStatus, UserType } from '../types'
 import { usePerm } from '../perm'
@@ -44,6 +44,9 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const d = useDashboardText()
   const dashboardContext = useDashboardContext()
   const { orderId = '' } = useParams()
+  const [query] = useSearchParams()
+  const fromLinks = query.get('from') === 'payment-links'
+  const focusSub = query.get('sub') || ''
   const orders = useStore((s) => s.orders)
   const students = useStore((s) => s.students)
   const { allowedLines } = usePerm()
@@ -51,7 +54,9 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const order = useMemo(() => orders.find((item) => item.orderId === orderId), [orders, orderId])
   const student = useMemo(() => students.find((item) => item.studentId === order?.studentId), [students, order?.studentId])
   const inScope = order && (!scope || (student && scope.includes(student.businessLine)))
-  const back = <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
+  const back = fromLinks
+    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/marketing-center-v5/payment-links')}>{d('backPaymentLinks')}</Button>
+    : <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
 
   if (!order || !inScope) {
     return (
@@ -97,7 +102,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
       </Card>
 
       <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderTransactions')}</span>}>
-        <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} />
+        <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} rowClassName={(row) => (row.id === focusSub ? 'order-sub--focus' : '')} />
       </Card>
     </Space>
   )

@@ -14,6 +14,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd'
@@ -1024,6 +1025,20 @@ export default function CreatePaymentLink() {
     .find((order) => order.orderId === row.orderId)?.transactions
     .find((txn) => txn.id === subOrderNoFor(row.id))?.channelRef || ''
 
+  const openOrder = (orderId: string, sub?: string) => {
+    const query = new URLSearchParams({ from: 'payment-links' })
+    if (sub) query.set('sub', sub)
+    navigate(`/orders/${orderId}?${query.toString()}`)
+  }
+
+  const orderNo = (no: string, paid: boolean, mainId?: string) => (paid
+    ? <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(mainId || no, mainId ? no : undefined)}>{no}</Button>
+    : (
+      <Tooltip title={en ? 'Reserved for this link. The order appears in the order center once the customer pays.' : '这条链接预留的单号，用户付款后才会出现在订单中心。'}>
+        <Typography.Text type="secondary" className="pl-order-no is-pending">{no}</Typography.Text>
+      </Tooltip>
+    ))
+
   const saveLegMethods = () => {
     if (!methodTarget) return
     if (!methodDraft.length) {
@@ -1160,11 +1175,22 @@ export default function CreatePaymentLink() {
       },
     },
     {
-      title: en ? 'Order' : '订单',
-      width: 190,
-      render: (_: unknown, row: ListRow) => (row.orderId
-        ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
-        : <Typography.Text type="secondary">{en ? 'Created on first payment' : '首笔到账后生成'}</Typography.Text>),
+      title: en ? 'Order no.' : '订单号',
+      width: 210,
+      render: (_: unknown, row: ListRow) => {
+        const mainNo = row.orderId || subOrderNoFor(row.id)
+        const count = row.kind === 'deposit_first' ? [row, row.balance].filter((item) => item?.orderId).length : 0
+        return (
+          <div className="pl-two-line">
+            {orderNo(mainNo, !!row.orderId)}
+            <Typography.Text type="secondary" className="pl-order-sub">
+              {row.kind === 'deposit_first'
+                ? (en ? `Main order · ${count}/2 sub-orders paid` : `主订单 · 子订单已付 ${count}/2`)
+                : row.orderId ? (en ? 'Main order = sub-order' : '主订单 = 子订单') : (en ? 'Created when the customer pays' : '用户付款时生成')}
+            </Typography.Text>
+          </div>
+        )
+      },
     },
     {
       title: en ? 'Created / Updated' : '创建 / 更新',
@@ -1217,7 +1243,15 @@ export default function CreatePaymentLink() {
             </div>
             <div className="pl-leg__name">
               <b>{name}</b>
-              <Typography.Text type="secondary" className="pl-leg__id">{subOrderNoFor(leg.id)}</Typography.Text>
+              <span className="pl-leg__order">
+                <Typography.Text type="secondary">{en ? 'Sub-order' : '子订单'}</Typography.Text>
+                {orderNo(subOrderNoFor(leg.id), !!leg.orderId, leg.orderId)}
+              </span>
+              <Typography.Text type="secondary" className="pl-leg__relation">
+                {leg.kind === 'deposit_first'
+                  ? (en ? 'Also the main order no.' : '同时作为主订单号')
+                  : (en ? `Linked to main order ${row.orderId || subOrderNoFor(row.id)}` : `关联主订单 ${row.orderId || subOrderNoFor(row.id)}`)}
+              </Typography.Text>
             </div>
             <div className="pl-leg__amount">{formatMoney(leg.amount, leg.currency)}</div>
             <div className="pl-leg__status">
