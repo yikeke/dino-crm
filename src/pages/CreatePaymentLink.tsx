@@ -35,7 +35,7 @@ import { useCurrentAccount } from '../perm'
 import { ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
 import { methodsForLine } from '../paymentMethods'
 
-const STORE_KEY = 'dino-cc-payment-links-v2'
+const STORE_KEY = 'dino-cc-payment-links-v3'
 
 type LinkKind = 'full' | 'deposit_first' | 'deposit_balance'
 
@@ -126,6 +126,14 @@ function buildSeedLinks(): PaymentLink[] {
       url: '', received: true, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05',
     }),
     blank({
+      id: 'PL-BAL-READY', kind: 'deposit_balance', depositPlanId: 'DP-VN-READY', sourceLinkId: 'PL-DEP-READY',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 391000, depositPaid: 500000,
+      phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2060199610824356009',
+      url: '', received: false, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:15',
+    }),
+    blank({
       id: 'PL-DEP-READY', kind: 'deposit_first', depositPlanId: 'DP-VN-READY',
       line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
@@ -133,6 +141,14 @@ function buildSeedLinks(): PaymentLink[] {
       phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2060199610824356009',
       orderId: 'WEB-PL-DEP-PART', paidMethod: 'vietqr',
       url: '', received: true, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40',
+    }),
+    blank({
+      id: 'PL-BAL-NEW', kind: 'deposit_balance', depositPlanId: 'DP-VN-NEW', sourceLinkId: 'PL-DEP-NEW',
+      line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
+      planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
+      listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 391000, depositPaid: 500000,
+      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2060199610824355844',
+      url: '', received: false, createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20',
     }),
     blank({
       id: 'PL-DEP-NEW', kind: 'deposit_first', depositPlanId: 'DP-VN-NEW',
@@ -228,14 +244,18 @@ function newId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 }
 
-function bankTransferOnly(row: PaymentLink) {
-  const methods = row.methods || []
-  return methods.length > 0 && methods.every((code) => code === 'bank_transfer')
+function hasBankTransfer(row: PaymentLink) {
+  return (row.methods || []).includes('bank_transfer') || row.paidMethod === 'bank_transfer' || row.transferDeclared
 }
 
-function canMarkBankPaid(row: PaymentLink) {
+function canMarkBankPaid(row: PaymentLink, all: PaymentLink[] = []) {
   if (row.orderId) return false
-  return bankTransferOnly(row) || row.transferDeclared || row.paidMethod === 'bank_transfer'
+  if (!hasBankTransfer(row)) return false
+  if (row.kind === 'deposit_balance') {
+    const first = all.find((item) => item.kind === 'deposit_first' && item.depositPlanId === row.depositPlanId)
+    if (!first?.orderId) return false
+  }
+  return true
 }
 
 function depositFloor(line: string, payable: number) {
@@ -315,7 +335,7 @@ export default function CreatePaymentLink() {
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { role } = useCurrentAccount()
-  const canConfirmBank = role?.id === 'role_admin' || role?.id === 'role_ops' || role?.id === 'role_sales_leader'
+  const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
   const students = useStore((s) => s.students)
   const userMatches = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
@@ -513,40 +533,34 @@ export default function CreatePaymentLink() {
     }
     const id = editingId || newId('PL')
     const planId = editingId ? (links.find((item) => item.id === editingId)?.depositPlanId || newId('DP')) : newId('DP')
-    const row = baseFields('deposit_first', amount, planId, id)
-    if (editingId) row.createdAt = links.find((item) => item.id === editingId)?.createdAt || row.createdAt
-    row.url = buildUrl(row)
-    persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
-    setEditingId(null)
-    setScreen('list')
-    message.success(en ? 'Deposit link created' : '定金首款链接已生成')
-    resetCustomer()
-  }
-
-  const createBalance = (first: PaymentLink) => {
-    const id = newId('PL')
-    const packageDue = first.payable || first.offers?.[0]?.payable || 0
-    const row: PaymentLink = {
+    const first = baseFields('deposit_first', amount, planId, id)
+    if (editingId) first.createdAt = links.find((item) => item.id === editingId)?.createdAt || first.createdAt
+    first.url = buildUrl(first)
+    const existingBalance = links.find((item) => item.kind === 'deposit_balance' && item.depositPlanId === planId)
+    const balanceId = existingBalance?.id || newId('PL')
+    const balance: PaymentLink = {
       ...first,
-      id,
+      id: balanceId,
       kind: 'deposit_balance',
-      orderId: undefined,
-      received: false,
-      paidMethod: undefined,
+      orderId: existingBalance?.orderId,
+      received: !!existingBalance?.orderId,
+      paidMethod: existingBalance?.paidMethod,
       transferDeclared: false,
       sourceLinkId: first.id,
-      depositPaid: first.amount,
-      amount: Math.max(packageDue - first.amount, 0),
-      payable: packageDue,
-      updatedAt: nowText(),
-      note: '',
-      createdAt: nowText(),
+      depositPaid: amount,
+      amount: Math.max(payable - amount, 0),
+      createdAt: existingBalance?.createdAt || first.createdAt,
       url: '',
     }
-    row.url = buildUrl(row)
-    persist([row, ...links])
+    balance.url = buildUrl(balance)
+    const withoutPair = links.filter((item) => item.id !== first.id && item.id !== balance.id)
+    persist([balance, first, ...withoutPair])
+    setEditingId(null)
     setScreen('list')
-    message.success(en ? 'Balance link created. When it is paid, the first payment order is updated. No second order is created.' : '尾款链接已生成。尾款支付后会更新首款那张订单，不另开订单。')
+    message.success(editingId
+      ? (en ? 'Deposit links updated' : '定金链接已更新')
+      : (en ? 'First and balance links created together' : '已同时生成首款链接和尾款链接'))
+    resetCustomer()
   }
 
   const startEdit = (row: PaymentLink) => {
@@ -583,7 +597,9 @@ export default function CreatePaymentLink() {
       existingOrderId: first?.orderId,
     })
     setLinks(loadLinks())
-    message.success(en ? 'Marked paid and membership opened' : '已标记已支付，并开通会员')
+    message.success(row.kind === 'deposit_first'
+      ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
+      : (en ? 'Marked paid and membership opened' : '已确认转账并开通会员'))
   }
 
   const formCard = (mode: 'full' | 'deposit') => (
@@ -731,13 +747,13 @@ export default function CreatePaymentLink() {
           <Typography.Paragraph type="secondary">
             {en ? 'Balance after this first payment: ' : '付完这笔首款后，尾款为 '}
             <b>{formatMoney(Math.max(chosenDeposit.payable - Math.round(Number(firstAmount) || 0), 0), chosenDeposit.currency)}</b>
-            {en ? '. One package is split into at most two payments.' : '。一个套餐最多拆成首款和尾款两笔。'}
+            {en ? '. Saving creates both the first-payment link and the balance link.' : '。保存后会同时生成首款链接和尾款链接。'}
           </Typography.Paragraph>
         )}
         <Button type="primary" icon={<LinkOutlined />} onClick={mode === 'full' ? createFull : createDepositFirst}>
           {editingId
             ? (en ? 'Save changes' : '保存修改')
-            : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first-payment link' : '生成首款链接')}
+            : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first and balance links' : '生成首款和尾款链接')}
         </Button>
       </Form>
     </Card>
@@ -802,7 +818,7 @@ export default function CreatePaymentLink() {
           const method = row.paidMethod === 'bank_transfer' ? (en ? 'Bank transfer' : '银行转账') : (row.paidMethod || '')
           return <Tag color="green">{en ? 'Paid' : '已支付'}{method ? ` · ${method}` : ''}</Tag>
         }
-        if (canMarkBankPaid(row)) return <Tag color="orange">{en ? 'Awaiting transfer confirmation' : '待确认转账'}</Tag>
+        if (hasBankTransfer(row)) return <Tag color="orange">{en ? 'Awaiting manager confirmation' : '待管理员确认支付'}</Tag>
         return <Tag>{en ? 'Waiting for payment callback' : '等待支付回调'}</Tag>
       },
     },
@@ -811,30 +827,28 @@ export default function CreatePaymentLink() {
     {
       title: en ? 'Actions' : '操作',
       width: 420,
-      render: (_: unknown, row: PaymentLink) => {
-        const balance = links.find((item) => item.kind === 'deposit_balance' && item.depositPlanId === row.depositPlanId)
-        return (
+      render: (_: unknown, row: PaymentLink) => (
           <Space wrap>
             <Button size="small" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open page' : '打开页面'}</Button>
             <Button size="small" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>
-              {row.kind === 'deposit_first' ? (en ? 'Copy deposit link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
+              {row.kind === 'deposit_first' ? (en ? 'Copy first-payment link' : '复制定金收款链接') : row.kind === 'deposit_balance' ? (en ? 'Copy balance link' : '复制尾款链接') : (en ? 'Copy' : '复制链接')}
             </Button>
             <Button size="small" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR code' : '二维码'}</Button>
-            {!row.orderId && (
+            {!row.orderId && row.kind !== 'deposit_balance' && (
               <Button size="small" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>
             )}
-            {canConfirmBank && canMarkBankPaid(row) && (
-              <Button size="small" onClick={() => markBankPaid(row)}>{en ? 'Mark paid and open membership' : '标记已支付并开通会员'}</Button>
+            {canConfirmBank && canMarkBankPaid(row, links) && (
+              <Button size="small" type="primary" onClick={() => markBankPaid(row)}>
+                {row.kind === 'deposit_first'
+                  ? (en ? 'Confirm first transfer' : '确认首款已转账')
+                  : (en ? 'Confirm transfer and open membership' : '确认已转账并开通会员')}
+              </Button>
             )}
             {row.orderId && (
               <Button size="small" type="link" onClick={() => navigate(`/orders/${row.orderId}`)}>{row.orderId}</Button>
             )}
-            {row.kind === 'deposit_first' && row.orderId && !balance && (
-              <Button size="small" type="primary" onClick={() => createBalance(row)}>{en ? 'Balance link' : '生成尾款链接'}</Button>
-            )}
           </Space>
-        )
-      },
+      ),
     },
   ]
 
@@ -843,8 +857,8 @@ export default function CreatePaymentLink() {
     if (keyword.trim() && !text.includes(keyword.trim().toLowerCase())) return false
     if (typeFilter && row.kind !== typeFilter) return false
     if (statusFilter === 'paid' && !row.orderId) return false
-    if (statusFilter === 'bank' && !canMarkBankPaid(row)) return false
-    if (statusFilter === 'callback' && (row.orderId || canMarkBankPaid(row))) return false
+    if (statusFilter === 'bank' && (row.orderId || !hasBankTransfer(row))) return false
+    if (statusFilter === 'callback' && (row.orderId || hasBankTransfer(row))) return false
     return true
   })
 
@@ -869,8 +883,8 @@ export default function CreatePaymentLink() {
             type="info"
             showIcon
             message={en
-              ? 'Deposit uses one order. The first payment opens it as partially paid. The balance link points at that order and, once paid, updates the same order. The two payments stay as separate lines.'
-              : '定金只用一张订单。首款支付后订单是部分付款。尾款链接关联这张订单，付完后更新同一张订单，不另开订单。两笔付款各自保留。'}
+              ? 'Saving creates the first-payment link and the balance link together. First payment opens one order as unpaid. Balance payment updates that same order. No second order is created.'
+              : '保存后会同时生成首款链接和尾款链接。首款到账后只开一张待支付订单，尾款到账后回写同一张订单，不另开订单。'}
           />
         )}
         {formCard(tab)}
@@ -893,7 +907,7 @@ export default function CreatePaymentLink() {
           <Select allowClear placeholder={en ? 'Status' : '状态'} value={statusFilter} onChange={setStatusFilter} style={{ width: 180 }}
             options={[
               { value: 'callback', label: en ? 'Waiting for callback' : '等待支付回调' },
-              { value: 'bank', label: en ? 'Awaiting transfer confirmation' : '待确认转账' },
+              { value: 'bank', label: en ? 'Awaiting manager confirmation' : '待管理员确认支付' },
               { value: 'paid', label: en ? 'Paid' : '已支付' },
             ]}
           />
@@ -907,8 +921,8 @@ export default function CreatePaymentLink() {
         type="info"
         showIcon
         message={en
-          ? 'Bank transfer is confirmed by an admin, ops, or sales lead. They mark it paid and open membership directly. Regular CC accounts do not see that action. The screenshot stays in the business group.'
-          : '银行转账由管理员、运营或销售组长直接标记已支付并开通会员。普通 CC 看不到这个操作。转账截图仍在业务群里核对，这里不再上传。'}
+          ? 'A deposit plan creates both links at once. Status is only paid, waiting for callback, or awaiting manager confirmation. Bank transfer rows show “Confirm transfer and open membership” for admin, ops, or a sales lead. Regular CC accounts do not see that action.'
+          : '定金会一次生成首款和尾款两条链接。状态只有已支付、等待支付回调、待管理员确认支付。包含银行转账的未支付记录，管理员、运营或销售组长会看到「确认已转账并开通会员」。普通 CC 看不到这个按钮。'}
       />
       <Table rowKey="id" size="middle" columns={columns('full')} dataSource={rows} pagination={false} locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }} />
       <Modal
