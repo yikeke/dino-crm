@@ -253,6 +253,54 @@ function legacyLinks(): PaymentLink[] {
     }))
 }
 
+function pairDeposits(input: PaymentLink[]): { links: PaymentLink[]; changed: boolean } {
+  let changed = false
+  const links = input.map((row) => ({ ...row }))
+  const out: PaymentLink[] = []
+  links.forEach((row) => {
+    if (row.kind === 'deposit_balance') {
+      const first = links.find((item) => item.id === row.sourceLinkId || (!!row.depositPlanId && item.kind === 'deposit_first' && item.depositPlanId === row.depositPlanId))
+      if (first && !row.depositPlanId) {
+        row.depositPlanId = first.depositPlanId || `DP-${first.id}`
+        changed = true
+      }
+      out.push(row)
+      return
+    }
+    if (row.kind !== 'deposit_first') {
+      out.push(row)
+      return
+    }
+    if (!row.depositPlanId) {
+      row.depositPlanId = `DP-${row.id}`
+      changed = true
+    }
+    const hasBalance = links.some((item) => item.kind === 'deposit_balance'
+      && (item.sourceLinkId === row.id || item.depositPlanId === row.depositPlanId))
+    if (!hasBalance) {
+      const payable = row.payable || row.offers?.[0]?.payable || 0
+      const balance: PaymentLink = {
+        ...row,
+        id: `${row.id}-B`,
+        kind: 'deposit_balance',
+        sourceLinkId: row.id,
+        depositPaid: row.amount,
+        amount: Math.max(payable - row.amount, 0),
+        orderId: undefined,
+        paidMethod: undefined,
+        transferDeclared: false,
+        received: false,
+        url: '',
+      }
+      balance.url = buildUrl(balance)
+      out.push(balance)
+      changed = true
+    }
+    out.push(row)
+  })
+  return { links: out, changed }
+}
+
 function loadLinks(): PaymentLink[] {
   const current = readArray(STORE_KEY)
   const base = current.length ? current : buildSeedLinks()
@@ -262,8 +310,8 @@ function loadLinks(): PaymentLink[] {
     known.add(row.id)
     return true
   })
-  const next = [...recovered, ...base]
-  if (!current.length || recovered.length) saveLinks(next)
+  const { links: next, changed } = pairDeposits([...recovered, ...base])
+  if (!current.length || recovered.length || changed) saveLinks(next)
   LEGACY_PAYMENT_LINK_KEYS.forEach((key) => localStorage.removeItem(key))
   return next
 }
