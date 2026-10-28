@@ -23,6 +23,20 @@ export type StoredPaymentLink = {
   kind?: string
   depositPlanId?: string
   sourceLinkId?: string
+  audience?: 'user' | 'open'
+  eventName?: string
+  validUntil?: string
+  payments?: OpenLinkPayment[]
+}
+
+/** One payment on an open link. Every payment is its own order, bound to the user who logged in. */
+export type OpenLinkPayment = {
+  orderId: string
+  userId: string
+  amount: number
+  currency: string
+  method: string
+  paidAt: string
 }
 
 export function readPaymentLinks(): StoredPaymentLink[] {
@@ -129,6 +143,7 @@ export function settlePaymentLink(id: string, detail: {
 }) {
   const links = readPaymentLinks()
   const current = links.find((item) => item.id === id)
+  if (current?.audience === 'open') return settleOpenLink(current, links, detail)
   if (current?.orderId && detail.leg !== 'deposit_balance') return current
   const when = paidTime()
   const userId = detail.userId || current?.userId || 'PAYMENT-LINK-USER'
@@ -187,4 +202,43 @@ export function settlePaymentLink(id: string, detail: {
     return { ...prev, orders: [order, ...prev.orders] }
   })
   return next.find((item) => item.id === id) || current
+}
+
+function settleOpenLink(link: StoredPaymentLink, links: StoredPaymentLink[], detail: {
+  methodName: string
+  skuName: string
+  amount: number
+  currency: string
+  userId?: string
+}) {
+  const when = paidTime()
+  const seq = (link.payments?.length || 0) + 1
+  const orderId = `${subOrderNoFor(link.id)}-${String(seq).padStart(3, '0')}`
+  const userId = detail.userId || 'PAYMENT-LINK-USER'
+  const payment: OpenLinkPayment = { orderId, userId, amount: detail.amount, currency: detail.currency, method: detail.methodName, paidAt: when }
+  writePaymentLinks(links.map((item) => (item.id === link.id ? { ...item, payments: [...(item.payments || []), payment] } : item)))
+  const order: Order = {
+    orderId,
+    productName: detail.skuName,
+    studentId: userId,
+    userStatus: '付费',
+    orderStatus: '已支付',
+    originalPrice: detail.amount,
+    paidAmount: detail.amount,
+    payMethod: 'Payment Link',
+    currency: detail.currency || 'USD',
+    paidTime: when,
+    transactions: [{
+      id: orderId,
+      time: when,
+      event: '支付成功',
+      status: '已支付',
+      amount: detail.amount,
+      paymentMethod: detail.methodName,
+      channelRef: providerRef(detail.methodName),
+      note: `Open payment link ${link.id}${link.eventName ? ` · ${link.eventName}` : ''}`,
+    }],
+  }
+  setState((prev) => ({ ...prev, orders: [order, ...prev.orders] }))
+  return { ...link, orderId }
 }

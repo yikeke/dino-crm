@@ -705,3 +705,235 @@
   font-size: 12px;
   text-align: center;
 }
+
+.pay-event {
+  margin: 0 0 10px;
+  color: var(--pay-muted, #6b7280);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.pay-due__meta strong.is-muted {
+  color: var(--pay-muted, #6b7280);
+  font-weight: 500;
+}
+
+.pay-expired {
+  color: #b42318;
+  text-align: center;
+  font-weight: 600;
+}
+
+.pay-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.pay-sheet__panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: #fff;
+  box-sizing: border-box;
+  animation: pay-sheet-in 0.2s ease-out;
+}
+
+@keyframes pay-sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.pay-sheet__close {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 14px;
+  border: 0;
+  background: none;
+  color: #9ca3af;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pay-sheet__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pay-sheet__sub {
+  margin: 0 0 18px;
+  color: var(--pay-muted, #6b7280);
+  font-size: 13px;
+}
+
+.pay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pay-field input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+}
+
+.pay-field small {
+  color: var(--pay-muted, #6b7280);
+  font-weight: 400;
+}
+
+.pay-field__row {
+  display: flex;
+  gap: 8px;
+}
+
+.pay-field__dial {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  font-weight: 500;
+}
+
+.pay-field__btn {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid var(--pay-brand, #5b5cf0);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pay-brand, #5b5cf0);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pay-field__btn:disabled {
+  border-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pay-sheet .pay-continue {
+  width: 100%;
+}
+
+.pay-sheet__or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 12px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.pay-sheet__or::before,
+.pay-sheet__or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.pay-social {
+  display: flex;
+  gap: 8px;
+}
+
+.pay-social__btn {
+  flex: 1;
+  height: 42px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pay-social__btn.is-kakao {
+  border-color: #fee500;
+  background: #fee500;
+  color: #191600;
+}
+
+.pay-social__btn.is-apple {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.pay-account {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.pay-account__avatar {
+  display: flex;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--pay-brand, #5b5cf0);
+  color: #fff;
+  font-weight: 700;
+}
+
+.pay-account__name {
+  margin: 0 0 2px;
+  font-weight: 700;
+}
+
+.pay-account__meta {
+  margin: 0;
+  color: var(--pay-muted, #6b7280);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.pay-account__new {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #027a48;
+  font-size: 12px;
+}
+
+.pay-sheet__link {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  border: 0;
+  background: none;
+  color: var(--pay-muted, #6b7280);
+  font: inherit;
+  cursor: pointer;
+}

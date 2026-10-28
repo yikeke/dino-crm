@@ -9,6 +9,7 @@ import {
   InputNumber,
   Checkbox,
   Modal,
+  Popover,
   Segmented,
   Select,
   Space,
@@ -32,7 +33,7 @@ import {
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
-import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, currentOrderId, ensurePaymentLinkOrders, subOrderNoFor, settlePaymentLink } from '../paymentLinkStore'
+import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, type OpenLinkPayment, currentOrderId, ensurePaymentLinkOrders, subOrderNoFor, settlePaymentLink } from '../paymentLinkStore'
 import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
@@ -76,12 +77,35 @@ type PaymentLink = {
   updatedAt: string
   sourceLinkId?: string
   createdBy?: string
+  audience?: 'user' | 'open'
+  eventName?: string
+  validUntil?: string
+  payments?: OpenLinkPayment[]
 }
 
-type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done'
+type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'open' | 'done'
 
 function offer(skuId: string, skuName: string, memberLevel: 'Pro' | 'Max', listPrice: number, payable: number, currency: string, ruleLabel: string): LinkOffer {
   return { skuId, skuName, memberLevel, listPrice, payable, currency, ruleLabel }
+}
+
+const OPEN_SEED_ID = 'PL-OPEN-KR'
+
+function OPEN_SEED(offers: LinkOffer[], blank: (row: PaymentLink) => PaymentLink): PaymentLink {
+  return blank({
+    id: OPEN_SEED_ID, kind: 'full', depositPlanId: '', audience: 'open',
+    eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30',
+    line: 'Korea', channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO',
+    planId: 'CSP-AMY', offers: offers.slice(0, 2), skuId: offers.slice(0, 2).map((item) => item.skuId).join(','),
+    skuName: offers.slice(0, 2).map((item) => item.skuName).join(' / '), currency: 'KRW',
+    listPrice: 99000, promoCode: 'CSP-AMY-PROMO', promoLabel: 'CSP-AMY-PROMO', payable: 0, amount: 0,
+    phone: '', customerName: '', note: '', methods: ['card', 'kakaopay'],
+    payments: [
+      { orderId: 'WEB-OPEN-KR-001', userId: '2060199610824356004', amount: 89100, currency: 'KRW', method: 'kakaopay', paidAt: '2026-10-26 14:12:00' },
+      { orderId: 'WEB-OPEN-KR-002', userId: '2060199610824355846', amount: 178000, currency: 'KRW', method: 'card', paidAt: '2026-10-27 11:40:00' },
+    ],
+    url: '', received: false, createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40',
+  })
 }
 
 function buildSeedLinks(): PaymentLink[] {
@@ -181,6 +205,7 @@ function buildSeedLinks(): PaymentLink[] {
       orderId: 'WEB-FULL-PAID', paidMethod: 'card',
       url: '', received: true, createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20',
     }),
+    OPEN_SEED(koreaOffers, blank),
     blank({
       id: 'PL-FULL-WAIT', kind: 'full', depositPlanId: '',
       line: 'Korea', channelId: 'sales_amy_zhang', channelName: 'Amy Zhang', channelCode: 'CH-KR-0001',
@@ -193,6 +218,22 @@ function buildSeedLinks(): PaymentLink[] {
 }
 
 export const PAYMENT_LINK_DEMO_ORDERS = [
+  {
+    orderId: 'WEB-OPEN-KR-001', productName: 'Pro · Pro Quarterly', studentId: '2060199610824356004', userStatus: '付费' as const,
+    orderStatus: '已支付' as const, originalPrice: 89100, paidAmount: 89100, payMethod: 'Payment Link' as const, currency: 'KRW',
+    paidTime: '2026-10-26 14:12:00',
+    transactions: [
+      { id: 'WEB-OPEN-KR-001', time: '2026-10-26 14:12:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'kakaopay', channelRef: 'KAKAO-26141209KR', note: 'Open payment link PL-OPEN-KR · Seoul Edu Expo 2026' },
+    ],
+  },
+  {
+    orderId: 'WEB-OPEN-KR-002', productName: 'Max · Max 6 Months', studentId: '2060199610824355846', userStatus: '付费' as const,
+    orderStatus: '已支付' as const, originalPrice: 178000, paidAmount: 178000, payMethod: 'Payment Link' as const, currency: 'KRW',
+    paidTime: '2026-10-27 11:40:00',
+    transactions: [
+      { id: 'WEB-OPEN-KR-002', time: '2026-10-27 11:40:00', event: '支付成功', status: '已支付' as const, amount: 178000, paymentMethod: 'card', channelRef: 'CARD-27114033KR', note: 'Open payment link PL-OPEN-KR · Seoul Edu Expo 2026' },
+    ],
+  },
   {
     orderId: 'WEB-FULL-PAID', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355846', userStatus: '付费' as const,
     orderStatus: '已支付' as const, originalPrice: 89100, paidAmount: 89100, payMethod: 'Payment Link' as const, currency: 'KRW',
@@ -307,7 +348,9 @@ function loadLinks(): PaymentLink[] {
   const stored = readArray(STORE_KEY)
   const renamed = stored.some((row) => currentOrderId(row.orderId) !== row.orderId)
   const current = renamed ? stored.map((row) => ({ ...row, orderId: currentOrderId(row.orderId) })) : stored
-  const base = current.length ? current : buildSeedLinks()
+  const seeded = current.length ? current : buildSeedLinks()
+  const missingOpen = current.length > 0 && !current.some((row) => row.id === OPEN_SEED_ID)
+  const base = missingOpen ? [...seeded, buildSeedLinks().find((row) => row.id === OPEN_SEED_ID) as PaymentLink] : seeded
   const known = new Set(base.map((row) => row.id))
   const recovered = legacyLinks().filter((row) => {
     if (known.has(row.id)) return false
@@ -315,7 +358,7 @@ function loadLinks(): PaymentLink[] {
     return true
   })
   const { links: next, changed } = pairDeposits([...recovered, ...base])
-  if (!current.length || recovered.length || changed || renamed) saveLinks(next)
+  if (!current.length || recovered.length || changed || renamed || missingOpen) saveLinks(next)
   LEGACY_PAYMENT_LINK_KEYS.forEach((key) => localStorage.removeItem(key))
   return next
 }
@@ -378,6 +421,11 @@ function buildUrl(link: PaymentLink) {
     offers: JSON.stringify(link.offers || []),
   })
   if (link.userId) query.set('user_id', link.userId)
+  if (link.audience === 'open') {
+    query.set('mode', 'open')
+    if (link.eventName) query.set('event', link.eventName)
+    if (link.validUntil) query.set('valid_until', link.validUntil)
+  }
   if (link.promoCode) query.set('promo', link.promoCode)
   if (link.depositPlanId) query.set('deposit_plan', link.depositPlanId)
   if (link.kind === 'deposit_balance') query.set('deposit_paid', String(link.depositPaid || 0))
@@ -409,6 +457,9 @@ export default function CreatePaymentLink() {
   const [firstAmount, setFirstAmount] = useState<number | null>(null)
   const [payMethods, setPayMethods] = useState<string[]>([])
   const [tab, setTab] = useState<'full' | 'deposit'>('full')
+  const [audience, setAudience] = useState<'user' | 'open'>('user')
+  const [eventName, setEventName] = useState('')
+  const [validUntil, setValidUntil] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [screen, setScreen] = useState<'list' | 'form'>(presetUserId ? 'form' : 'list')
   const [keyword, setKeyword] = useState('')
@@ -521,6 +572,9 @@ export default function CreatePaymentLink() {
   const resetCustomer = () => {
     setUserQuery('')
     setFirstAmount(null)
+    setAudience('user')
+    setEventName('')
+    setValidUntil('')
   }
 
   const onLine = (value: string) => {
@@ -535,16 +589,26 @@ export default function CreatePaymentLink() {
     setFirstAmount(null)
   }
 
+  const openMode = tab === 'full' && audience === 'open'
+  const methodsFor = (mode: 'full' | 'deposit') => (mode === 'deposit'
+    ? depositMethods(activeLine)
+    : methodsForLine(activeLine).filter((method) => !(openMode && method.kind === 'manual')))
+
   const requireCustomer = () => {
     if (!activeChannel?.plan || !shown.length) {
       message.warning(en ? 'This channel has no active price plan' : '这个渠道还没有生效中的价格方案')
       return false
     }
-    if (!linkedUserId) {
+    if (openMode) {
+      if (!eventName.trim()) {
+        message.warning(en ? 'Enter the event or material name' : '请填写活动 / 物料名称')
+        return false
+      }
+    } else if (!linkedUserId) {
       message.warning(en ? 'Pick a User ID from the matches' : '请从匹配结果里选中一个 User ID')
       return false
     }
-    if (!payMethods.length) {
+    if (!payMethods.some((code) => methodsFor(tab).some((method) => method.code === code))) {
       message.warning(en ? 'Select at least one payment method' : '请至少选择一种支付方式')
       return false
     }
@@ -576,8 +640,12 @@ export default function CreatePaymentLink() {
       phone: '',
       customerName: '',
       note: '',
-      methods: kind === 'full' ? payMethods : payMethods.filter((code) => !code.includes('installment')),
-      userId: linkedUserId,
+      methods: payMethods.filter((code) => methodsFor(kind === 'full' ? 'full' : 'deposit').some((method) => method.code === code)),
+      userId: kind === 'full' && audience === 'open' ? undefined : linkedUserId,
+      audience: kind === 'full' && audience === 'open' ? 'open' : 'user',
+      eventName: kind === 'full' && audience === 'open' ? eventName.trim() : undefined,
+      validUntil: kind === 'full' && audience === 'open' ? (validUntil || undefined) : undefined,
+      payments: editingId ? links.find((item) => item.id === editingId)?.payments : undefined,
       orderId: editingId ? links.find((item) => item.id === editingId)?.orderId : undefined,
       url: '',
       received: false,
@@ -590,7 +658,7 @@ export default function CreatePaymentLink() {
 
   const createFull = () => {
     if (!requireCustomer()) return
-    if (editingId && links.some((item) => item.id === editingId && item.orderId)) {
+    if (editingId && links.some((item) => item.id === editingId && (item.orderId || item.payments?.length))) {
       message.warning(en ? 'This link is already paid' : '这条链接已经支付，不能再改')
       return
     }
@@ -606,7 +674,9 @@ export default function CreatePaymentLink() {
     persist(editingId ? links.map((item) => item.id === editingId ? row : item) : [row, ...links])
     setEditingId(null)
     setScreen('list')
-    message.success(editingId ? (en ? 'Payment link updated' : '支付链接已更新') : (en ? 'Full payment link created' : '全款链接已生成'))
+    message.success(editingId
+      ? (en ? 'Payment link updated' : '支付链接已更新')
+      : row.audience === 'open' ? (en ? 'Open payment link created. Download the QR code for print.' : '通用支付链接已生成，可下载二维码用于印刷物料') : (en ? 'Full payment link created' : '全款链接已生成'))
     resetCustomer()
   }
 
@@ -662,7 +732,7 @@ export default function CreatePaymentLink() {
   }
 
   const startEdit = (row: PaymentLink) => {
-    if (row.orderId) {
+    if (row.orderId || row.payments?.length) {
       message.warning(en ? 'Paid links cannot be edited' : '已经支付的链接不能再编辑')
       return
     }
@@ -675,6 +745,9 @@ export default function CreatePaymentLink() {
     setDepositSkuId(row.offers?.[0]?.skuId || row.skuId.split(',')[0] || '')
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit_first' ? row.amount : null)
+    setAudience(row.audience === 'open' ? 'open' : 'user')
+    setEventName(row.eventName || '')
+    setValidUntil(row.validUntil || '')
     setTab(row.kind === 'full' ? 'full' : 'deposit')
     setScreen('form')
   }
@@ -701,7 +774,6 @@ export default function CreatePaymentLink() {
   }
 
   const linkedStudent = students.find((student) => student.studentId === linkedUserId)
-  const lineMethods = (mode: 'full' | 'deposit') => (mode === 'deposit' ? depositMethods(activeLine) : methodsForLine(activeLine))
   const firstValue = Math.round(Number(firstAmount) || 0)
   const depositPayable = chosenDeposit?.payable || 0
   const floor = depositFloor(activeLine, depositPayable)
@@ -766,17 +838,62 @@ export default function CreatePaymentLink() {
   )
 
   const formCard = (mode: 'full' | 'deposit') => {
-    const methodList = lineMethods(mode)
+    const methodList = methodsFor(mode)
+    const open = mode === 'full' && audience === 'open'
+    const hiddenManual = open && methodsForLine(activeLine).some((method) => method.kind === 'manual')
     const pickedMethods = methodList.filter((method) => payMethods.includes(method.code))
     const promo = usePromo && hasDiscount ? activeChannel?.plan?.promoCode : ''
     const balanceValue = Math.max(depositPayable - firstValue, 0)
     const firstShare = depositPayable ? Math.min(100, Math.max(0, (firstValue / depositPayable) * 100)) : 0
-    const ready = !!linkedUserId && !!activeChannel?.plan && pickedMethods.length > 0 && (mode === 'full' ? shown.length > 0 : firstValid)
+    const ready = (open ? !!eventName.trim() : !!linkedUserId) && !!activeChannel?.plan && pickedMethods.length > 0 && (mode === 'full' ? shown.length > 0 : firstValid)
     let stepNo = 0
     return (
       <div className="pl-form">
         <div className="pl-form__main">
-          <Card size="small" title={step(++stepNo, en ? 'Customer' : '客户', en ? 'Phone number or User ID' : '手机号或 User ID')}>
+          <Card size="small" title={step(++stepNo, en ? 'Who pays' : '付款人', open ? (en ? 'Anyone who scans logs in first' : '扫码用户先登录再付款') : (en ? 'Phone number or User ID' : '手机号或 User ID'))}>
+            {mode === 'full' && (
+              <div className="pl-audience">
+                {([
+                  { value: 'user', title: en ? 'A specific user' : '指定用户', desc: en ? 'Sales follow-up. The link is tied to one User ID and can be paid once.' : '销售跟进用。链接绑定一个 User ID，只能付一次。' },
+                  { value: 'open', title: en ? 'Open link (expo / printed QR)' : '通用链接（展会 / 物料二维码）', desc: en ? 'No User ID up front. The customer logs in before paying; anyone can pay, many times.' : '不预先指定用户。用户付款前先登录，付款绑定到登录账号；可被多人多次付款。' },
+                ] as const).map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={`pl-audience__item${audience === item.value ? ' is-on' : ''}`}
+                    disabled={!!editingId}
+                    onClick={() => setAudience(item.value)}
+                  >
+                    <span className="pl-audience__radio" />
+                    <span>
+                      <b>{item.title}</b>
+                      <Typography.Text type="secondary">{item.desc}</Typography.Text>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {open ? (
+              <div className="pl-grid-2 pl-grid-2--wide">
+                <div>
+                  <div className="pl-label">{en ? 'Event / material name' : '活动 / 物料名称'} <span className="pl-required">*</span></div>
+                  <Input
+                    value={eventName}
+                    onChange={(event) => setEventName(event.target.value)}
+                    placeholder={en ? 'e.g. Seoul Edu Expo 2026 · Booth B12' : '例如 Seoul Edu Expo 2026 · B12 展位'}
+                    maxLength={60}
+                    showCount
+                  />
+                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Shown at the top of the customer page; also used to attribute orders.' : '显示在用户页面顶部，同时用于统计订单来源。'}</Typography.Text>
+                </div>
+                <div>
+                  <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
+                  <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
+                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Optional. After this date the QR code shows the link as expired.' : '可不填。过期后扫码会提示链接已失效。'}</Typography.Text>
+                </div>
+              </div>
+            ) : (
+              <>
             <AutoComplete
               value={userQuery}
               options={userMatches.map((student) => ({
@@ -809,6 +926,8 @@ export default function CreatePaymentLink() {
                   ? (en ? 'Pick a user from the matches. The link saves the User ID.' : '请从下拉结果里选中一个用户，链接保存的是 User ID。')
                   : (en ? 'The link is tied to one user. Only that user can pay with it.' : '链接绑定一个用户，只给这个用户付款。')}
               </Typography.Text>
+            )}
+              </>
             )}
           </Card>
 
@@ -911,6 +1030,9 @@ export default function CreatePaymentLink() {
               ? (en ? 'Offered on both links; chosen per payment; no instalments' : '首款、尾款都提供，用户每笔单独选；不含分期')
               : (en ? 'The customer only sees the methods checked here' : '用户只会看到这里勾选的方式'))}
           >
+            {hiddenManual && (
+              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Bank transfer is not offered on open links: each transfer has to be matched to a person by an admin.' : '通用链接不提供银行转账：转账需要管理员按人核对，没法对应到扫码用户。'}</Typography.Text>
+            )}
             <div className="pl-method-tiles">
               {methodList.map((method) => {
                 const on = payMethods.includes(method.code)
@@ -937,11 +1059,12 @@ export default function CreatePaymentLink() {
               <Tag color={mode === 'full' ? 'green' : 'blue'} bordered={false}>
                 {mode === 'full' ? (en ? 'Full payment' : '全款') : (en ? 'Deposit · 2 links' : '定金 · 2 条链接')}
               </Tag>
+              {open && <Tag color="cyan" bordered={false}>{en ? 'Open link · reusable' : '通用链接 · 可多次付款'}</Tag>}
               {editingId && <Tag bordered={false}>{en ? 'Editing' : '编辑中'} {editingId}</Tag>}
             </div>
             <dl className="pl-summary__list">
               <dt>{en ? 'Customer' : '客户'}</dt>
-              <dd>{linkedStudent ? <>{linkedStudent.name}<br /><Typography.Text type="secondary">{linkedStudent.studentId}</Typography.Text></> : <Typography.Text type="secondary">{en ? 'Not selected' : '未选择'}</Typography.Text>}</dd>
+              <dd>{open ? <>{en ? 'Bound at login' : '登录后绑定'}{eventName.trim() && <><br /><Typography.Text type="secondary">{eventName.trim()}</Typography.Text></>}{validUntil && <><br /><Typography.Text type="secondary">{en ? 'Until' : '有效期至'} {validUntil}</Typography.Text></>}</> : linkedStudent ? <>{linkedStudent.name}<br /><Typography.Text type="secondary">{linkedStudent.studentId}</Typography.Text></> : <Typography.Text type="secondary">{en ? 'Not selected' : '未选择'}</Typography.Text>}</dd>
               <dt>{en ? 'Channel' : '渠道'}</dt>
               <dd>{activeChannel ? `${activeChannel.channel.name} · ${activeLine}` : '—'}</dd>
               <dt>{en ? 'Promo' : '优惠'}</dt>
@@ -969,21 +1092,25 @@ export default function CreatePaymentLink() {
               </dd>
             </dl>
             <Typography.Paragraph type="secondary" className="pl-summary__note">
-              {mode === 'full'
+              {open
+                ? (en ? 'Print the QR code on expo materials. Each customer logs in, pays, and gets their own order bound to the account they logged in with.' : '二维码可印在展会物料上。每个用户扫码登录后付款，各自生成一张订单，绑定到登录的账号。')
+                : mode === 'full'
                 ? (en ? 'One link, one payment. When it lands, one order is created and membership opens.' : '1 条链接对应 1 笔付款。到账后生成 1 张订单并开通会员。')
                 : (en ? 'Saving creates the first and balance links together. Both payments sit under one main order; membership opens after the balance.' : '保存后同时生成首款和尾款链接，两笔都挂在同一张主订单下；尾款到账后开通会员。')}
             </Typography.Paragraph>
             <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDepositFirst}>
               {editingId
                 ? (en ? 'Save changes' : '保存修改')
-                : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first and balance links' : '生成首款和尾款链接')}
+                : open ? (en ? 'Create open link' : '生成通用支付链接') : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create first and balance links' : '生成首款和尾款链接')}
             </Button>
             <Button block icon={<EyeOutlined />} style={{ marginTop: 8 }} disabled={!activeChannel?.plan || !shown.length} onClick={() => previewDraft(mode)}>
               {en ? 'Preview customer page' : '预览用户页面'}
             </Button>
             {!ready && (
               <Typography.Text type="secondary" className="pl-summary__todo">
-                {!linkedUserId
+                {open && !eventName.trim()
+                  ? (en ? 'Enter the event or material name.' : '请填写活动 / 物料名称。')
+                  : !open && !linkedUserId
                   ? (en ? 'Select a customer to continue.' : '选中客户后才能生成。')
                   : !pickedMethods.length
                     ? (en ? 'Select at least one payment method.' : '至少选择一种支付方式。')
@@ -1110,14 +1237,26 @@ export default function CreatePaymentLink() {
       key: 'kind',
       width: 96,
       render: (_: unknown, row: ListRow) => (row.kind === 'full'
-        ? <Tag color="green">{en ? 'Full' : '全款'}</Tag>
+        ? (
+          <Space direction="vertical" size={4}>
+            <Tag color="green">{en ? 'Full' : '全款'}</Tag>
+            {row.audience === 'open' && <Tag color="cyan">{en ? 'Open' : '通用'}</Tag>}
+          </Space>
+        )
         : <Tag color="orange">{en ? 'Deposit' : '定金'}</Tag>),
     },
     {
       title: 'User ID',
       dataIndex: 'userId',
       width: 220,
-      render: (userId: string | undefined) => <Typography.Text copyable={!!userId}>{userId || '—'}</Typography.Text>,
+      render: (userId: string | undefined, row: ListRow) => (row.audience === 'open'
+        ? (
+          <div className="pl-two-line">
+            <span>{en ? 'Bound when the customer logs in' : '扫码登录后绑定'}</span>
+            <Typography.Text type="secondary">{row.eventName || '—'}</Typography.Text>
+          </div>
+        )
+        : <Typography.Text copyable={!!userId}>{userId || '—'}</Typography.Text>),
     },
     {
       title: en ? 'Channel / SKU' : '渠道 / SKU',
@@ -1165,6 +1304,23 @@ export default function CreatePaymentLink() {
       width: 170,
       render: (_: unknown, row: ListRow) => {
         if (row.kind === 'deposit_first') return depositProgress(row)
+        if (row.audience === 'open') {
+          const expired = !!row.validUntil && row.validUntil < nowText().slice(0, 10)
+          const count = row.payments?.length || 0
+          return (
+            <div className="pl-two-line">
+              {expired
+                ? <Tag bordered={false}>{en ? 'Expired' : '已过期'}</Tag>
+                : <Tag color="cyan" bordered={false}>{en ? 'Collecting' : '收款中'}</Tag>}
+              <Typography.Text type="secondary">
+                {count
+                  ? (en ? `${count} paid · ${formatMoney((row.payments || []).reduce((sum, item) => sum + item.amount, 0), row.currency)}` : `已收 ${count} 笔 · ${formatMoney((row.payments || []).reduce((sum, item) => sum + item.amount, 0), row.currency)}`)
+                  : (en ? 'No payments yet' : '还没有人付款')}
+                {row.validUntil && ` · ${en ? 'until' : '至'} ${row.validUntil}`}
+              </Typography.Text>
+            </div>
+          )
+        }
         return (
           <div className="pl-two-line">
             {legStatus(row)}
@@ -1178,6 +1334,33 @@ export default function CreatePaymentLink() {
       title: en ? 'Order no.' : '订单号',
       width: 210,
       render: (_: unknown, row: ListRow) => {
+        if (row.audience === 'open') {
+          const payments = [...(row.payments || [])].reverse()
+          if (!payments.length) return <Typography.Text type="secondary">{en ? 'One order per payment' : '每笔付款各生成一张订单'}</Typography.Text>
+          return (
+            <div className="pl-two-line">
+              {orderNo(payments[0].orderId, true)}
+              <Popover
+                trigger="click"
+                title={en ? `${payments.length} orders from this link` : `这条链接的 ${payments.length} 张订单`}
+                content={(
+                  <div className="pl-open-orders">
+                    {payments.map((item) => (
+                      <div key={item.orderId} className="pl-open-orders__row">
+                        {orderNo(item.orderId, true)}
+                        <Typography.Text type="secondary">{item.userId}</Typography.Text>
+                        <b>{formatMoney(item.amount, item.currency)}</b>
+                        <Typography.Text type="secondary">{item.paidAt.slice(0, 16)}</Typography.Text>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              >
+                <Button type="link" size="small" className="pl-order-no">{en ? `All ${payments.length} orders` : `共 ${payments.length} 张订单`}</Button>
+              </Popover>
+            </div>
+          )
+        }
         const mainNo = row.orderId || subOrderNoFor(row.id)
         const count = row.kind === 'deposit_first' ? [row, row.balance].filter((item) => item?.orderId).length : 0
         return (
@@ -1220,7 +1403,7 @@ export default function CreatePaymentLink() {
           <Space direction="vertical" size={4}>
             {linkActions(row, en ? 'Copy link' : '复制链接')}
             <Space size={4}>
-              {!row.orderId && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
+              {!row.orderId && !row.payments?.length && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
               {confirmButton(row)}
             </Space>
           </Space>
@@ -1285,7 +1468,7 @@ export default function CreatePaymentLink() {
 
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
-    return [row.userId, row.id, row.channelName, row.skuName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
+    return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...(row.payments || []).flatMap((item) => [item.orderId, item.userId])].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
   const sceneMatch = (row: ListRow, value: Scene) => {
     const legs = [row, row.balance].filter((item): item is PaymentLink => !!item)
@@ -1293,8 +1476,9 @@ export default function CreatePaymentLink() {
     if (value === 'confirm') return legs.some((item) => canMarkBankPaid(item, links))
     if (value === 'first') return isDeposit && !row.orderId
     if (value === 'balance') return isDeposit && !!row.orderId && !!row.balance && !row.balance.orderId
-    if (value === 'full_wait') return row.kind === 'full' && !row.orderId
-    if (value === 'done') return legs.every((item) => item.orderId)
+    if (value === 'open') return row.audience === 'open'
+    if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && !row.orderId
+    if (value === 'done') return row.audience !== 'open' && legs.every((item) => item.orderId)
     return true
   }
   const allRows: ListRow[] = links
@@ -1322,6 +1506,7 @@ export default function CreatePaymentLink() {
     { value: 'first', label: en ? 'First payment due' : '待付首款' },
     { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
     { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
+    { value: 'open', label: en ? 'Open links' : '通用链接' },
     { value: 'done', label: en ? 'Completed' : '已完成' },
   ]
   const lineOptions = Array.from(new Set(allRows.map((row) => row.line).filter(Boolean)))
@@ -1371,7 +1556,7 @@ export default function CreatePaymentLink() {
             <Segmented
               className="pl-form-head__switch"
               value={tab}
-              onChange={(value) => { setTab(value as 'full' | 'deposit'); setFirstAmount(null) }}
+              onChange={(value) => { setTab(value as 'full' | 'deposit'); setFirstAmount(null); if (value === 'deposit') setAudience('user') }}
               options={[
                 { value: 'full', label: en ? 'Full payment' : '全款' },
                 { value: 'deposit', label: en ? 'Deposit' : '定金' },
@@ -1406,6 +1591,7 @@ export default function CreatePaymentLink() {
         <Space>
           <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New full payment link' : '新建全款支付链接'}</Button>
           <Button icon={<LinkOutlined />} onClick={() => openCreate('deposit')}>{en ? 'New deposit link' : '新建定金支付链接'}</Button>
+          <Button icon={<QrcodeOutlined />} onClick={() => { openCreate('full'); setAudience('open') }}>{en ? 'New open link (QR)' : '新建通用支付链接'}</Button>
         </Space>
       </div>
       <Space wrap>

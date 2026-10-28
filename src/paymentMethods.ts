@@ -32,6 +32,22 @@ export type PayCopy = {
   account: string
   fullTag: string
   linkPaid: string
+  bindAfterLogin: string
+  loginTitle: string
+  loginSub: string
+  phone: string
+  getCode: string
+  code: string
+  codeHint: string
+  login: string
+  orWith: string
+  confirmTitle: string
+  confirmBody: string
+  confirmPay: string
+  switchAccount: string
+  newAccount: string
+  paySuccess: string
+  expired: string
   dir: 'ltr' | 'rtl'
 }
 
@@ -81,37 +97,43 @@ const COPY: Record<string, PayCopy> = {
     title: '결제', discount: '할인', total: '합계', choose: '결제 수단 선택', pay: '결제하기',
     cancel: '언제든 취소 가능 · ', terms: '이용약관', privacy: '개인정보 처리방침',
     first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택',
-    summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '계정 ID', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다', dir: 'ltr',
+    summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '계정 ID', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다',
+    bindAfterLogin: '로그인 후 연결', loginTitle: '로그인하고 결제 계속하기', loginSub: '결제는 로그인한 Dino AI 계정에 연결됩니다', phone: '휴대폰 번호', getCode: '인증번호 받기', code: '인증번호', codeHint: '데모: 아무 6자리 숫자', login: '로그인', orWith: '또는', confirmTitle: '결제 계정 확인', confirmBody: '이 계정으로 결제하고 멤버십을 개통합니다', confirmPay: '확인하고 결제하기', switchAccount: '다른 계정으로 로그인', newAccount: '신규 계정 · 자동 가입됨', paySuccess: '결제가 완료되었습니다', expired: '이 결제 링크는 만료되었습니다', dir: 'ltr',
   },
   Vietnam: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
     cancel: 'Hủy bất cứ lúc nào · ', terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
     first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói',
-    summary: 'Tóm tắt đơn hàng', dueNow: 'Cần thanh toán', paidTag: 'Đã thanh toán', laterTag: 'Thanh toán sau', secure: 'Thanh toán an toàn', account: 'ID tài khoản', fullTag: 'Thanh toán toàn bộ', linkPaid: 'Liên kết này đã được thanh toán', dir: 'ltr',
+    summary: 'Tóm tắt đơn hàng', dueNow: 'Cần thanh toán', paidTag: 'Đã thanh toán', laterTag: 'Thanh toán sau', secure: 'Thanh toán an toàn', account: 'ID tài khoản', fullTag: 'Thanh toán toàn bộ', linkPaid: 'Liên kết này đã được thanh toán',
+    bindAfterLogin: 'Liên kết sau khi đăng nhập', loginTitle: 'Đăng nhập để tiếp tục thanh toán', loginSub: 'Thanh toán sẽ được gắn với tài khoản Dino AI bạn đăng nhập', phone: 'Số điện thoại', getCode: 'Lấy mã', code: 'Mã xác minh', codeHint: 'Demo: nhập 6 chữ số bất kỳ', login: 'Đăng nhập', orWith: 'hoặc', confirmTitle: 'Xác nhận tài khoản thanh toán', confirmBody: 'Thanh toán và mở hội viên cho tài khoản này', confirmPay: 'Xác nhận và thanh toán', switchAccount: 'Đổi tài khoản khác', newAccount: 'Tài khoản mới · đã tự động đăng ký', paySuccess: 'Thanh toán thành công', expired: 'Liên kết thanh toán này đã hết hạn', dir: 'ltr',
   },
   Malaysia: {
     title: 'Pembayaran', discount: 'Diskaun', total: 'Jumlah', choose: 'Pilih kaedah pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batal bila-bila masa · ', terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
     first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan',
-    summary: 'Ringkasan pesanan', dueNow: 'Perlu dibayar', paidTag: 'Telah dibayar', laterTag: 'Bayar kemudian', secure: 'Pembayaran selamat', account: 'ID akaun', fullTag: 'Bayaran penuh', linkPaid: 'Pautan ini telah dibayar', dir: 'ltr',
+    summary: 'Ringkasan pesanan', dueNow: 'Perlu dibayar', paidTag: 'Telah dibayar', laterTag: 'Bayar kemudian', secure: 'Pembayaran selamat', account: 'ID akaun', fullTag: 'Bayaran penuh', linkPaid: 'Pautan ini telah dibayar',
+    bindAfterLogin: 'Dipautkan selepas log masuk', loginTitle: 'Log masuk untuk teruskan pembayaran', loginSub: 'Pembayaran akan dipautkan ke akaun Dino AI yang anda log masuk', phone: 'Nombor telefon', getCode: 'Dapatkan kod', code: 'Kod pengesahan', codeHint: 'Demo: mana-mana 6 digit', login: 'Log masuk', orWith: 'atau', confirmTitle: 'Sahkan akaun pembayaran', confirmBody: 'Bayar dan aktifkan keahlian untuk akaun ini', confirmPay: 'Sahkan dan bayar', switchAccount: 'Tukar akaun', newAccount: 'Akaun baharu · didaftarkan secara automatik', paySuccess: 'Pembayaran berjaya', expired: 'Pautan pembayaran ini telah tamat tempoh', dir: 'ltr',
   },
   'Saudi Arabia': {
     title: 'الدفع', discount: 'الخصم', total: 'الإجمالي', choose: 'اختر طريقة الدفع', pay: 'ادفع الآن',
     cancel: 'يمكن الإلغاء في أي وقت · ', terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
     first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة',
-    summary: 'ملخص الطلب', dueNow: 'المستحق الآن', paidTag: 'تم الدفع', laterTag: 'يدفع لاحقًا', secure: 'دفع آمن', account: 'معرّف الحساب', fullTag: 'دفع كامل', linkPaid: 'تم دفع هذا الرابط', dir: 'rtl',
+    summary: 'ملخص الطلب', dueNow: 'المستحق الآن', paidTag: 'تم الدفع', laterTag: 'يدفع لاحقًا', secure: 'دفع آمن', account: 'معرّف الحساب', fullTag: 'دفع كامل', linkPaid: 'تم دفع هذا الرابط',
+    bindAfterLogin: 'يُربط بعد تسجيل الدخول', loginTitle: 'سجّل الدخول لمتابعة الدفع', loginSub: 'سيتم ربط الدفع بحساب Dino AI الذي تسجّل الدخول به', phone: 'رقم الهاتف', getCode: 'إرسال الرمز', code: 'رمز التحقق', codeHint: 'عرض تجريبي: أي 6 أرقام', login: 'تسجيل الدخول', orWith: 'أو', confirmTitle: 'تأكيد حساب الدفع', confirmBody: 'سيتم الدفع وتفعيل العضوية لهذا الحساب', confirmPay: 'تأكيد والدفع', switchAccount: 'تبديل الحساب', newAccount: 'حساب جديد · تم التسجيل تلقائيًا', paySuccess: 'تم الدفع بنجاح', expired: 'انتهت صلاحية رابط الدفع هذا', dir: 'rtl',
   },
   Thailand: {
     title: 'ชำระเงิน', discount: 'ส่วนลด', total: 'ยอดรวม', choose: 'เลือกวิธีชำระเงิน', pay: 'ชำระเงินตอนนี้',
     cancel: 'ยกเลิกได้ทุกเมื่อ · ', terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
     first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ',
-    summary: 'สรุปคำสั่งซื้อ', dueNow: 'ชำระตอนนี้', paidTag: 'ชำระแล้ว', laterTag: 'ชำระภายหลัง', secure: 'ชำระเงินอย่างปลอดภัย', account: 'รหัสบัญชี', fullTag: 'ชำระเต็มจำนวน', linkPaid: 'ลิงก์นี้ชำระเงินแล้ว', dir: 'ltr',
+    summary: 'สรุปคำสั่งซื้อ', dueNow: 'ชำระตอนนี้', paidTag: 'ชำระแล้ว', laterTag: 'ชำระภายหลัง', secure: 'ชำระเงินอย่างปลอดภัย', account: 'รหัสบัญชี', fullTag: 'ชำระเต็มจำนวน', linkPaid: 'ลิงก์นี้ชำระเงินแล้ว',
+    bindAfterLogin: 'เชื่อมหลังเข้าสู่ระบบ', loginTitle: 'เข้าสู่ระบบเพื่อชำระเงินต่อ', loginSub: 'การชำระเงินจะผูกกับบัญชี Dino AI ที่คุณเข้าสู่ระบบ', phone: 'หมายเลขโทรศัพท์', getCode: 'ขอรหัส', code: 'รหัสยืนยัน', codeHint: 'เดโม: ตัวเลข 6 หลักใดก็ได้', login: 'เข้าสู่ระบบ', orWith: 'หรือ', confirmTitle: 'ยืนยันบัญชีที่ชำระเงิน', confirmBody: 'ชำระเงินและเปิดสมาชิกให้บัญชีนี้', confirmPay: 'ยืนยันและชำระเงิน', switchAccount: 'เปลี่ยนบัญชี', newAccount: 'บัญชีใหม่ · สมัครให้อัตโนมัติ', paySuccess: 'ชำระเงินสำเร็จ', expired: 'ลิงก์ชำระเงินนี้หมดอายุแล้ว', dir: 'ltr',
   },
   Indonesia: {
     title: 'Pembayaran', discount: 'Diskon', total: 'Total', choose: 'Pilih metode pembayaran', pay: 'Bayar sekarang',
     cancel: 'Batalkan kapan saja · ', terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
     first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket',
-    summary: 'Ringkasan pesanan', dueNow: 'Tagihan saat ini', paidTag: 'Sudah dibayar', laterTag: 'Bayar nanti', secure: 'Pembayaran aman', account: 'ID akun', fullTag: 'Pembayaran penuh', linkPaid: 'Tautan ini sudah dibayar', dir: 'ltr',
+    summary: 'Ringkasan pesanan', dueNow: 'Tagihan saat ini', paidTag: 'Sudah dibayar', laterTag: 'Bayar nanti', secure: 'Pembayaran aman', account: 'ID akun', fullTag: 'Pembayaran penuh', linkPaid: 'Tautan ini sudah dibayar',
+    bindAfterLogin: 'Ditautkan setelah masuk', loginTitle: 'Masuk untuk melanjutkan pembayaran', loginSub: 'Pembayaran akan ditautkan ke akun Dino AI yang Anda gunakan untuk masuk', phone: 'Nomor telepon', getCode: 'Kirim kode', code: 'Kode verifikasi', codeHint: 'Demo: 6 digit apa saja', login: 'Masuk', orWith: 'atau', confirmTitle: 'Konfirmasi akun pembayaran', confirmBody: 'Bayar dan aktifkan keanggotaan untuk akun ini', confirmPay: 'Konfirmasi dan bayar', switchAccount: 'Ganti akun', newAccount: 'Akun baru · terdaftar otomatis', paySuccess: 'Pembayaran berhasil', expired: 'Tautan pembayaran ini sudah kedaluwarsa', dir: 'ltr',
   },
 }
 
@@ -122,7 +144,8 @@ const ZH: PayCopy = {
   cancel: '可随时取消 · ', terms: '服务条款', privacy: '隐私政策',
   first: '定金首款', balance: '定金尾款', packageDue: '套餐应付', installment: '分期支付需要在 3,000,000 越南盾以上。',
   forLink: '这条支付链接的客户', chooseSku: '选择套餐',
-    summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '账号 ID', fullTag: '全款', linkPaid: '这条支付链接已支付', dir: 'ltr',
+    summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '账号 ID', fullTag: '全款', linkPaid: '这条支付链接已支付',
+    bindAfterLogin: '登录后绑定', loginTitle: '登录后继续支付', loginSub: '付款将绑定到你登录的 Dino AI 账号', phone: '手机号', getCode: '获取验证码', code: '验证码', codeHint: '演示：任意 6 位数字', login: '登录', orWith: '或', confirmTitle: '确认付款账号', confirmBody: '将为这个账号付款并开通会员', confirmPay: '确认并去支付', switchAccount: '换个账号', newAccount: '新账号 · 已自动注册', paySuccess: '支付成功', expired: '这条支付链接已过期', dir: 'ltr',
 }
 
 const EN: PayCopy = {
@@ -130,7 +153,8 @@ const EN: PayCopy = {
   cancel: 'Cancel anytime · ', terms: 'Terms of Service', privacy: 'Privacy Policy',
   first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: 'Instalments require at least 3,000,000 VND.',
   forLink: 'Payment link for', chooseSku: 'Choose a plan',
-    summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'Account ID', fullTag: 'Full payment', linkPaid: 'This payment link has been paid', dir: 'ltr',
+    summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'Account ID', fullTag: 'Full payment', linkPaid: 'This payment link has been paid',
+    bindAfterLogin: 'Linked after login', loginTitle: 'Log in to continue', loginSub: 'The payment is linked to the Dino AI account you log in with', phone: 'Phone number', getCode: 'Get code', code: 'Verification code', codeHint: 'Demo: any 6 digits', login: 'Log in', orWith: 'or', confirmTitle: 'Confirm the paying account', confirmBody: 'You will pay for this account and its membership opens', confirmPay: 'Confirm and pay', switchAccount: 'Use another account', newAccount: 'New account · signed up automatically', paySuccess: 'Payment successful', expired: 'This payment link has expired', dir: 'ltr',
 }
 
 export function methodsForLine(line: string): PayMethod[] {
