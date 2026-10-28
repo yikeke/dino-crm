@@ -34,6 +34,7 @@ const USER_TYPE_COLOR: Record<UserType, string> = {
 }
 const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
   待支付: 'orange',
+  部分付款: 'blue',
   已支付: 'green',
   已退款: 'red',
   已取消: 'default',
@@ -42,15 +43,17 @@ const ORDER_STATUS_CODE: Record<OrderStatus, string> = {
   已退款: 'REFUNDED',
   已取消: 'CANCELED',
   已支付: 'PAID',
+  部分付款: 'PARTIALLY_PAID',
   待支付: 'PENDING',
 }
 const ORDER_STATUS_PRIORITY: Record<OrderStatus, number> = {
   已退款: 0,
   已取消: 1,
   已支付: 2,
-  待支付: 3,
+  部分付款: 3,
+  待支付: 4,
 }
-const ORDER_STATUS_ORDER: OrderStatus[] = ['已退款', '已取消', '已支付', '待支付']
+const ORDER_STATUS_ORDER: OrderStatus[] = ['已退款', '已取消', '已支付', '部分付款', '待支付']
 
 function fmtMoney(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString()}`

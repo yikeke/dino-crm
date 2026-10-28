@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier, type LinkOffer } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
-import { declareBankTransfer, readPaymentLinks, settlePaymentLink } from '../paymentLinkStore'
+import { declareBankTransfer, readPaymentLinks, settlePaymentLink, transferReference } from '../paymentLinkStore'
 import './PayLinkPage.css'
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
@@ -11,11 +11,6 @@ const RECEIVER = {
   bank: 'Vietcombank',
   name: 'CONG TY DINO AI',
   number: '10588899210',
-}
-
-function transferNote(payLink: string) {
-  const tail = payLink.replace(/^PL-?/i, '').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'PAYLINK'
-  return `DINO${tail}`
 }
 
 function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string; onChange: (next: ReviewLang) => void }) {
@@ -87,7 +82,7 @@ export default function PayLinkPage() {
 
   const discount = Math.max(list - payable, 0)
   const chargeLabel = type === 'deposit_first' ? copy.first : type === 'deposit_balance' ? copy.balance : copy.total
-  const note = transferNote(payLink)
+  const note = transferReference(payLink)
 
   const copyValue = async (key: string, value: string) => {
     try {

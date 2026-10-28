@@ -286,7 +286,7 @@ export type CallRecord = {
   time: string // 起呼时间
 }
 
-export type OrderStatus = '待支付' | '已支付' | '已退款' | '已取消'
+export type OrderStatus = '待支付' | '部分付款' | '已支付' | '已退款' | '已取消'
 
 export type OrderTransaction = {
   id: string
@@ -295,6 +295,8 @@ export type OrderTransaction = {
   status: OrderStatus
   amount: number
   paymentMethod?: string
+  /** Third-party transaction id, or the bank transfer reference for manual transfers. */
+  channelRef?: string
   note?: string
 }
 

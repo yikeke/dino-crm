@@ -34,7 +34,7 @@ import {
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
-import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, ensurePaymentLinkOrders, settlePaymentLink } from '../paymentLinkStore'
+import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, ensurePaymentLinkOrders, paymentNoFor, settlePaymentLink } from '../paymentLinkStore'
 import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
@@ -119,7 +119,7 @@ function buildSeedLinks(): PaymentLink[] {
       line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
       listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 391000, depositPaid: 500000,
-      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2090031938694049793',
+      phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2090031938694049793',
       orderId: 'WEB-PL-DEP-DONE', paidMethod: 'bank_transfer',
       url: '', received: true, createdAt: '2026-10-28 14:10', updatedAt: '2026-10-28 16:05',
     }),
@@ -128,8 +128,8 @@ function buildSeedLinks(): PaymentLink[] {
       line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005',
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
       listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
-      phone: '', customerName: '', note: '', methods: ['bank_transfer'], userId: '2090031938694049793',
-      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'bank_transfer',
+      phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2090031938694049793',
+      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'vietqr',
       url: '', received: true, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05',
     }),
     blank({
@@ -200,21 +200,21 @@ export const PAYMENT_LINK_DEMO_ORDERS = [
     orderStatus: '已支付' as const, originalPrice: 89100, paidAmount: 89100, payMethod: 'Payment Link' as const, currency: 'KRW',
     paidTime: '2026-10-27 16:20:00',
     transactions: [
-      { id: 'TXN-WEB-PL-FULL-001-full', time: '2026-10-27 16:20:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'card', note: 'Payment link PL-FULL-PAID' },
+      { id: 'PAY-FULL-PAID', time: '2026-10-27 16:20:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'card', channelRef: 'CARD-27162011KR', note: 'Payment link PL-FULL-PAID' },
     ],
   },
   {
     orderId: 'WEB-PL-DEP-PART', productName: 'Pro · Pro Quarterly', studentId: '2060199610824356009', userStatus: '未付费-体验中' as const,
-    orderStatus: '待支付' as const, originalPrice: 891000, paidAmount: 500000, payMethod: 'Payment Link' as const, currency: 'VND',
+    orderStatus: '部分付款' as const, originalPrice: 891000, paidAmount: 500000, payMethod: 'Payment Link' as const, currency: 'VND',
     transactions: [
-      { id: 'TXN-WEB-PL-DEP-PART-deposit_first', time: '2026-10-28 09:40:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'vietqr', note: 'Payment link PL-DEP-READY' },
+      { id: 'PAY-DEP-READY', time: '2026-10-28 09:40:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-28094007VN', note: 'Payment link PL-DEP-READY' },
     ],
   },
   {
     orderId: 'WEB-PL-TH', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355848', userStatus: '未付费-体验中' as const,
-    orderStatus: '待支付' as const, originalPrice: 9900, paidAmount: 990, payMethod: 'Payment Link' as const, currency: 'THB',
+    orderStatus: '部分付款' as const, originalPrice: 9900, paidAmount: 990, payMethod: 'Payment Link' as const, currency: 'THB',
     transactions: [
-      { id: 'TXN-WEB-PL-TH-deposit_first', time: '2026-10-28 11:20:00', event: '定金首款支付成功', status: '已支付' as const, amount: 990, paymentMethod: 'KPLUS', note: 'Payment link PL-DEP-TH' },
+      { id: 'PAY-DEP-TH', time: '2026-10-28 11:20:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 990, paymentMethod: 'KPLUS', channelRef: 'KPLUS-28112033TH', note: 'Payment link PL-DEP-TH' },
     ],
   },
   {
@@ -222,11 +222,15 @@ export const PAYMENT_LINK_DEMO_ORDERS = [
     orderStatus: '已支付' as const, originalPrice: 891000, paidAmount: 891000, payMethod: 'Payment Link' as const, currency: 'VND',
     paidTime: '2026-10-28 16:05:00',
     transactions: [
-      { id: 'TXN-WEB-PL-DEP-DONE-deposit_first', time: '2026-10-27 18:48:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'bank_transfer', note: 'Payment link PL-DEP-VN' },
-      { id: 'TXN-WEB-PL-DEP-DONE-deposit_balance', time: '2026-10-28 16:05:00', event: '尾款支付成功', status: '已支付' as const, amount: 391000, paymentMethod: 'bank_transfer', note: 'Payment link PL-BAL-VN' },
+      { id: 'PAY-DEP-VN', time: '2026-10-27 18:48:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-27184802VN', note: 'Payment link PL-DEP-VN' },
+      { id: 'PAY-BAL-VN', time: '2026-10-28 16:05:00', event: '尾款支付成功', status: '已支付' as const, amount: 391000, paymentMethod: 'bank_transfer', channelRef: 'DINOBALVN', note: 'Payment link PL-BAL-VN' },
     ],
   },
 ]
+
+function depositMethods(line: string) {
+  return methodsForLine(line).filter((method) => !method.code.includes('installment'))
+}
 
 function readArray(key: string): PaymentLink[] {
   try {
@@ -415,6 +419,8 @@ export default function CreatePaymentLink() {
   const [onlyMine, setOnlyMine] = useState(false)
   const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
   const [qrImage, setQrImage] = useState('')
+  const [methodTarget, setMethodTarget] = useState<PaymentLink | null>(null)
+  const [methodDraft, setMethodDraft] = useState<string[]>([])
   const [expanded, setExpanded] = useState<string[]>([])
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
@@ -423,6 +429,7 @@ export default function CreatePaymentLink() {
   const myEmail = account?.email || session?.email || ''
   const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
   const students = useStore((s) => s.students)
+  const orders = useStore((s) => s.orders)
   const userMatches = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
     if (query.length < 2) return []
@@ -569,7 +576,7 @@ export default function CreatePaymentLink() {
       phone: '',
       customerName: '',
       note: '',
-      methods: payMethods,
+      methods: kind === 'full' ? payMethods : payMethods.filter((code) => !code.includes('installment')),
       userId: linkedUserId,
       orderId: editingId ? links.find((item) => item.id === editingId)?.orderId : undefined,
       url: '',
@@ -616,6 +623,10 @@ export default function CreatePaymentLink() {
       message.warning(floor.label
         ? `${floor.label}，且必须小于套餐应付 ${formatMoney(payable, chosenDeposit.currency)}`
         : (en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于这个套餐的应付金额'))
+      return
+    }
+    if (!payMethods.some((code) => !code.includes('installment'))) {
+      message.warning(en ? 'Select at least one payment method that is not an instalment' : '请至少选择一种非分期的支付方式')
       return
     }
     const id = editingId || newId('PL')
@@ -815,11 +826,15 @@ export default function CreatePaymentLink() {
         <Form.Item
           label={en ? 'Payment methods' : '支付方式'}
           required
-          extra={en ? 'Pick one method, or several. The customer page only shows the methods checked here.' : '可以只选一种，也可以多选。用户打开链接后，只会看到这里勾选的方式。'}
+          extra={mode === 'deposit'
+            ? (en
+              ? 'Both the first payment and the balance offer these methods. The customer picks a method for each payment separately. Instalment methods are not available for deposits.'
+              : '首款和尾款都提供这些方式，用户每一笔单独选择，可以不一样。定金不支持分期类支付方式。')
+            : (en ? 'Pick one method, or several. The customer page only shows the methods checked here.' : '可以只选一种，也可以多选。用户打开链接后，只会看到这里勾选的方式。')}
         >
           <Checkbox.Group value={payMethods} onChange={(value) => setPayMethods(value as string[])}>
             <Space size={[16, 8]} wrap>
-              {methodsForLine(activeLine).map((method) => (
+              {(mode === 'deposit' ? depositMethods(activeLine) : methodsForLine(activeLine)).map((method) => (
                 <Checkbox key={method.code} value={method.code}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <img src={method.icon} alt="" width={22} height={22} style={{ objectFit: 'contain' }} />
@@ -858,6 +873,34 @@ export default function CreatePaymentLink() {
     if (!row.paidMethod) return ''
     const method = methodsForLine(row.line).find((item) => item.code === row.paidMethod)
     return method ? methodDisplayName(method, en ? 'en' : 'zh') : row.paidMethod
+  }
+
+  const methodNames = (row: PaymentLink) => {
+    const all = methodsForLine(row.line)
+    return (row.methods || [])
+      .map((code) => all.find((item) => item.code === code))
+      .filter((item): item is NonNullable<typeof item> => !!item)
+      .map((item) => methodDisplayName(item, en ? 'en' : 'zh'))
+      .join(' / ')
+  }
+
+  const legRef = (row: PaymentLink) => orders
+    .find((order) => order.orderId === row.orderId)?.transactions
+    .find((txn) => txn.id === paymentNoFor(row.id))?.channelRef || ''
+
+  const saveLegMethods = () => {
+    if (!methodTarget) return
+    if (!methodDraft.length) {
+      message.warning(en ? 'Select at least one payment method' : '请至少选择一种支付方式')
+      return
+    }
+    persist(links.map((item) => {
+      if (item.id !== methodTarget.id) return item
+      const next = { ...item, methods: methodDraft, updatedAt: nowText() }
+      return { ...next, url: buildUrl(next) }
+    }))
+    setMethodTarget(null)
+    message.success(en ? 'Payment methods updated. The link stays the same.' : '支付方式已更新，链接地址不变。')
   }
 
   const methodsCell = (row: PaymentLink) => {
@@ -975,6 +1018,7 @@ export default function CreatePaymentLink() {
           <div className="pl-two-line">
             {legStatus(row)}
             {row.orderId && <Typography.Text type="secondary">{paidVia(row)}</Typography.Text>}
+            {row.orderId && legRef(row) && <Typography.Text type="secondary" className="pl-leg__id">{legRef(row)}</Typography.Text>}
           </div>
         )
       },
@@ -1037,23 +1081,33 @@ export default function CreatePaymentLink() {
             </div>
             <div className="pl-leg__name">
               <b>{name}</b>
-              <Typography.Text type="secondary" className="pl-leg__id">{leg.id}</Typography.Text>
+              <Typography.Text type="secondary" className="pl-leg__id">{paymentNoFor(leg.id)}</Typography.Text>
             </div>
             <div className="pl-leg__amount">{formatMoney(leg.amount, leg.currency)}</div>
             <div className="pl-leg__status">
-              {legStatus(leg)}
-              {leg.orderId && <Typography.Text type="secondary">{paidVia(leg)}</Typography.Text>}
+              <div className="pl-leg__status-line">
+                {legStatus(leg)}
+                {leg.orderId
+                  ? <Typography.Text type="secondary">{paidVia(leg)}</Typography.Text>
+                  : <Typography.Text type="secondary">{methodNames(leg)}</Typography.Text>}
+              </div>
+              {leg.orderId && legRef(leg) && <Typography.Text type="secondary" className="pl-leg__id">{legRef(leg)}</Typography.Text>}
             </div>
             <div className="pl-leg__actions">
               {linkActions(leg, copy)}
+              {!leg.orderId && (
+                <Button size="small" type="link" icon={<EditOutlined />} onClick={() => { setMethodTarget(leg); setMethodDraft(leg.methods || []) }}>
+                  {en ? 'Methods' : '改支付方式'}
+                </Button>
+              )}
               {confirmButton(leg)}
             </div>
           </div>
         ))}
         <div className="pl-legs__note">
           {row.orderId
-            ? (en ? `Both payments post to order ${row.orderId}. No second order is created.` : `两笔收款都记在订单 ${row.orderId} 上，不另开订单。`)
-            : (en ? 'The order is created when the first payment lands. The balance updates that same order.' : '首款到账后生成订单，尾款到账后回写同一张订单。')}
+            ? (en ? `Each payment has its own payment number. Both post to order ${row.orderId}; no second order is created.` : `每笔收款有自己的支付单号，都记在订单 ${row.orderId} 上，不另开订单。`)
+            : (en ? 'Each payment has its own payment number. The order is created when the first payment lands, and the balance updates that same order.' : '每笔收款有自己的支付单号。首款到账后生成订单，尾款到账后回写同一张订单。')}
         </div>
       </div>
     )
@@ -1220,6 +1274,32 @@ export default function CreatePaymentLink() {
         rowClassName={(row: ListRow) => (row.kind === 'deposit_first' && expanded.includes(row.id) ? 'pl-row--open' : '')}
         locale={{ emptyText: en ? 'No payment links yet' : '还没有支付链接' }}
       />
+      <Modal
+        title={methodTarget?.kind === 'deposit_balance' ? (en ? 'Balance payment methods' : '尾款支付方式') : (en ? 'Payment methods' : '支付方式')}
+        open={!!methodTarget}
+        onCancel={() => setMethodTarget(null)}
+        onOk={saveLegMethods}
+        okText={en ? 'Save' : '保存'}
+        cancelText={en ? 'Cancel' : '取消'}
+      >
+        <Typography.Paragraph type="secondary">
+          {en
+            ? 'Each payment is chosen separately, so this one can differ from the other. Instalment methods are not available for deposits. The link address does not change.'
+            : '每一笔单独选择支付方式，可以和另一笔不同。定金不支持分期类支付方式。修改后链接地址不变。'}
+        </Typography.Paragraph>
+        <Checkbox.Group value={methodDraft} onChange={(value) => setMethodDraft(value as string[])}>
+          <Space direction="vertical">
+            {methodTarget && depositMethods(methodTarget.line).map((method) => (
+              <Checkbox key={method.code} value={method.code}>
+                <span className="pl-method">
+                  <img src={method.icon} alt="" />
+                  {methodDisplayName(method, en ? 'en' : 'zh')}
+                </span>
+              </Checkbox>
+            ))}
+          </Space>
+        </Checkbox.Group>
+      </Modal>
       <Modal
         title={en ? 'Payment link QR code' : '支付链接二维码'}
         open={!!qrTarget}

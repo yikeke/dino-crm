@@ -16,6 +16,7 @@ const { Text } = Typography
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   待支付: 'orange',
+  部分付款: 'blue',
   已支付: 'green',
   已退款: 'red',
   已取消: 'default',
@@ -70,6 +71,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
     { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{t(`enum.order.${status}`)}</Tag> },
     { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
     { title: t('order.col.payMethod'), dataIndex: 'paymentMethod', width: 130, render: (method) => method || <Text type="secondary">—</Text> },
+    { title: d('channelRef'), dataIndex: 'channelRef', width: 190, render: (ref) => (ref ? <Text code>{ref}</Text> : <Text type="secondary">—</Text>) },
   ]
 
   return (

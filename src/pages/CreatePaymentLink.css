@@ -163,9 +163,16 @@
 
 .pl-leg__status {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.pl-leg__status-line {
+  display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
 }
 
 .pl-leg__actions {

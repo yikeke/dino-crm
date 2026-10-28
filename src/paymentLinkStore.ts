@@ -38,13 +38,40 @@ export function writePaymentLinks(links: StoredPaymentLink[]) {
   localStorage.setItem(PAYMENT_LINK_KEY, JSON.stringify(links))
 }
 
+/** One payment link is one payment, so the payment number is derived from the link id. */
+export function paymentNoFor(linkId: string) {
+  return `PAY-${linkId.replace(/^PL-/i, '')}`
+}
+
+export function transferReference(linkId: string) {
+  const tail = linkId.replace(/^PL-?/i, '').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'PAYLINK'
+  return `DINO${tail}`
+}
+
+function providerRef(method: string) {
+  const prefix = method.replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase() || 'PSP'
+  return `${prefix}-${Date.now().toString().slice(-8)}${Math.random().toString(36).slice(2, 5).toUpperCase()}`
+}
+
+function upgradeLinkOrder(order: Order): Order {
+  if (order.payMethod !== 'Payment Link') return order
+  const partial = order.orderStatus === '待支付' && order.paidAmount > 0 && order.paidAmount < order.originalPrice
+  return {
+    ...order,
+    orderStatus: partial ? '部分付款' : order.orderStatus,
+    transactions: order.transactions.map((txn) => (txn.status === '待支付' ? { ...txn, status: '部分付款' } : txn)),
+  }
+}
+
 /** Put the demo orders behind the seeded payment links. Existing order ids are left as they are. */
 export function ensurePaymentLinkOrders(orders: Order[]) {
   setState((prev) => {
     const known = new Set(prev.orders.map((order) => order.orderId))
     const missing = orders.filter((order) => !known.has(order.orderId))
-    if (!missing.length) return prev
-    return { ...prev, orders: [...missing, ...prev.orders] }
+    const upgraded = prev.orders.map(upgradeLinkOrder)
+    const changed = missing.length > 0 || upgraded.some((order, index) => order !== prev.orders[index] && order.orderStatus !== prev.orders[index].orderStatus)
+    if (!changed) return prev
+    return { ...prev, orders: [...missing, ...upgraded] }
   })
 }
 
@@ -106,13 +133,16 @@ export function settlePaymentLink(id: string, detail: {
     next.unshift({ id, received: true, orderId, paidMethod: detail.methodName, userId, skuName: detail.skuName, amount: detail.amount, currency: detail.currency })
   }
   writePaymentLinks(next)
+  const packageAmount = detail.packageAmount || detail.amount
+  const partial = detail.leg === 'deposit_first' && detail.amount < packageAmount
   const txn = {
-    id: `TXN-${orderId}-${detail.leg || 'full'}`,
+    id: paymentNoFor(id),
     time: when,
     event: detail.leg === 'deposit_balance' ? '尾款支付成功' : detail.leg === 'deposit_first' ? '定金首款支付成功' : '支付成功',
-    status: '已支付' as const,
+    status: (partial ? '部分付款' : '已支付') as Order['orderStatus'],
     amount: detail.amount,
     paymentMethod: detail.methodName,
+    channelRef: detail.methodName === 'bank_transfer' ? transferReference(id) : providerRef(detail.methodName),
     note: [detail.note, detail.proofName ? `截图 ${detail.proofName}` : '', `Payment link ${id}`].filter(Boolean).join(' · '),
   }
   setState((prev) => {
@@ -128,14 +158,12 @@ export function settlePaymentLink(id: string, detail: {
         } : order),
       }
     }
-    const packageAmount = detail.packageAmount || detail.amount
-    const partial = detail.leg === 'deposit_first' && detail.amount < packageAmount
     const order: Order = {
       orderId,
       productName: detail.skuName,
       studentId: userId,
       userStatus: partial ? '未付费-体验中' : '付费',
-      orderStatus: partial ? '待支付' : '已支付',
+      orderStatus: partial ? '部分付款' : '已支付',
       originalPrice: packageAmount,
       paidAmount: detail.amount,
       payMethod: 'Payment Link',
