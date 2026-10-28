@@ -34,7 +34,7 @@ import {
 import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
-import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, ensurePaymentLinkOrders, paymentNoFor, settlePaymentLink } from '../paymentLinkStore'
+import { LEGACY_PAYMENT_LINK_KEYS, PAYMENT_LINK_KEY, currentOrderId, ensurePaymentLinkOrders, subOrderNoFor, settlePaymentLink } from '../paymentLinkStore'
 import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
@@ -111,7 +111,7 @@ function buildSeedLinks(): PaymentLink[] {
       planId: 'CSP-TH', offers: thQuarterly, skuId: 'TH-Q-2026', skuName: 'Pro Quarterly', currency: 'THB',
       listPrice: 9900, promoCode: '', promoLabel: '', payable: 9900, amount: 990,
       phone: '', customerName: '', note: '', methods: ['KPLUS'], userId: '2060199610824355848',
-      orderId: 'WEB-PL-TH', paidMethod: 'KPLUS',
+      orderId: 'WEB-DEP-TH', paidMethod: 'KPLUS',
       url: '', received: true, createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 11:20',
     }),
     blank({
@@ -120,7 +120,7 @@ function buildSeedLinks(): PaymentLink[] {
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
       listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 391000, depositPaid: 500000,
       phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2090031938694049793',
-      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'bank_transfer',
+      orderId: 'WEB-DEP-VN', paidMethod: 'bank_transfer',
       url: '', received: true, createdAt: '2026-10-28 14:10', updatedAt: '2026-10-28 16:05',
     }),
     blank({
@@ -129,7 +129,7 @@ function buildSeedLinks(): PaymentLink[] {
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
       listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
       phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2090031938694049793',
-      orderId: 'WEB-PL-DEP-DONE', paidMethod: 'vietqr',
+      orderId: 'WEB-DEP-VN', paidMethod: 'vietqr',
       url: '', received: true, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05',
     }),
     blank({
@@ -146,7 +146,7 @@ function buildSeedLinks(): PaymentLink[] {
       planId: 'CSP-LINH', offers: vnQuarterly, skuId: 'VN-Q-2026', skuName: 'Pro Quarterly', currency: 'VND',
       listPrice: 990000, promoCode: 'CSP-LINH-PROMO', promoLabel: 'CSP-LINH-PROMO', payable: 891000, amount: 500000,
       phone: '', customerName: '', note: '', methods: ['vietqr', 'bank_transfer'], userId: '2060199610824356009',
-      orderId: 'WEB-PL-DEP-PART', paidMethod: 'vietqr',
+      orderId: 'WEB-DEP-READY', paidMethod: 'vietqr',
       url: '', received: true, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40',
     }),
     blank({
@@ -180,7 +180,7 @@ function buildSeedLinks(): PaymentLink[] {
       planId: 'CSP-AMY', offers: [koreaOffers[0]], skuId: 'KR-Q-2026', skuName: 'Pro Quarterly', currency: 'KRW',
       listPrice: 99000, promoCode: 'CSP-AMY-PROMO', promoLabel: 'CSP-AMY-PROMO', payable: 89100, amount: 89100,
       phone: '', customerName: '', note: '', methods: ['card', 'kakaopay'], userId: '2060199610824355846',
-      orderId: 'WEB-PL-FULL-001', paidMethod: 'card',
+      orderId: 'WEB-FULL-PAID', paidMethod: 'card',
       url: '', received: true, createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20',
     }),
     blank({
@@ -196,34 +196,34 @@ function buildSeedLinks(): PaymentLink[] {
 
 export const PAYMENT_LINK_DEMO_ORDERS = [
   {
-    orderId: 'WEB-PL-FULL-001', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355846', userStatus: '付费' as const,
+    orderId: 'WEB-FULL-PAID', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355846', userStatus: '付费' as const,
     orderStatus: '已支付' as const, originalPrice: 89100, paidAmount: 89100, payMethod: 'Payment Link' as const, currency: 'KRW',
     paidTime: '2026-10-27 16:20:00',
     transactions: [
-      { id: 'PAY-FULL-PAID', time: '2026-10-27 16:20:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'card', channelRef: 'CARD-27162011KR', note: 'Payment link PL-FULL-PAID' },
+      { id: 'WEB-FULL-PAID', time: '2026-10-27 16:20:00', event: '支付成功', status: '已支付' as const, amount: 89100, paymentMethod: 'card', channelRef: 'CARD-27162011KR', note: 'Payment link PL-FULL-PAID' },
     ],
   },
   {
-    orderId: 'WEB-PL-DEP-PART', productName: 'Pro · Pro Quarterly', studentId: '2060199610824356009', userStatus: '未付费-体验中' as const,
+    orderId: 'WEB-DEP-READY', productName: 'Pro · Pro Quarterly', studentId: '2060199610824356009', userStatus: '未付费-体验中' as const,
     orderStatus: '部分付款' as const, originalPrice: 891000, paidAmount: 500000, payMethod: 'Payment Link' as const, currency: 'VND',
     transactions: [
-      { id: 'PAY-DEP-READY', time: '2026-10-28 09:40:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-28094007VN', note: 'Payment link PL-DEP-READY' },
+      { id: 'WEB-DEP-READY', time: '2026-10-28 09:40:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-28094007VN', note: 'Payment link PL-DEP-READY' },
     ],
   },
   {
-    orderId: 'WEB-PL-TH', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355848', userStatus: '未付费-体验中' as const,
+    orderId: 'WEB-DEP-TH', productName: 'Pro · Pro Quarterly', studentId: '2060199610824355848', userStatus: '未付费-体验中' as const,
     orderStatus: '部分付款' as const, originalPrice: 9900, paidAmount: 990, payMethod: 'Payment Link' as const, currency: 'THB',
     transactions: [
-      { id: 'PAY-DEP-TH', time: '2026-10-28 11:20:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 990, paymentMethod: 'KPLUS', channelRef: 'KPLUS-28112033TH', note: 'Payment link PL-DEP-TH' },
+      { id: 'WEB-DEP-TH', time: '2026-10-28 11:20:00', event: '定金首款支付成功', status: '已支付' as const, amount: 990, paymentMethod: 'KPLUS', channelRef: 'KPLUS-28112033TH', note: 'Payment link PL-DEP-TH' },
     ],
   },
   {
-    orderId: 'WEB-PL-DEP-DONE', productName: 'Pro · Pro Quarterly', studentId: '2090031938694049793', userStatus: '付费' as const,
+    orderId: 'WEB-DEP-VN', productName: 'Pro · Pro Quarterly', studentId: '2090031938694049793', userStatus: '付费' as const,
     orderStatus: '已支付' as const, originalPrice: 891000, paidAmount: 891000, payMethod: 'Payment Link' as const, currency: 'VND',
     paidTime: '2026-10-28 16:05:00',
     transactions: [
-      { id: 'PAY-DEP-VN', time: '2026-10-27 18:48:00', event: '定金首款支付成功', status: '部分付款' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-27184802VN', note: 'Payment link PL-DEP-VN' },
-      { id: 'PAY-BAL-VN', time: '2026-10-28 16:05:00', event: '尾款支付成功', status: '已支付' as const, amount: 391000, paymentMethod: 'bank_transfer', channelRef: 'DINOBALVN', note: 'Payment link PL-BAL-VN' },
+      { id: 'WEB-DEP-VN', time: '2026-10-27 18:48:00', event: '定金首款支付成功', status: '已支付' as const, amount: 500000, paymentMethod: 'vietqr', channelRef: 'VIETQR-27184802VN', note: 'Payment link PL-DEP-VN' },
+      { id: 'WEB-BAL-VN', time: '2026-10-28 16:05:00', event: '尾款支付成功', status: '已支付' as const, amount: 391000, paymentMethod: 'bank_transfer', channelRef: 'DINOBALVN', note: 'Payment link PL-BAL-VN' },
     ],
   },
 ]
@@ -306,7 +306,9 @@ function pairDeposits(input: PaymentLink[]): { links: PaymentLink[]; changed: bo
 }
 
 function loadLinks(): PaymentLink[] {
-  const current = readArray(STORE_KEY)
+  const stored = readArray(STORE_KEY)
+  const renamed = stored.some((row) => currentOrderId(row.orderId) !== row.orderId)
+  const current = renamed ? stored.map((row) => ({ ...row, orderId: currentOrderId(row.orderId) })) : stored
   const base = current.length ? current : buildSeedLinks()
   const known = new Set(base.map((row) => row.id))
   const recovered = legacyLinks().filter((row) => {
@@ -315,7 +317,7 @@ function loadLinks(): PaymentLink[] {
     return true
   })
   const { links: next, changed } = pairDeposits([...recovered, ...base])
-  if (!current.length || recovered.length || changed) saveLinks(next)
+  if (!current.length || recovered.length || changed || renamed) saveLinks(next)
   LEGACY_PAYMENT_LINK_KEYS.forEach((key) => localStorage.removeItem(key))
   return next
 }
@@ -886,7 +888,7 @@ export default function CreatePaymentLink() {
 
   const legRef = (row: PaymentLink) => orders
     .find((order) => order.orderId === row.orderId)?.transactions
-    .find((txn) => txn.id === paymentNoFor(row.id))?.channelRef || ''
+    .find((txn) => txn.id === subOrderNoFor(row.id))?.channelRef || ''
 
   const saveLegMethods = () => {
     if (!methodTarget) return
@@ -1081,7 +1083,7 @@ export default function CreatePaymentLink() {
             </div>
             <div className="pl-leg__name">
               <b>{name}</b>
-              <Typography.Text type="secondary" className="pl-leg__id">{paymentNoFor(leg.id)}</Typography.Text>
+              <Typography.Text type="secondary" className="pl-leg__id">{subOrderNoFor(leg.id)}</Typography.Text>
             </div>
             <div className="pl-leg__amount">{formatMoney(leg.amount, leg.currency)}</div>
             <div className="pl-leg__status">
@@ -1106,8 +1108,8 @@ export default function CreatePaymentLink() {
         ))}
         <div className="pl-legs__note">
           {row.orderId
-            ? (en ? `Each payment has its own payment number. Both post to order ${row.orderId}; no second order is created.` : `每笔收款有自己的支付单号，都记在订单 ${row.orderId} 上，不另开订单。`)
-            : (en ? 'Each payment has its own payment number. The order is created when the first payment lands, and the balance updates that same order.' : '每笔收款有自己的支付单号。首款到账后生成订单，尾款到账后回写同一张订单。')}
+            ? (en ? `Each payment is its own sub-order. Both sit under main order ${row.orderId}, like App renewals under one subscription.` : `每笔收款是一张子订单，都挂在主订单 ${row.orderId} 下，和 App 续费挂在同一条订阅链上是一个做法。`)
+            : (en ? 'Each payment is its own sub-order. The first payment\'s sub-order number becomes the main order number, and the balance joins that main order.' : '每笔收款是一张子订单。首款子订单号就是主订单号，尾款到账后挂到同一张主订单下。')}
         </div>
       </div>
     )

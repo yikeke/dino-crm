@@ -38,9 +38,24 @@ export function writePaymentLinks(links: StoredPaymentLink[]) {
   localStorage.setItem(PAYMENT_LINK_KEY, JSON.stringify(links))
 }
 
-/** One payment link is one payment, so the payment number is derived from the link id. */
-export function paymentNoFor(linkId: string) {
-  return `PAY-${linkId.replace(/^PL-/i, '')}`
+/**
+ * One payment link is one payment, which is one sub-order (web_order) derived from the link id.
+ * Sub-orders of the same package share a main order whose id is the first sub-order's id,
+ * the same way App renewals are grouped under original_transaction_id.
+ */
+export function subOrderNoFor(linkId: string) {
+  return `WEB-${linkId.replace(/^PL-/i, '')}`
+}
+
+const LEGACY_DEMO_ORDER_IDS: Record<string, string> = {
+  'WEB-PL-FULL-001': 'WEB-FULL-PAID',
+  'WEB-PL-DEP-PART': 'WEB-DEP-READY',
+  'WEB-PL-TH': 'WEB-DEP-TH',
+  'WEB-PL-DEP-DONE': 'WEB-DEP-VN',
+}
+
+export function currentOrderId(orderId?: string) {
+  return orderId ? LEGACY_DEMO_ORDER_IDS[orderId] || orderId : orderId
 }
 
 export function transferReference(linkId: string) {
@@ -55,31 +70,29 @@ function providerRef(method: string) {
 
 function upgradeLinkOrder(order: Order): Order {
   if (order.payMethod !== 'Payment Link') return order
-  const partial = order.orderStatus === '待支付' && order.paidAmount > 0 && order.paidAmount < order.originalPrice
+  const partial = order.paidAmount > 0 && order.paidAmount < order.originalPrice
+  const orderStatus = partial && order.orderStatus === '待支付' ? '部分付款' : order.orderStatus
+  const stale = orderStatus !== order.orderStatus
+    || order.transactions.some((txn) => txn.status !== '已支付' || txn.id.startsWith('PAY-'))
+  if (!stale) return order
   return {
     ...order,
-    orderStatus: partial ? '部分付款' : order.orderStatus,
-    transactions: order.transactions.map((txn) => (txn.status === '待支付' ? { ...txn, status: '部分付款' } : txn)),
+    orderStatus,
+    transactions: order.transactions.map((txn) => ({ ...txn, id: txn.id.replace(/^PAY-/, 'WEB-'), status: '已支付' })),
   }
 }
 
-/** Put the demo orders behind the seeded payment links. Existing order ids are left as they are. */
+/** Put the demo orders behind the seeded payment links, replacing demo orders stored under old ids. */
 export function ensurePaymentLinkOrders(orders: Order[]) {
   setState((prev) => {
-    const known = new Set(prev.orders.map((order) => order.orderId))
+    const kept = prev.orders.filter((order) => !LEGACY_DEMO_ORDER_IDS[order.orderId])
+    const known = new Set(kept.map((order) => order.orderId))
     const missing = orders.filter((order) => !known.has(order.orderId))
-    const upgraded = prev.orders.map(upgradeLinkOrder)
-    const changed = missing.length > 0 || upgraded.some((order, index) => order !== prev.orders[index] && order.orderStatus !== prev.orders[index].orderStatus)
+    const upgraded = kept.map(upgradeLinkOrder)
+    const changed = missing.length > 0 || kept.length !== prev.orders.length || upgraded.some((order, index) => order !== kept[index])
     if (!changed) return prev
     return { ...prev, orders: [...missing, ...upgraded] }
   })
-}
-
-function orderIdNow() {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-  return `WEB${stamp}${Math.random().toString(36).slice(2, 6).toUpperCase()}`
 }
 
 function paidTime() {
@@ -119,7 +132,7 @@ export function settlePaymentLink(id: string, detail: {
   if (current?.orderId && detail.leg !== 'deposit_balance') return current
   const when = paidTime()
   const userId = detail.userId || current?.userId || 'PAYMENT-LINK-USER'
-  const orderId = detail.existingOrderId || orderIdNow()
+  const orderId = detail.existingOrderId || subOrderNoFor(id)
   const next = links.map((item) => item.id === id ? {
     ...item,
     received: true,
@@ -136,10 +149,10 @@ export function settlePaymentLink(id: string, detail: {
   const packageAmount = detail.packageAmount || detail.amount
   const partial = detail.leg === 'deposit_first' && detail.amount < packageAmount
   const txn = {
-    id: paymentNoFor(id),
+    id: subOrderNoFor(id),
     time: when,
     event: detail.leg === 'deposit_balance' ? '尾款支付成功' : detail.leg === 'deposit_first' ? '定金首款支付成功' : '支付成功',
-    status: (partial ? '部分付款' : '已支付') as Order['orderStatus'],
+    status: '已支付' as Order['orderStatus'],
     amount: detail.amount,
     paymentMethod: detail.methodName,
     channelRef: detail.methodName === 'bank_transfer' ? transferReference(id) : providerRef(detail.methodName),

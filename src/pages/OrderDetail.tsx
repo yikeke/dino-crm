@@ -67,6 +67,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const transactions = [...(order.transactions ?? [])].sort((a, b) => b.time.localeCompare(a.time))
   const columns: ColumnsType<OrderTransaction> = [
     { title: d('subOrder'), dataIndex: 'id', width: 190, render: (id) => <Text code>{id}</Text> },
+    { title: d('subOrderEvent'), dataIndex: 'event', width: 150 },
     { title: d('recordTime'), dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
     { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{t(`enum.order.${status}`)}</Tag> },
     { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },

@@ -106,10 +106,10 @@ const words = {
  dashboardSelection: ['来自看板的筛选', 'Dashboard selection'], clearDashboardSelection: ['清除看板筛选', 'Clear dashboard selection'],
  filtered: ['已按用户 ID 筛选', 'Filtered by User ID'], noRows: ['暂无符合条件的用户，请调整日期或 CC。', 'No matching users. Try changing the dates or CC.'],
  noOrders: ['该用户暂无符合条件的订单。', 'No matching orders for this user.'],
- orderDetail: ['订单详情', 'Order details'], orderTransactions: ['订单流水', 'Order transactions'], backOrders: ['返回订单中心', 'Back to Order Center'],
+ orderDetail: ['订单详情', 'Order details'], orderTransactions: ['子订单流水', 'Sub-orders'], backOrders: ['返回订单中心', 'Back to Order Center'],
  ordersIntro: ['点击订单 ID 查看订单详情及全部交易流水。', 'Select an order ID to view its details and all transactions.'],
  noOrder: ['未找到该订单，或你没有访问权限。', 'This order was not found or you do not have access.'],
- subOrder: ['支付单号', 'Payment no.'], recordTime: ['发生时间', 'Time'], amount: ['金额', 'Amount'],
+ subOrder: ['子订单号', 'Sub-order no.'], subOrderEvent: ['类型', 'Type'], recordTime: ['发生时间', 'Time'], amount: ['金额', 'Amount'],
  channelRef: ['三方交易号 / 转账附言', 'Provider txn / transfer ref'],
  export: ['导出列表', 'Export list'],
 } as const
