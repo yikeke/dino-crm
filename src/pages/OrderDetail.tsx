@@ -55,7 +55,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const student = useMemo(() => students.find((item) => item.studentId === order?.studentId), [students, order?.studentId])
   const inScope = order && (!scope || (student && scope.includes(student.businessLine)))
   const back = fromLinks
-    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/marketing-center-v5/payment-links')}>{d('backPaymentLinks')}</Button>
+    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/marketing-center-v5/payment-links${order?.paymentLinkId ? `?link=${encodeURIComponent(order.paymentLinkId)}` : ''}`)}>{d('backPaymentLinks')}</Button>
     : <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
 
   if (!order || !inScope) {
@@ -72,7 +72,14 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const transactions = [...(order.transactions ?? [])].sort((a, b) => b.time.localeCompare(a.time))
   const columns: ColumnsType<OrderTransaction> = [
     { title: d('subOrder'), dataIndex: 'id', width: 190, render: (id) => <Text code>{id}</Text> },
-    { title: d('subOrderEvent'), dataIndex: 'event', width: 150 },
+    {
+      title: d('subOrderEvent'),
+      dataIndex: 'event',
+      width: 150,
+      render: (event: string, row: OrderTransaction) => (row.payStage
+        ? d(row.payStage === 'FULL' ? 'stageFull' : row.payStage === 'DEPOSIT_FIRST' ? 'stageFirst' : 'stageBalance')
+        : event),
+    },
     { title: d('recordTime'), dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
     { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{t(`enum.order.${status}`)}</Tag> },
     { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
@@ -96,6 +103,11 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
           <Descriptions.Item label={t('order.col.original')}>{money(order.originalPrice, order.currency)}</Descriptions.Item>
           <Descriptions.Item label={t('order.col.paid')}>{money(order.paidAmount, order.currency)}</Descriptions.Item>
           <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
+          {order.paymentLinkId && (
+            <Descriptions.Item label={d('sourceLink')}>
+              <a onClick={() => navigate(`/marketing-center-v5/payment-links?link=${encodeURIComponent(order.paymentLinkId || '')}`)}>{order.paymentLinkId}</a>
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label={t('order.col.paidTime')}><LocalTime time={order.paidTime} country={country} /></Descriptions.Item>
           <Descriptions.Item label={t('order.col.validUntil')}><LocalTime time={order.validUntil} country={country} /></Descriptions.Item>
         </Descriptions>

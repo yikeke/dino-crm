@@ -298,6 +298,8 @@ export type OrderTransaction = {
   /** Third-party transaction id, or the bank transfer reference for manual transfers. */
   channelRef?: string
   note?: string
+  /** Payment Link sub-orders: FULL / DEPOSIT_FIRST / DEPOSIT_BALANCE (web_order.pay_stage). */
+  payStage?: 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
 }
 
 export type Order = {
@@ -312,6 +314,8 @@ export type Order = {
   currency: string
   paidTime?: string
   validUntil?: string // 有效期到期时间
+  /** Payment Link orders: the link the customer paid through (web_order.payment_link_id). */
+  paymentLinkId?: string
   transactions: OrderTransaction[]
 }
 

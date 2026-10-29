@@ -63,8 +63,9 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
-  const [query] = useSearchParams()
+  const [query, setQuery] = useSearchParams()
   const targetStudentId = query.get('studentId') || ''
+  const linkFilter = query.get('payment_link_id') || ''
   const dashboardContext = useDashboardContext()
   const d = useDashboardText()
   const { can, actor, allowedLines } = usePerm()
@@ -81,7 +82,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
 
-  useEffect(() => { if (targetStudentId || dashboardScope) setLineSel([]) }, [targetStudentId, dashboardScope])
+  useEffect(() => { if (targetStudentId || linkFilter || dashboardScope) setLineSel([]) }, [targetStudentId, linkFilter, dashboardScope])
 
   const lineOptions = useMemo(
     () => Array.from(new Set([...channels.map((c) => c.name), ...students.map((s) => s.businessLine)].filter(Boolean))),
@@ -118,6 +119,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       orders.filter((o) => {
         if (dashboardScope && (!matchesDashboardScope(dashboardScope, o.studentId, o.orderId) || !permittedDashboardIds?.has(o.studentId))) return false
         if (targetStudentId && o.studentId !== targetStudentId) return false
+        if (linkFilter && o.paymentLinkId !== linkFilter) return false
         if (!matchLine(lineOf(o.studentId))) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
@@ -134,7 +136,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           (!typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
-    [orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
+    [orders, dashboardScope, permittedDashboardIds, targetStudentId, linkFilter, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
   )
 
   const exportOrders = () => {
@@ -237,6 +239,19 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
     <Card className="page-card" bordered={false} title={<span className="section-title">{t('order.title')}</span>}>
       <DashboardLinkContext filter />
       <Space wrap style={{ marginBottom: 16 }}>
+        {linkFilter && (
+          <Tag
+            color="cyan"
+            closable
+            onClose={() => {
+              const next = new URLSearchParams(query)
+              next.delete('payment_link_id')
+              setQuery(next, { replace: true })
+            }}
+          >
+            {d('filterLink')} {linkFilter}
+          </Tag>
+        )}
         <Input
           allowClear
           prefix={<SearchOutlined />}

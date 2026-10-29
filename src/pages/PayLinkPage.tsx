@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatMoney, memberTier, type LinkOffer } from '../paymentLinkCatalog'
+import { formatMoney, memberTier } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
-import { declareBankTransfer, readPaymentLinks, settlePaymentLink, transferReference } from '../paymentLinkStore'
+import {
+  PREVIEW_LINK_ID,
+  completeOrder,
+  currentStage,
+  declareTransfer,
+  ensurePaymentLinkData,
+  findPaymentLink,
+  isExpired,
+  ordersOfLink,
+  stageAmount,
+  stageMethods,
+  startCheckout,
+  transferReference,
+  type LinkOrder,
+  type PayStage,
+} from '../paymentLinkStore'
 import { useStore } from '../store'
 import './PayLinkPage.css'
 
@@ -125,63 +140,65 @@ function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string
 
 export default function PayLinkPage() {
   const [params] = useSearchParams()
-  const line = params.get('line') || 'Korea'
+  const linkId = params.get('link') || params.get('pay_link') || ''
+  return <PayLinkView key={linkId} linkId={linkId} />
+}
+
+function PayLinkView({ linkId }: { linkId: string }) {
+  const [params] = useSearchParams()
+  const preview = params.get('preview') === '1' || linkId === PREVIEW_LINK_ID
+  const [version, setVersion] = useState(0)
+  const refresh = () => setVersion((value) => value + 1)
+  useEffect(() => {
+    ensurePaymentLinkData()
+    refresh()
+  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const link = useMemo(() => findPaymentLink(linkId), [linkId, version])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const orders = useMemo(() => ordersOfLink(linkId), [linkId, version])
+  const line = link?.line || 'Korea'
   const [lang, setLang] = useState<ReviewLang>('local')
   const copy = payCopy(line, lang)
   const bank = bankCopy(lang)
-  const userId = params.get('user_id') || ''
-  const payLink = params.get('pay_link') || ''
-  const preview = params.get('preview') === '1'
-  const open = params.get('mode') === 'open'
-  const eventName = params.get('event') || ''
-  const validUntil = params.get('valid_until') || ''
-  const expired = open && !!validUntil && validUntil < new Date().toISOString().slice(0, 10)
+  const open = link?.audience === 'open'
   const [account, setAccount] = useState<Account | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
-  const offerKey = params.get('offers') || ''
-  const offers = useMemo(() => {
-    try {
-      const parsed = JSON.parse(offerKey) as LinkOffer[]
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }, [offerKey])
+  const [doneOrder, setDoneOrder] = useState<LinkOrder | null>(null)
+  const [previewAcked, setPreviewAcked] = useState(false)
+  const stage = link ? currentStage(link, orders) : null
+  const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
+  const offers = link?.offers || []
   const [pickedId, setPickedId] = useState('')
   const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
-  const skuName = picked?.skuName || params.get('sku_name') || params.get('sku') || ''
-  const currency = picked?.currency || params.get('currency') || ''
-  const payable = picked?.payable ?? Number(params.get('payable') || params.get('amount') || 0)
-  const list = picked?.listPrice ?? Number(params.get('list') || payable)
-  const promo = params.get('promo') || ''
-  const type = params.get('type') || 'full'
-  const depositPaid = Number(params.get('deposit_paid') || 0)
-  const amount = type === 'deposit_first'
-    ? Number(params.get('amount') || 0)
-    : type === 'deposit_balance'
-      ? Math.max(payable - depositPaid, 0)
-      : payable
-  const methodKey = params.get('methods') || ''
-  const methods = useMemo(
-    () => findMethods(line, methodKey.split(',').map((item) => item.trim()).filter(Boolean)),
-    [line, methodKey],
-  )
+  const shownStage: PayStage = stage || (link?.kind === 'deposit' ? 'DEPOSIT_BALANCE' : 'FULL')
+  const amount = link ? stageAmount(link, shownStage, picked, orders) : 0
+  const payable = picked?.payable ?? link?.payable ?? 0
+  const list = picked?.listPrice ?? payable
+  const currency = picked?.currency || link?.currency || ''
+  const skuName = picked?.skuName || link?.skuName || ''
+  const methodKey = link ? stageMethods(link, shownStage).join(',') : ''
+  const methods = useMemo(() => findMethods(line, methodKey.split(',').filter(Boolean)), [line, methodKey])
   const [methodCode, setMethodCode] = useState('')
   const activeMethod = methods.find((method) => method.code === methodCode) || methods[0]
   const showBank = activeMethod?.kind === 'manual'
-  const [host, setHost] = useState<PayMethod | null>(null)
-  const [acked, setAcked] = useState(false)
+  const [host, setHost] = useState<{ method: PayMethod; order?: LinkOrder } | null>(null)
   const [copied, setCopied] = useState('')
-  const [paidOrderId, setPaidOrderId] = useState(() => (open ? '' : readPaymentLinks().find((item) => item.id === payLink)?.orderId || ''))
   const bankRef = useRef<HTMLElement>(null)
+  const payerId = open ? account?.userId : link?.userId
+  const collecting = !!stage && !doneOrder
+  const bankOrder = showBank && collecting
+    ? orders.find((order) => order.status === 'PENDING' && order.payStage === stage && order.method === activeMethod?.code && order.userId === payerId)
+    : undefined
 
   useEffect(() => {
     if (showBank) bankRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [showBank])
 
-  const discount = Math.max(list - payable, 0)
-  const chargeLabel = type === 'deposit_first' ? copy.first : type === 'deposit_balance' ? copy.balance : copy.total
-  const note = transferReference(payLink)
+  useEffect(() => {
+    if (!showBank || !collecting || preview || bankOrder || !stage || !activeMethod || !payerId) return
+    if (startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payerId })) refresh()
+  }, [showBank, collecting, preview, bankOrder, stage, activeMethod, payerId, linkId, picked?.skuId])
 
   const copyValue = async (key: string, value: string) => {
     try {
@@ -193,54 +210,66 @@ export default function PayLinkPage() {
     }
   }
 
-  const pay = (methodName: string) => {
-    if (paidOrderId) return
+  if (!link) {
+    return (
+      <div className="pay-link-page" dir={copy.dir}>
+        <div className="pay-shell">
+          <section className="pay-card pay-expired">{copy.notFound}</section>
+        </div>
+      </div>
+    )
+  }
+
+  const begin = (payer?: Account) => {
+    if (!stage || !activeMethod) return
     if (preview) {
-      setHost(null)
+      setHost({ method: activeMethod })
       return
     }
-    if (!picked && offers.length > 0) return
-    const stored = readPaymentLinks().find((item) => item.id === payLink)
-    const leg = stored?.kind === 'deposit_balance' || stored?.kind === 'deposit_first' ? stored.kind : 'full'
-    const first = leg === 'deposit_balance'
-      ? readPaymentLinks().find((item) => item.kind === 'deposit_first' && item.depositPlanId && item.depositPlanId === stored?.depositPlanId)
-      : undefined
-    const settled = settlePaymentLink(payLink || `PL-${Date.now()}`, {
-      methodName,
-      skuName: `${memberTier(picked?.memberLevel)} · ${skuName}`,
-      amount,
-      packageAmount: payable,
-      currency,
-      userId: (open ? account?.userId : userId) || undefined,
-      leg,
-      existingOrderId: first?.orderId,
-    })
-    setPaidOrderId(settled?.orderId || paidOrderId)
+    const order = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payer?.userId })
+    if (!order) return
+    setHost({ method: activeMethod, order })
+    refresh()
+  }
+
+  const pay = () => {
+    if (!host) return
+    const paid = !preview && host.order ? completeOrder(host.order.orderNo) : undefined
+    if (paid) setDoneOrder(paid)
     setHost(null)
-    setAcked(true)
+    refresh()
   }
 
   const choose = (method: PayMethod) => {
-    if (paidOrderId) return
+    if (!collecting) return
     if (method.minAmount && amount < method.minAmount) return
     setMethodCode(method.code)
-    setAcked(false)
   }
 
   const checkout = () => {
-    if (paidOrderId || expired || !activeMethod || activeMethod.kind === 'manual') return
+    if (!collecting || blockedLink || !activeMethod || activeMethod.kind === 'manual') return
     if (activeMethod.minAmount && amount < activeMethod.minAmount) return
     if (open && !account) {
       setLoginOpen(true)
       return
     }
-    setHost(activeMethod)
+    begin(account || undefined)
   }
 
   const confirmAccount = (next: Account) => {
     setAccount(next)
     setLoginOpen(false)
-    if (activeMethod) setHost(activeMethod)
+    begin(next)
+  }
+
+  const declare = () => {
+    if (preview) {
+      setPreviewAcked(true)
+      return
+    }
+    if (!bankOrder) return
+    declareTransfer(bankOrder.orderNo)
+    refresh()
   }
 
   if (host) {
@@ -248,12 +277,13 @@ export default function PayLinkPage() {
       <div className="psp-page">
         <ReviewSwitch lang={lang} line={line} onChange={setLang} />
         <div className="psp-card">
-          <img className="psp-logo" src={host.icon} alt="" />
-          <p className="psp-kicker">{host.name}</p>
+          <img className="psp-logo" src={host.method.icon} alt="" />
+          <p className="psp-kicker">{host.method.name}</p>
           <h1>{formatMoney(amount, currency)}</h1>
           <p className="psp-sku">{skuName}</p>
+          {host.order && <p className="psp-sku">Order {host.order.orderNo}</p>}
           {open && account && <p className="psp-sku">ID {account.userId}</p>}
-          <button className="psp-pay" type="button" onClick={() => pay(host.name)}>{copy.pay}</button>
+          <button className="psp-pay" type="button" onClick={pay}>{copy.pay}</button>
           <button className="psp-cancel" type="button" onClick={() => setHost(null)}>{copy.choose}</button>
         </div>
       </div>
@@ -261,16 +291,23 @@ export default function PayLinkPage() {
   }
 
   const tier = memberTier(picked?.memberLevel)
-  const deposit = type !== 'full'
-  const firstAmount = type === 'deposit_first' ? amount : depositPaid
-  const balanceAmount = type === 'deposit_first' ? Math.max(payable - amount, 0) : amount
-  const kindTag = deposit ? `${chargeLabel} · ${type === 'deposit_first' ? 1 : 2}/2` : copy.fullTag
+  const deposit = link.kind === 'deposit'
+  const discount = Math.max(list - payable, 0)
+  const chargeLabel = shownStage === 'DEPOSIT_FIRST' ? copy.first : shownStage === 'DEPOSIT_BALANCE' ? copy.balance : copy.total
+  const kindTag = deposit ? `${chargeLabel} · ${shownStage === 'DEPOSIT_FIRST' ? 1 : 2}/2` : copy.fullTag
   const blocked = !!activeMethod?.minAmount && amount < activeMethod.minAmount
+  const firstPaid = orders.find((order) => order.payStage === 'DEPOSIT_FIRST' && order.status === 'COMPLETED')
+  const balancePaid = orders.find((order) => order.payStage === 'DEPOSIT_BALANCE' && order.status === 'COMPLETED')
   const steps = [
-    { key: 'first', name: copy.first, value: firstAmount, state: type === 'deposit_balance' ? 'paid' : 'now' },
-    { key: 'balance', name: copy.balance, value: balanceAmount, state: type === 'deposit_balance' ? 'now' : 'later' },
+    { key: 'first', name: copy.first, value: firstPaid?.payAmount ?? link.amount, state: firstPaid ? 'paid' : 'now' },
+    { key: 'balance', name: copy.balance, value: Math.max(payable - (firstPaid?.payAmount ?? link.amount), 0), state: balancePaid ? 'paid' : firstPaid ? 'now' : 'later' },
   ]
   const stateLabel = (state: string) => (state === 'paid' ? copy.paidTag : state === 'now' ? copy.dueNow : copy.laterTag)
+  const settledOrder = !stage && !open && !blockedLink
+    ? orders.filter((order) => order.status === 'COMPLETED').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
+    : undefined
+  const note = bankOrder?.transferReference || transferReference(preview ? 'WEB-PREVIEW' : linkId)
+  const acked = preview ? previewAcked : !!bankOrder?.declaredAt
 
   return (
     <div className="pay-link-page" dir={copy.dir}>
@@ -289,7 +326,7 @@ export default function PayLinkPage() {
           </span>
         </header>
 
-        {open && eventName && <p className="pay-event">{eventName}</p>}
+        {open && link.eventName && <p className="pay-event">{link.eventName}</p>}
 
         <section className="pay-due">
           <span className={`pay-due__tag${deposit ? ' is-deposit' : ''}`}>{kindTag}</span>
@@ -303,21 +340,24 @@ export default function PayLinkPage() {
           )}
           <div className="pay-due__meta">
             <span>{copy.account}</span>
-            <strong className={open && !account ? 'is-muted' : ''}>{open ? (account?.userId || copy.bindAfterLogin) : (userId || '—')}</strong>
+            <strong className={open && !account ? 'is-muted' : ''}>{open ? (account?.userId || copy.bindAfterLogin) : (link.userId || '—')}</strong>
           </div>
         </section>
 
-        {paidOrderId && (
+        {(doneOrder || settledOrder) && (
           <section className="pay-card pay-done">
             <span className="pay-done__icon">✓</span>
             <div>
-              <p className="pay-done__title">{open ? copy.paySuccess : copy.linkPaid}</p>
-              <p className="pay-done__order">Order {paidOrderId}</p>
+              <p className="pay-done__title">{doneOrder ? copy.paySuccess : copy.linkPaid}</p>
+              <p className="pay-done__order">Order {(doneOrder || settledOrder)?.orderNo}</p>
+              {doneOrder?.payStage === 'DEPOSIT_FIRST' && <p className="pay-done__order">{copy.balanceNext}</p>}
             </div>
           </section>
         )}
 
-        {offers.length > 1 && (
+        {blockedLink && <section className="pay-card pay-expired">{copy.expired}</section>}
+
+        {offers.length > 1 && shownStage === 'FULL' && (
           <section className="pay-card">
             <p className="pay-card__title">{copy.chooseSku}</p>
             <div className="pay-options">
@@ -330,7 +370,7 @@ export default function PayLinkPage() {
                     type="button"
                     className={`pay-option${selected ? ' is-selected' : ''}`}
                     onClick={() => setPickedId(offer.skuId)}
-                    disabled={!!paidOrderId}
+                    disabled={!collecting}
                   >
                     <span className="pay-option__radio" aria-hidden="true" />
                     <span className="pay-option__main">
@@ -355,7 +395,7 @@ export default function PayLinkPage() {
               </div>
               {discount > 0 && (
                 <div className="pay-row">
-                  <span>{copy.discount}{promo ? ` · ${promo}` : ''}</span>
+                  <span>{copy.discount}{link.promoCode ? ` · ${link.promoCode}` : ''}</span>
                   <span className="pay-row__discount">-{formatMoney(discount, currency)}</span>
                 </div>
               )}
@@ -385,11 +425,7 @@ export default function PayLinkPage() {
           </section>
         )}
 
-        {expired && (
-          <section className="pay-card pay-expired">{copy.expired}</section>
-        )}
-
-        {!paidOrderId && !expired && (
+        {collecting && (
           <section className="pay-card">
             <p className="pay-card__title">{copy.choose}</p>
             <div className="pay-options">
@@ -418,7 +454,7 @@ export default function PayLinkPage() {
           </section>
         )}
 
-        {showBank && !paidOrderId && (
+        {showBank && collecting && (
           <section className="pay-card bank-panel" ref={bankRef}>
             <p className="bank-lead">{bank.instruction}</p>
             <div className="bank-amount">
@@ -461,7 +497,7 @@ export default function PayLinkPage() {
             </div>
             {copied && <p className="bank-copied">{bank.copied}</p>}
             {!acked ? (
-              <button className="pay-continue" type="button" onClick={() => { if (!preview) declareBankTransfer(payLink); setAcked(true) }}>{bank.transferred}</button>
+              <button className="pay-continue" type="button" onClick={declare}>{bank.transferred}</button>
             ) : (
               <div className="bank-noted">
                 <h2>{bank.notedTitle}</h2>
@@ -479,7 +515,7 @@ export default function PayLinkPage() {
         </p>
       </div>
 
-      {!paidOrderId && !expired && activeMethod && !showBank && (
+      {collecting && !blockedLink && activeMethod && !showBank && (
         <div className="pay-bar">
           <button className="pay-continue" type="button" disabled={blocked} onClick={checkout}>
             {copy.pay} · {formatMoney(amount, currency)}

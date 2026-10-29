@@ -111,6 +111,8 @@ const words = {
  noOrder: ['未找到该订单，或你没有访问权限。', 'This order was not found or you do not have access.'],
  subOrder: ['子订单号', 'Sub-order no.'], subOrderEvent: ['类型', 'Type'], recordTime: ['发生时间', 'Time'], amount: ['金额', 'Amount'],
  channelRef: ['三方交易号 / 转账附言', 'Provider txn / transfer ref'],
+ sourceLink: ['来源支付链接', 'Source payment link'], filterLink: ['来源链接', 'Source link'],
+ stageFull: ['全款', 'Full payment'], stageFirst: ['定金首款', 'Deposit · first'], stageBalance: ['定金尾款', 'Deposit · balance'],
  export: ['导出列表', 'Export list'],
 } as const
 export type DashboardWord = keyof typeof words
