@@ -943,8 +943,8 @@ export default function CreatePaymentLink() {
             ? `${en ? 'Declared' : '用户声明转账'} ${order.declaredAt.slice(0, 16)}`
             : `${en ? 'Ordered' : '下单'} ${order.createdAt.slice(0, 16)}`}
       </Typography.Text>
-      {(order.providerRef || order.transferReference) && (
-        <Typography.Text type="secondary" className="pl-leg__id">{order.providerRef || order.transferReference}</Typography.Text>
+      {order.status === 'PENDING' && order.transferReference && (
+        <Typography.Text type="secondary" className="pl-leg__id">{en ? 'Transfer note' : '转账附言'} {order.transferReference}</Typography.Text>
       )}
       {canConfirmBank && order.status === 'PENDING' && order.method === 'bank_transfer' && row.status === 'ACTIVE' && (
         <Button size="small" type="primary" onClick={() => confirmTransfer(order)}>
