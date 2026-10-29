@@ -9,7 +9,9 @@ import {
   InputNumber,
   Checkbox,
   DatePicker,
+  Drawer,
   Dropdown,
+  Empty,
   Modal,
   Segmented,
   Select,
@@ -19,7 +21,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -42,6 +44,8 @@ import {
   balanceOverdue,
   completeOrder,
   currentStage,
+  historyEntry,
+  logLinkAction,
   ensurePaymentLinkData,
   isExpired,
   now,
@@ -54,6 +58,7 @@ import {
   stageMethods,
   voidPaymentLink,
   writePaymentLinks,
+  type LinkHistoryEntry,
   type LinkOrder,
   type PayStage,
   type PaymentLink,
@@ -130,6 +135,8 @@ export default function CreatePaymentLink() {
   const [methodDraft, setMethodDraft] = useState<string[]>([])
   const [expanded, setExpanded] = useState<string[]>(focusLinkId ? [focusLinkId] : [])
   const [memberTarget, setMemberTarget] = useState<string | null>(null)
+  const [memberLink, setMemberLink] = useState('')
+  const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
   const [memberDays, setMemberDays] = useState<number | null>(7)
   const [dueDays, setDueDays] = useState<number | null>(DEFAULT_BALANCE_DUE_DAYS)
   const [dueTarget, setDueTarget] = useState<PaymentLink | null>(null)
@@ -142,6 +149,9 @@ export default function CreatePaymentLink() {
   const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
   const ccManager = role?.id !== 'role_support'
   const students = useStore((s) => s.students)
+  const accounts = useStore((s) => s.accounts)
+  const actorName = (email?: string) => accounts.find((item) => item.email === email)?.name || email || '—'
+  const logAction = (id: string, action: string, detail: string) => logLinkAction(id, myEmail || 'admin@dinoai.ai', action, detail)
   const userMatches = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
     if (query.length < 2) return []
@@ -324,6 +334,15 @@ export default function CreatePaymentLink() {
   }
 
   const save = (row: PaymentLink) => {
+    const previous = editingId ? links.find((item) => item.id === editingId) : undefined
+    const action = previous ? '编辑链接' : row.audience === 'open' ? '新建通用链接' : row.kind === 'deposit' ? '新建定金链接' : '新建全款链接'
+    const methodText = row.methods.map((code) => methodName(row, code)).join('、')
+    const detail = row.kind === 'deposit'
+      ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}，尾款期限 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天 · ${methodText}`
+      : row.audience === 'open'
+        ? `${row.eventName || ''}${row.validUntil ? `，有效期至 ${row.validUntil}` : ''} · ${row.offers.length} 个 SKU · ${methodText}`
+        : `${row.offers.length} 个 SKU · ${methodText}`
+    row = { ...row, history: [...(previous?.history || []), historyEntry(myEmail || 'admin@dinoai.ai', action, detail)] }
     persist(editingId ? links.map((item) => (item.id === editingId ? row : item)) : [row, ...links])
     setEditingId(null)
     setScreen('list')
@@ -395,6 +414,8 @@ export default function CreatePaymentLink() {
 
   const confirmTransfer = (order: LinkOrder) => {
     completeOrder(order.orderNo)
+    logAction(order.paymentLinkId, order.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : order.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
+      `${order.orderNo} · ${formatMoney(order.payAmount, order.currency)}${order.payStage === 'DEPOSIT_FIRST' ? '' : '，开通会员'}`)
     reload()
     message.success(order.payStage === 'DEPOSIT_FIRST'
       ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
@@ -412,6 +433,7 @@ export default function CreatePaymentLink() {
       cancelText: en ? 'Cancel' : '取消',
       onOk: () => {
         voidPaymentLink(row.id)
+        logAction(row.id, '作废链接', '未支付的订单一起取消')
         reload()
       },
     })
@@ -866,7 +888,6 @@ export default function CreatePaymentLink() {
       <span className={`pl-due-line ${tone}`}>
         <ClockCircleOutlined /> {en ? 'Due' : '尾款截止'} {due.slice(5, 16)}
         <b>{leftText(due)}</b>
-        {row.balanceDueAt && <Tag bordered={false} className="pl-due-line__tag">{en ? 'Adjusted' : '已调整'}</Tag>}
         {ccManager && (
           <Button size="small" type="link" className="pl-due-line__btn" onClick={() => openDue(row)}>
             {en ? 'Adjust' : '调整截止'}
@@ -888,7 +909,9 @@ export default function CreatePaymentLink() {
       message.warning(en ? 'Pick a time in the future' : '请选择一个晚于现在的时间')
       return
     }
+    const before = balanceDeadline(dueTarget, ordersOf(dueTarget.id))
     setBalanceDeadline(dueTarget.id, dueDraft.format('YYYY-MM-DD HH:mm:00'))
+    logAction(dueTarget.id, '调整尾款截止', `${before ? before.slice(0, 16) : '—'} → ${dueDraft.format('YYYY-MM-DD HH:mm')}`)
     reload()
     setDueTarget(null)
     message.success(en ? 'Balance deadline updated. The customer page shows the new days left.' : '尾款截止时间已更新，用户支付页的剩余天数同步更新')
@@ -988,7 +1011,7 @@ export default function CreatePaymentLink() {
               <>
                 <Typography.Text type="secondary" copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>
                 {row.userId && (
-                  <Button size="small" type="link" className="pl-member-btn" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberDays(7) }}>
+                  <Button size="small" type="link" className="pl-member-btn" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberLink(row.id); setMemberDays(7) }}>
                     {en ? 'Add membership' : '添加会员'}
                   </Button>
                 )}
@@ -1067,6 +1090,16 @@ export default function CreatePaymentLink() {
       },
     },
     {
+      title: en ? 'Creator' : '创建人',
+      width: 150,
+      render: (_: unknown, row: PaymentLink) => (
+        <div className="pl-two-line">
+          <span>{actorName(row.createdBy)}</span>
+          {row.createdBy && <Typography.Text type="secondary">{row.createdBy}</Typography.Text>}
+        </div>
+      ),
+    },
+    {
       title: en ? 'Created / Updated' : '创建 / 更新',
       width: 150,
       render: (_: unknown, row: PaymentLink) => {
@@ -1087,6 +1120,7 @@ export default function CreatePaymentLink() {
       render: (_: unknown, row: PaymentLink) => (
         <Space direction="vertical" size={4}>
           {linkActions(row)}
+          <Button size="small" type="link" icon={<HistoryOutlined />} className="pl-history-btn" onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
           {row.status === 'ACTIVE' && (
             <Space size={4}>
               {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
@@ -1171,7 +1205,6 @@ export default function CreatePaymentLink() {
   const openRows = (row: PaymentLink) => {
     const orders = ordersOf(row.id)
     const paid = orders.filter((order) => order.status === 'COMPLETED').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))
-    const pending = orders.filter((order) => order.status === 'PENDING').length
     return (
       <div className="pl-legs">
         {paid.length ? (
@@ -1193,8 +1226,8 @@ export default function CreatePaymentLink() {
         <div className="pl-legs__note pl-open-foot">
           <span>
             {en
-              ? `${paid.length} paid${pending ? ` · ${pending} in progress` : ''}${paid.length > OPEN_ORDER_PREVIEW ? ` · latest ${OPEN_ORDER_PREVIEW} shown` : ''}`
-              : `已支付 ${paid.length} 单${pending ? ` · 进行中 ${pending} 单` : ''}${paid.length > OPEN_ORDER_PREVIEW ? ` · 这里只显示最近 ${OPEN_ORDER_PREVIEW} 单` : ''}`}
+              ? `${paid.length} paid${paid.length > OPEN_ORDER_PREVIEW ? ` · latest ${OPEN_ORDER_PREVIEW} shown` : ''}`
+              : `已支付 ${paid.length} 单${paid.length > OPEN_ORDER_PREVIEW ? ` · 这里只显示最近 ${OPEN_ORDER_PREVIEW} 单` : ''}`}
           </span>
           {orders.length > 0 && (
             <Button size="small" type="link" onClick={() => navigate(`/orders?payment_link_id=${encodeURIComponent(row.id)}`)}>
@@ -1218,7 +1251,12 @@ export default function CreatePaymentLink() {
       const update = stage === 'DEPOSIT_BALANCE'
         ? { balanceMethods: methodDraft }
         : { methods: methodDraft, balanceMethods: item.kind === 'deposit' ? (item.balanceMethods || item.methods) : undefined }
-      return { ...item, ...update, updatedAt: nowText() }
+      return {
+        ...item,
+        ...update,
+        updatedAt: nowText(),
+        history: [...(item.history || []), historyEntry(myEmail || 'admin@dinoai.ai', '修改支付方式', `${stageName(stage)}：${methodDraft.map((code) => methodName(item, code)).join('、')}`)],
+      }
     }))
     setMethodTarget(null)
     message.success(en ? 'Payment methods updated. The link stays the same.' : '支付方式已更新，链接地址不变。')
@@ -1235,6 +1273,10 @@ export default function CreatePaymentLink() {
         return { ...student, expireTime: base.add(memberDays, 'day').format('YYYY-MM-DD HH:mm:ss'), lastModifier: myEmail || student.lastModifier }
       }),
     }))
+    if (memberLink) {
+      logAction(memberLink, '添加会员', `${memberTarget} · ${memberDays} 天`)
+      reload()
+    }
     message.success(en ? `Added ${memberDays} days for ${memberTarget}` : `已为 ${memberTarget} 添加 ${memberDays} 天会员`)
     setMemberTarget(null)
   }
@@ -1391,7 +1433,7 @@ export default function CreatePaymentLink() {
         columns={columns}
         dataSource={rows}
         pagination={false}
-        scroll={{ x: 1700 }}
+        scroll={{ x: 1850 }}
         expandable={{
           expandedRowKeys: expanded,
           onExpandedRowsChange: (keys) => setExpanded(keys.map(String)),
@@ -1434,6 +1476,36 @@ export default function CreatePaymentLink() {
           </Space>
         </Checkbox.Group>
       </Modal>
+      <Drawer
+        title={`${historyOf?.id || ''} · ${en ? 'Operation history' : '操作记录'}`}
+        open={!!historyOf}
+        onClose={() => setHistoryOf(null)}
+        width={720}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={en
+            ? 'Creating, editing, changing methods, moving the balance deadline, confirming transfers, adding membership and voiding are logged with the operator.'
+            : '新建、编辑、改支付方式、调整尾款截止、确认转账、添加会员、作废都会记录操作人和变更内容。'}
+        />
+        <Table
+          rowKey="id"
+          size="middle"
+          pagination={{ pageSize: 8 }}
+          locale={{ emptyText: <Empty description={en ? 'No history yet' : '暂无操作记录'} /> }}
+          dataSource={[...((links.find((item) => item.id === historyOf?.id) || historyOf)?.history || [])].reverse()}
+          columns={[
+            { title: en ? 'Time' : '操作时间', dataIndex: 'at', width: 170, render: (value: string) => value.slice(0, 16) },
+            { title: en ? 'Operator' : '操作人', dataIndex: 'actor', width: 170, render: (value: string) => (
+              <div className="pl-two-line"><span>{actorName(value)}</span><Typography.Text type="secondary">{value}</Typography.Text></div>
+            ) },
+            { title: en ? 'Action' : '操作', dataIndex: 'action', width: 120 },
+            { title: en ? 'Detail' : '变更内容', dataIndex: 'detail' },
+          ] as { title: string; dataIndex: keyof LinkHistoryEntry; width?: number; render?: (value: string) => React.ReactNode }[]}
+        />
+      </Drawer>
       <Modal
         title={`${en ? 'Balance deadline' : '调整尾款截止时间'} · ${dueTarget?.id || ''}`}
         open={!!dueTarget}

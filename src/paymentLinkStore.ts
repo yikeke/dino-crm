@@ -2,11 +2,11 @@ import { setState } from './store'
 import type { Order, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v5'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v6'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v1'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
-const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4']
+const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4', 'dino-cc-payment-links-v5']
 export const DEFAULT_BALANCE_DUE_DAYS = 7
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
@@ -47,6 +47,24 @@ export type PaymentLink = {
   createdAt: string
   updatedAt: string
   createdBy?: string
+  /** CRM operations on this link, shown in the「操作记录」drawer. Oldest first. */
+  history?: LinkHistoryEntry[]
+}
+
+export type LinkHistoryEntry = {
+  id: string
+  at: string
+  actor: string
+  action: string
+  detail: string
+}
+
+export function historyEntry(actor: string, action: string, detail: string, at = now()): LinkHistoryEntry {
+  return { id: `H_${Math.random().toString(36).slice(2, 10)}`, at, actor, action, detail }
+}
+
+export function logLinkAction(id: string, actor: string, action: string, detail: string) {
+  writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, history: [...(link.history || []), historyEntry(actor, action, detail)] } : link)))
 }
 
 /** One web_order. It is created when the customer picks a method and starts paying, so it always has one method. */
@@ -351,6 +369,29 @@ function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
     seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
     seedLink({ id: 'PL-FULL-WAIT', kind: 'full', audience: 'user', userId: '2060199610824355842', ...amy, offers: kr, payable: 0, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-28 10:12', updatedAt: '2026-10-28 10:12' }),
   ]
+  const lead = 'sales.lead@dinoai.ai'
+  const cc = 'sales.kr@dinoai.ai'
+  const ops = 'ops.vn@dinoai.ai'
+  const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
+    'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，尾款期限 7 天'], [lead, '确认首款到账', 'WEB-261028-TF01 · 990 THB', '2026-10-28 11:20'], [lead, '调整尾款截止', `首款后 7 天 → ${links[0].balanceDueAt?.slice(0, 16)}`, '2026-10-28 15:40']] },
+    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'WEB-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
+    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
+    'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天']] },
+    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 3 天']] },
+    'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Bank transfer']] },
+    'PL-FULL-PAID': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Card、Kakao Pay']] },
+    'PL-OPEN-KR': { by: lead, log: [[lead, '新建通用链接', 'Seoul Edu Expo 2026 · Booth B12，有效期至 2026-11-30'], [lead, '修改支付方式', '全款：Card、Kakao Pay', '2026-10-27 11:40']] },
+    'PL-FULL-WAIT': { by: cc, log: [[cc, '新建全款链接', '4 个 SKU · Card、Kakao Pay']] },
+  }
+  links.forEach((link, index) => {
+    const meta = audit[link.id]
+    if (!meta) return
+    links[index] = {
+      ...link,
+      createdBy: meta.by,
+      history: meta.log.map(([actor, action, detail, at], step) => historyEntry(actor, action, detail, at || (step === 0 ? `${link.createdAt}:00` : `${link.updatedAt}:00`))),
+    }
+  })
   const o = (row: Omit<LinkOrder, 'currency' | 'status'> & { status?: LinkOrderStatus; currency?: string }): LinkOrder => ({
     currency: row.currency || (row.skuId.startsWith('KR') ? 'KRW' : row.skuId.startsWith('TH') ? 'THB' : 'VND'),
     status: row.status || 'COMPLETED',

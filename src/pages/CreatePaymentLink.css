@@ -764,14 +764,14 @@
   font-weight: 600;
 }
 
-.pl-due-line__tag {
-  margin: 0;
-  font-size: 11px;
-  line-height: 16px;
-}
 
 .pl-due-line__btn {
   height: auto;
   padding: 0 2px;
   font-size: 12px;
+}
+
+.pl-history-btn {
+  align-self: flex-start;
+  padding-inline: 0;
 }
