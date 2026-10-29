@@ -73,6 +73,16 @@ export default function AppLayout() {
   const { account, role } = useCurrentAccount()
   const accounts = useStore((s) => s.accounts)
   const roles = useStore((s) => s.roles)
+  // Create Payment Link demo only switches between the two CC roles.
+  const onPaymentLinks = location.pathname.startsWith('/marketing-center-v5/payment-links')
+  const ccRoles = [
+    { email: 'sales.lead@dinoai.ai', label: lang === 'en' ? 'CC manager' : 'CC 主管' },
+    { email: 'sales.kr@dinoai.ai', label: lang === 'en' ? 'CC' : '普通 CC' },
+  ].flatMap((item) => {
+    const found = accounts.find((a) => a.email === item.email)
+    return found ? [{ ...item, account: found }] : []
+  })
+  const ccCurrent = ccRoles.find((item) => item.account.id === account?.id) || (role?.id === 'role_support' ? ccRoles[1] : ccRoles[0])
 
   const phaseLabel = (text: string, phaseText: string, color: string) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -271,6 +281,30 @@ export default function AppLayout() {
             {TITLES[selectedPath] ?? TITLES[basePath] ?? t('app.brand')}
           </Text>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {onPaymentLinks && ccCurrent ? (
+              <Dropdown
+                menu={{
+                  selectedKeys: [ccCurrent.account.id],
+                  items: ccRoles.map((item) => ({
+                    key: item.account.id,
+                    label: (
+                      <span>
+                        {item.label} · <Text type="secondary">{item.account.name}</Text>
+                      </span>
+                    ),
+                    onClick: () => setIdentity(item.account.id),
+                  })),
+                }}
+              >
+                <Button type="text" icon={<UserSwitchOutlined />}>
+                  {ccCurrent.account.name}
+                  <Tag color={ccCurrent === ccRoles[0] ? 'gold' : 'geekblue'} style={{ marginLeft: 6 }}>
+                    {ccCurrent.label}
+                  </Tag>
+                  <DownOutlined style={{ fontSize: 10 }} />
+                </Button>
+              </Dropdown>
+            ) : (
             <Dropdown
               menu={{
                 selectedKeys: [account?.id ?? '__default__'],
@@ -307,6 +341,7 @@ export default function AppLayout() {
                 <DownOutlined style={{ fontSize: 10 }} />
               </Button>
             </Dropdown>
+            )}
             <Dropdown
               menu={{
                 selectedKeys: [lang],

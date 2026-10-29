@@ -2,11 +2,12 @@ import { setState } from './store'
 import type { Order, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v4'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v5'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v1'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
-const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3']
+const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4']
+export const DEFAULT_BALANCE_DUE_DAYS = 7
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
 export type LinkOrderStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED'
@@ -35,6 +36,10 @@ export type PaymentLink = {
   methods: string[]
   /** Deposit balance methods. CC can change them until the balance is paid. */
   balanceMethods?: string[]
+  /** Deposit: the balance is due this many days after the first payment lands, or the first payment is cancelled. */
+  balanceDueDays?: number
+  /** Deposit: a CC manager moved the balance deadline. Overrides first payment time + balanceDueDays. */
+  balanceDueAt?: string
   eventName?: string
   validUntil?: string
   status: 'ACTIVE' | 'VOID'
@@ -112,9 +117,7 @@ export function payLinkUrl(id: string) {
 }
 
 export function now() {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  return stamp(new Date())
 }
 
 function newOrderNo() {
@@ -136,6 +139,36 @@ export function isExpired(link: PaymentLink) {
   return !!link.validUntil && link.validUntil < now().slice(0, 10)
 }
 
+function stamp(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+export function parseTime(value: string) {
+  return new Date(value.replace(' ', 'T')).getTime()
+}
+
+/** When the balance must be paid by. Null until the first payment has landed, and once the balance is paid. */
+export function balanceDeadline(link: PaymentLink, orders: LinkOrder[]): string | null {
+  if (link.kind !== 'deposit') return null
+  const done = (stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'COMPLETED')
+  const first = done('DEPOSIT_FIRST')
+  if (!first?.paidAt || done('DEPOSIT_BALANCE')) return null
+  if (link.balanceDueAt) return link.balanceDueAt
+  const due = new Date(parseTime(first.paidAt))
+  due.setDate(due.getDate() + (link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS))
+  return stamp(due)
+}
+
+export function balanceOverdue(link: PaymentLink, orders: LinkOrder[]) {
+  const due = balanceDeadline(link, orders)
+  return !!due && link.status === 'ACTIVE' && parseTime(due) < Date.now()
+}
+
+export function setBalanceDeadline(id: string, dueAt: string) {
+  writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, balanceDueAt: dueAt, updatedAt: now().slice(0, 16) } : link)))
+}
+
 /** Which payment the link is collecting now; null when nothing more can be paid. */
 export function currentStage(link: PaymentLink, orders: LinkOrder[]): PayStage | null {
   if (link.status === 'VOID' || isExpired(link)) return null
@@ -143,7 +176,8 @@ export function currentStage(link: PaymentLink, orders: LinkOrder[]): PayStage |
   if (link.audience === 'open') return 'FULL'
   if (link.kind === 'full') return paid('FULL') ? null : 'FULL'
   if (!paid('DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'
-  return paid('DEPOSIT_BALANCE') ? null : 'DEPOSIT_BALANCE'
+  if (paid('DEPOSIT_BALANCE') || balanceOverdue(link, orders)) return null
+  return 'DEPOSIT_BALANCE'
 }
 
 export function stageAmount(link: PaymentLink, stage: PayStage, offer: LinkOffer | undefined, orders: LinkOrder[]) {
@@ -294,6 +328,7 @@ function seedLink(row: Omit<PaymentLink, 'url' | 'status' | 'skuId' | 'skuName' 
 }
 
 function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
+  const shift = (hours: number) => stamp(new Date(Date.now() + hours * 3_600_000))
   const kr = [
     offer('KR-Q-2026', 'Pro Quarterly', 'Pro', 99000, 89100, 'KRW', '10% off'),
     offer('KR-H-2026', 'Max 6 Months', 'Max', 178000, 178000, 'KRW', 'List price'),
@@ -306,10 +341,11 @@ function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
   const linh = { line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005', planId: 'CSP-LINH', promoCode: 'CSP-LINH-PROMO' }
   const bkk = { line: 'Thailand', channelId: 'th_ground', channelName: 'Bangkok Ground Team', channelCode: 'CH-TH-0001', planId: 'CSP-TH', promoCode: '' }
   const links: PaymentLink[] = [
-    seedLink({ id: 'PL-DEP-TH', kind: 'deposit', audience: 'user', userId: '2060199610824355848', ...bkk, offers: th, payable: 9900, amount: 990, methods: ['KPLUS'], createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 15:40' }),
-    seedLink({ id: 'PL-DEP-VN', kind: 'deposit', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
-    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
-    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
+    seedLink({ id: 'PL-DEP-TH', kind: 'deposit', audience: 'user', userId: '2060199610824355848', ...bkk, offers: th, payable: 9900, amount: 990, methods: ['KPLUS'], balanceDueDays: 7, balanceDueAt: `${shift(30).slice(0, 13)}:00:00`, createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 15:40' }),
+    seedLink({ id: 'PL-DEP-VN', kind: 'deposit', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
+    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
+    seedLink({ id: 'PL-DEP-LATE', kind: 'deposit', audience: 'user', userId: '2060199610824356004', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: shift(-218).slice(0, 16), updatedAt: shift(-216).slice(0, 16) }),
+    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], balanceDueDays: 3, createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
     seedLink({ id: 'PL-FULL-BANK', kind: 'full', audience: 'user', userId: '2090031938694049794', ...linh, offers: vn, payable: 891000, amount: 0, methods: ['bank_transfer'], createdAt: '2026-10-28 13:05', updatedAt: '2026-10-28 13:22' }),
     seedLink({ id: 'PL-FULL-PAID', kind: 'full', audience: 'user', userId: '2060199610824355846', ...amy, offers: [kr[0]], payable: 89100, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20' }),
     seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
@@ -325,7 +361,8 @@ function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
     o({ orderNo: 'WEB-261028-TF01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', userId: '2060199610824355848', skuId: 'TH-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 9900, payAmount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
     o({ orderNo: 'WEB-261028-VB02', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', parentOrderNo: 'WEB-261027-VF01', userId: '2090031938694049793', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', declaredAt: '2026-10-28 15:30:00', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
     o({ orderNo: 'WEB-261027-VF01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', userId: '2090031938694049793', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
-    o({ orderNo: 'WEB-261028-RF01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', userId: '2060199610824356009', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: '2026-10-28 09:36:00', paidAt: '2026-10-28 09:40:00' }),
+    o({ orderNo: 'WEB-261028-RF01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', userId: '2060199610824356009', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
+    o({ orderNo: 'WEB-261020-LF01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', userId: '2060199610824356004', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
     o({ orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', userId: '2090031938694049794', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', declaredAt: '2026-10-28 13:22:00', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
     o({ orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', userId: '2060199610824355846', skuId: 'KR-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 89100, payAmount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
     o({ orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', userId: '2060199610824356011', skuId: 'KR-H-2026', skuName: 'Max · Max 6 Months', originalAmount: 178000, payAmount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),

@@ -8,6 +8,7 @@ import {
   Input,
   InputNumber,
   Checkbox,
+  DatePicker,
   Dropdown,
   Modal,
   Segmented,
@@ -18,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -34,8 +35,11 @@ import { setState, useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
 import {
+  DEFAULT_BALANCE_DUE_DAYS,
   PREVIEW_LINK_ID,
   PREVIEW_LINK_KEY,
+  balanceDeadline,
+  balanceOverdue,
   completeOrder,
   currentStage,
   ensurePaymentLinkData,
@@ -43,7 +47,9 @@ import {
   now,
   payLinkUrl,
   readLinkOrders,
+  parseTime,
   readPaymentLinks,
+  setBalanceDeadline,
   stageAmount,
   stageMethods,
   voidPaymentLink,
@@ -125,12 +131,16 @@ export default function CreatePaymentLink() {
   const [expanded, setExpanded] = useState<string[]>(focusLinkId ? [focusLinkId] : [])
   const [memberTarget, setMemberTarget] = useState<string | null>(null)
   const [memberDays, setMemberDays] = useState<number | null>(7)
+  const [dueDays, setDueDays] = useState<number | null>(DEFAULT_BALANCE_DUE_DAYS)
+  const [dueTarget, setDueTarget] = useState<PaymentLink | null>(null)
+  const [dueDraft, setDueDraft] = useState<dayjs.Dayjs | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { account, role } = useCurrentAccount()
   const session = useSession()
   const myEmail = account?.email || session?.email || ''
   const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
+  const ccManager = role?.id !== 'role_support'
   const students = useStore((s) => s.students)
   const userMatches = useMemo(() => {
     const query = userQuery.trim().toLowerCase()
@@ -231,6 +241,7 @@ export default function CreatePaymentLink() {
   const resetCustomer = () => {
     setUserQuery('')
     setFirstAmount(null)
+    setDueDays(DEFAULT_BALANCE_DUE_DAYS)
     setAudience('user')
     setEventName('')
     setValidUntil('')
@@ -300,6 +311,8 @@ export default function CreatePaymentLink() {
       amount,
       methods,
       balanceMethods: kind === 'deposit' ? methods : undefined,
+      balanceDueDays: kind === 'deposit' ? (dueDays || DEFAULT_BALANCE_DUE_DAYS) : undefined,
+      balanceDueAt: kind === 'deposit' ? previous?.balanceDueAt : undefined,
       eventName: open ? eventName.trim() : undefined,
       validUntil: open ? (validUntil || undefined) : undefined,
       status: 'ACTIVE',
@@ -372,6 +385,7 @@ export default function CreatePaymentLink() {
     setDepositSkuId(row.offers?.[0]?.skuId || row.skuId.split(',')[0] || '')
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit' ? row.amount : null)
+    setDueDays(row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS)
     setAudience(row.audience === 'open' ? 'open' : 'user')
     setEventName(row.eventName || '')
     setValidUntil(row.validUntil || '')
@@ -660,6 +674,42 @@ export default function CreatePaymentLink() {
             </Card>
           )}
 
+          {mode === 'deposit' && chosenDeposit && (
+            <Card
+              size="small"
+              title={step(++stepNo, en ? 'Balance deadline' : '尾款支付期限', ccManager
+                ? (en ? 'CC managers can change it here and on the list later' : 'CC 主管可在这里设置，之后也可以在列表里调整')
+                : (en ? 'Set by your CC manager' : '由 CC 主管设置'))}
+            >
+              <div className="pl-due">
+                <span>{en ? 'Balance must be paid within' : '首款到账后'}</span>
+                {ccManager ? (
+                  <InputNumber min={1} max={30} value={dueDays} onChange={(value) => setDueDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: 140 }} />
+                ) : (
+                  <b className="pl-due__fixed">{dueDays || DEFAULT_BALANCE_DUE_DAYS} {en ? 'days' : '天'}</b>
+                )}
+                <span>{en ? 'of the first payment' : '内必须付清尾款'}</span>
+              </div>
+              <Alert
+                type="warning"
+                showIcon
+                icon={<ClockCircleOutlined />}
+                className="pl-due__alert"
+                message={en
+                  ? `If the balance is not paid within ${dueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment, the first payment is cancelled.`
+                  : `首款到账后 ${dueDays || DEFAULT_BALANCE_DUE_DAYS} 天内未付清尾款，首款将被取消。`}
+                description={en
+                  ? 'The customer page shows this rule before the first payment and a live countdown before the balance. Follow up before the deadline.'
+                  : '用户支付页：付首款前展示这条规则，付尾款时展示截止时间和倒计时。请在截止前跟进用户付尾款。'}
+              />
+              {!ccManager && (
+                <Typography.Text type="secondary" className="pl-field-hint">
+                  {en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。'}
+                </Typography.Text>
+              )}
+            </Card>
+          )}
+
           <Card
             size="small"
             title={step(++stepNo, en ? 'Payment methods' : '支付方式', mode === 'deposit'
@@ -718,6 +768,8 @@ export default function CreatePaymentLink() {
                     <div className="pl-summary__sku"><span>① {en ? 'First' : '首款'}</span><b>{firstValid ? formatMoney(firstValue, chosenDeposit.currency) : '—'}</b></div>
                     <div className="pl-summary__sku"><span>② {en ? 'Balance' : '尾款'}</span><b>{firstValid ? formatMoney(balanceValue, chosenDeposit.currency) : '—'}</b></div>
                   </dd>
+                  <dt>{en ? 'Balance due' : '尾款期限'}</dt>
+                  <dd className="pl-summary__due">{en ? `Within ${dueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment` : `首款到账后 ${dueDays || DEFAULT_BALANCE_DUE_DAYS} 天内，逾期首款取消`}</dd>
                 </>
               )}
               <dt>{en ? 'Methods' : '支付方式'}</dt>
@@ -789,6 +841,59 @@ export default function CreatePaymentLink() {
   const paidOf = (orders: LinkOrder[], stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'COMPLETED')
   const declaredOf = (orders: LinkOrder[], stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'PENDING' && !!order.declaredAt)
 
+  const leftText = (due: string) => {
+    const left = parseTime(due) - Date.now()
+    if (left <= 0) {
+      const late = Math.max(1, Math.floor(-left / 86_400_000))
+      return en ? `${late} day${late > 1 ? 's' : ''} overdue` : `已逾期 ${late} 天`
+    }
+    const days = Math.floor(left / 86_400_000)
+    const hours = Math.floor(left / 3_600_000) % 24
+    if (days) return en ? `${days}d ${hours}h left` : `剩 ${days} 天 ${hours} 小时`
+    return en ? `${hours}h ${Math.floor(left / 60_000) % 60}m left` : `剩 ${hours} 小时 ${Math.floor(left / 60_000) % 60} 分`
+  }
+
+  const dueLine = (row: PaymentLink) => {
+    const orders = ordersOf(row.id)
+    if (paidOf(orders, 'DEPOSIT_BALANCE')) return null
+    const due = balanceDeadline(row, orders)
+    if (!due) {
+      return <Typography.Text type="secondary" className="pl-due-line">{en ? `Balance within ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of first payment` : `首款后 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款`}</Typography.Text>
+    }
+    const left = parseTime(due) - Date.now()
+    const tone = left <= 0 ? 'is-late' : left < 86_400_000 * 2 ? 'is-soon' : ''
+    return (
+      <span className={`pl-due-line ${tone}`}>
+        <ClockCircleOutlined /> {en ? 'Due' : '尾款截止'} {due.slice(5, 16)}
+        <b>{leftText(due)}</b>
+        {row.balanceDueAt && <Tag bordered={false} className="pl-due-line__tag">{en ? 'Adjusted' : '已调整'}</Tag>}
+        {ccManager && (
+          <Button size="small" type="link" className="pl-due-line__btn" onClick={() => openDue(row)}>
+            {en ? 'Adjust' : '调整截止'}
+          </Button>
+        )}
+      </span>
+    )
+  }
+
+  const openDue = (row: PaymentLink) => {
+    const due = balanceDeadline(row, ordersOf(row.id))
+    setDueTarget(row)
+    setDueDraft(due ? dayjs(due) : dayjs().add(1, 'day'))
+  }
+
+  const saveDue = () => {
+    if (!dueTarget || !dueDraft) return
+    if (!dueDraft.isAfter(dayjs())) {
+      message.warning(en ? 'Pick a time in the future' : '请选择一个晚于现在的时间')
+      return
+    }
+    setBalanceDeadline(dueTarget.id, dueDraft.format('YYYY-MM-DD HH:mm:00'))
+    reload()
+    setDueTarget(null)
+    message.success(en ? 'Balance deadline updated. The customer page shows the new countdown.' : '尾款截止时间已更新，用户支付页同步显示新的倒计时')
+  }
+
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
     const orders = ordersOf(row.id)
     if (row.status === 'VOID') return { label: en ? 'Void' : '已作废', color: 'default' }
@@ -801,6 +906,7 @@ export default function CreatePaymentLink() {
       return { label: en ? 'Awaiting payment' : '待支付', color: 'processing' }
     }
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return { label: en ? 'Fully paid' : '已付清', color: 'success' }
+    if (balanceOverdue(row, orders)) return { label: en ? 'Balance overdue' : '尾款已逾期', color: 'error' }
     if (paidOf(orders, 'DEPOSIT_FIRST')) {
       return declaredOf(orders, 'DEPOSIT_BALANCE')
         ? { label: en ? 'Balance transfer to confirm' : '尾款待确认', color: 'warning' }
@@ -934,13 +1040,14 @@ export default function CreatePaymentLink() {
     },
     {
       title: en ? 'Status' : '状态',
-      width: 150,
+      width: 210,
       render: (_: unknown, row: PaymentLink) => {
         const status = linkStatus(row)
         return (
           <div className="pl-two-line">
             <span><Tag color={status.color} bordered={false}>{status.label}</Tag></span>
             {row.audience === 'open' && row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
+            {row.kind === 'deposit' && row.status === 'ACTIVE' && dueLine(row)}
           </div>
         )
       },
@@ -983,7 +1090,7 @@ export default function CreatePaymentLink() {
           {row.status === 'ACTIVE' && (
             <Space size={4}>
               {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-              {currentStage(row, ordersOf(row.id)) && (
+              {(currentStage(row, ordersOf(row.id)) || balanceOverdue(row, ordersOf(row.id))) && (
                 <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
               )}
             </Space>
@@ -1030,6 +1137,7 @@ export default function CreatePaymentLink() {
                 {live?.parentOrderNo && (
                   <Typography.Text type="secondary" className="pl-leg__relation">parent_order_no = {live.parentOrderNo}</Typography.Text>
                 )}
+                {stage === 'DEPOSIT_BALANCE' && firstPaid && !paid && row.status === 'ACTIVE' && dueLine(row)}
                 {folded > 0 && (
                   <Typography.Text type="secondary" className="pl-leg__relation">
                     {en ? `${folded} abandoned attempt${folded > 1 ? 's' : ''} folded` : `另有 ${folded} 次未完成的尝试（已折叠）`}
@@ -1141,9 +1249,9 @@ export default function CreatePaymentLink() {
     const stage = currentStage(row, orders)
     if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((order) => order.status === 'PENDING' && !!order.declaredAt)
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
-    if (value === 'balance') return row.kind === 'deposit' && stage === 'DEPOSIT_BALANCE'
+    if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE' || balanceOverdue(row, orders))
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
-    if (value === 'done') return row.audience !== 'open' && row.status === 'ACTIVE' && !stage
+    if (value === 'done') return row.audience !== 'open' && row.status === 'ACTIVE' && !stage && !balanceOverdue(row, orders)
     return true
   }
   const baseRows = links.filter((row) => {
@@ -1273,8 +1381,8 @@ export default function CreatePaymentLink() {
         type="info"
         showIcon
         message={en
-          ? 'Each row is one payment link; expand it to see its orders. Orders are created when the customer starts paying. Bank transfers are confirmed by an admin, ops, or a sales lead.'
-          : '每一行是一条支付链接，展开看它下面的订单。订单在用户开始付款时才生成。银行转账由管理员、运营或销售组长确认到账。'}
+          ? `Each row is one payment link; expand it to see its orders. Orders are created when the customer starts paying. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
+          : `每一行是一条支付链接，展开看它下面的订单。订单在用户开始付款时才生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"
@@ -1325,6 +1433,42 @@ export default function CreatePaymentLink() {
             ))}
           </Space>
         </Checkbox.Group>
+      </Modal>
+      <Modal
+        title={`${en ? 'Balance deadline' : '调整尾款截止时间'} · ${dueTarget?.id || ''}`}
+        open={!!dueTarget}
+        onCancel={() => setDueTarget(null)}
+        onOk={saveDue}
+        okButtonProps={{ disabled: !dueDraft }}
+        okText={en ? 'Save' : '保存'}
+        cancelText={en ? 'Cancel' : '取消'}
+        destroyOnClose
+      >
+        {dueTarget && (() => {
+          const current = balanceDeadline(dueTarget, ordersOf(dueTarget.id))
+          return (
+            <>
+              <Typography.Paragraph type="secondary">
+                {en
+                  ? `Default rule: balance within ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment. If it is not paid by the deadline, the first payment is cancelled. The customer page shows the new deadline and countdown right away.`
+                  : `默认规则：首款到账后 ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款，逾期首款将被取消。改完后用户支付页立即显示新的截止时间和倒计时。`}
+              </Typography.Paragraph>
+              <div className="pl-label">{en ? 'Current deadline' : '当前截止'}</div>
+              <Typography.Paragraph strong>{current ? `${current.slice(0, 16)} · ${leftText(current)}` : '—'}</Typography.Paragraph>
+              <div className="pl-label">{en ? 'New deadline' : '新的截止时间'}</div>
+              <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" value={dueDraft} onChange={setDueDraft} style={{ width: '100%' }}
+                disabledDate={(day) => day.isBefore(dayjs(), 'day')}
+              />
+              <Space size={6} style={{ marginTop: 8 }}>
+                {[1, 3, 7].map((days) => (
+                  <Button key={days} size="small" onClick={() => setDueDraft((current && dayjs(current).isAfter(dayjs()) ? dayjs(current) : dayjs()).add(days, 'day'))}>
+                    {en ? `+${days} day${days > 1 ? 's' : ''}` : `延长 ${days} 天`}
+                  </Button>
+                ))}
+              </Space>
+            </>
+          )
+        })()}
       </Modal>
       <Modal
         title={`${en ? 'Add membership' : '添加会员'} · ${memberTarget || ''}`}
