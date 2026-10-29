@@ -699,8 +699,8 @@ export default function CreatePaymentLink() {
                   ? `If the balance is not paid within ${dueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment, the first payment is cancelled.`
                   : `首款到账后 ${dueDays || DEFAULT_BALANCE_DUE_DAYS} 天内未付清尾款，首款将被取消。`}
                 description={en
-                  ? 'The customer page shows this rule before the first payment and a live countdown before the balance. Follow up before the deadline.'
-                  : '用户支付页：付首款前展示这条规则，付尾款时展示截止时间和倒计时。请在截止前跟进用户付尾款。'}
+                  ? 'The customer page shows one small line under "Due now" with the days left to pay the balance. Follow up before the deadline.'
+                  : '用户支付页只在「本次应付」下方用一行小字提示还剩几天付清尾款。请在截止前跟进用户付尾款。'}
               />
               {!ccManager && (
                 <Typography.Text type="secondary" className="pl-field-hint">
@@ -891,7 +891,7 @@ export default function CreatePaymentLink() {
     setBalanceDeadline(dueTarget.id, dueDraft.format('YYYY-MM-DD HH:mm:00'))
     reload()
     setDueTarget(null)
-    message.success(en ? 'Balance deadline updated. The customer page shows the new countdown.' : '尾款截止时间已更新，用户支付页同步显示新的倒计时')
+    message.success(en ? 'Balance deadline updated. The customer page shows the new days left.' : '尾款截止时间已更新，用户支付页的剩余天数同步更新')
   }
 
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
@@ -1450,8 +1450,8 @@ export default function CreatePaymentLink() {
             <>
               <Typography.Paragraph type="secondary">
                 {en
-                  ? `Default rule: balance within ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment. If it is not paid by the deadline, the first payment is cancelled. The customer page shows the new deadline and countdown right away.`
-                  : `默认规则：首款到账后 ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款，逾期首款将被取消。改完后用户支付页立即显示新的截止时间和倒计时。`}
+                  ? `Default rule: balance within ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment. If it is not paid by the deadline, the first payment is cancelled. The customer page updates the days left right away.`
+                  : `默认规则：首款到账后 ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款，逾期首款将被取消。改完后用户支付页的剩余天数立即更新。`}
               </Typography.Paragraph>
               <div className="pl-label">{en ? 'Current deadline' : '当前截止'}</div>
               <Typography.Paragraph strong>{current ? `${current.slice(0, 16)} · ${leftText(current)}` : '—'}</Typography.Paragraph>

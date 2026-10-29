@@ -15,7 +15,6 @@ export type PayCopy = {
   total: string
   choose: string
   pay: string
-  cancel: string
   terms: string
   privacy: string
   first: string
@@ -31,12 +30,8 @@ export type PayCopy = {
   secure: string
   account: string
   dueRule: string
-  dueTitle: string
-  dueWarn: string
-  timeLeft: string
-  overdueTitle: string
-  overdueBody: string
-  units: string
+  dueLeft: string
+  overdue: string
   fullTag: string
   linkPaid: string
   bindAfterLogin: string
@@ -104,44 +99,44 @@ export const LINE_PAY_METHODS: Record<string, PayMethod[]> = {
 const COPY: Record<string, PayCopy> = {
   Korea: {
     title: '결제', discount: '할인', total: '합계', choose: '결제 수단 선택', pay: '결제하기',
-    cancel: '언제든 취소 가능 · ', terms: '이용약관', privacy: '개인정보 처리방침',
+    terms: '이용약관', privacy: '개인정보 처리방침',
     first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택',
-    summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '사용자 ID', dueRule: '계약금 결제 후 {days}일 이내에 잔금을 결제해야 합니다. 기한을 넘기면 계약금 결제가 취소됩니다.', dueTitle: '잔금 결제 마감', dueWarn: '기한 내에 잔금을 결제하지 않으면 계약금 결제가 취소됩니다.', timeLeft: '남은 시간', overdueTitle: '잔금 결제 기한이 지났습니다', overdueBody: '이 링크로는 더 이상 결제할 수 없으며 계약금 결제는 취소됩니다. 담당 상담사에게 문의해 주세요.', units: '일|시간|분|초', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다',
+    summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '사용자 ID', dueRule: '계약금 결제 후 {days}일 이내에 잔금을 결제해 주세요', dueLeft: '{days}일 이내에 잔금을 결제해 주세요', overdue: '잔금 결제 기간이 지났습니다. 담당 상담사에게 문의해 주세요', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다',
     bindAfterLogin: '로그인 후 연결', loginTitle: '로그인하고 결제 계속하기', loginSub: '결제는 로그인한 Dino AI 계정에 연결됩니다', phone: '휴대폰 번호', getCode: '인증번호 받기', code: '인증번호', codeHint: '데모: 아무 6자리 숫자', login: '로그인', orWith: '또는', confirmTitle: '결제 계정 확인', confirmBody: '이 계정으로 결제하고 멤버십을 개통합니다', confirmPay: '확인하고 결제하기', switchAccount: '다른 계정으로 로그인', newAccount: '신규 계정 · 자동 가입됨', paySuccess: '결제가 완료되었습니다', expired: '이 결제 링크는 만료되었습니다', balanceNext: '남은 금액은 같은 링크로 나중에 결제할 수 있습니다', notFound: '결제 링크를 찾을 수 없습니다', dir: 'ltr',
   },
   Vietnam: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
-    cancel: 'Hủy bất cứ lúc nào · ', terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
+    terms: 'Điều khoản dịch vụ', privacy: 'Chính sách bảo mật',
     first: 'Đặt cọc', balance: 'Thanh toán phần còn lại', packageDue: 'Giá gói', installment: 'Thanh toán trả góp cần từ 3.000.000 đồng trở lên.', forLink: 'Liên kết thanh toán của', chooseSku: 'Chọn gói',
-    summary: 'Tóm tắt đơn hàng', dueNow: 'Cần thanh toán', paidTag: 'Đã thanh toán', laterTag: 'Thanh toán sau', secure: 'Thanh toán an toàn', account: 'ID người dùng', dueRule: 'Bạn cần thanh toán phần còn lại trong vòng {days} ngày sau khi đặt cọc. Quá hạn, khoản đặt cọc sẽ bị hủy.', dueTitle: 'Hạn thanh toán phần còn lại', dueWarn: 'Nếu không thanh toán đúng hạn, khoản đặt cọc của bạn sẽ bị hủy.', timeLeft: 'Thời gian còn lại', overdueTitle: 'Đã quá hạn thanh toán phần còn lại', overdueBody: 'Liên kết này không thể thanh toán nữa và khoản đặt cọc sẽ bị hủy. Vui lòng liên hệ tư vấn viên.', units: 'ngày|giờ|phút|giây', fullTag: 'Thanh toán toàn bộ', linkPaid: 'Liên kết này đã được thanh toán',
+    summary: 'Tóm tắt đơn hàng', dueNow: 'Cần thanh toán', paidTag: 'Đã thanh toán', laterTag: 'Thanh toán sau', secure: 'Thanh toán an toàn', account: 'ID người dùng', dueRule: 'Vui lòng thanh toán phần còn lại trong vòng {days} ngày sau khi đặt cọc', dueLeft: 'Vui lòng thanh toán phần còn lại trong vòng {days} ngày', overdue: 'Đã hết thời hạn thanh toán phần còn lại. Vui lòng liên hệ tư vấn viên.', fullTag: 'Thanh toán toàn bộ', linkPaid: 'Liên kết này đã được thanh toán',
     bindAfterLogin: 'Liên kết sau khi đăng nhập', loginTitle: 'Đăng nhập để tiếp tục thanh toán', loginSub: 'Thanh toán sẽ được gắn với tài khoản Dino AI bạn đăng nhập', phone: 'Số điện thoại', getCode: 'Lấy mã', code: 'Mã xác minh', codeHint: 'Demo: nhập 6 chữ số bất kỳ', login: 'Đăng nhập', orWith: 'hoặc', confirmTitle: 'Xác nhận tài khoản thanh toán', confirmBody: 'Thanh toán và mở hội viên cho tài khoản này', confirmPay: 'Xác nhận và thanh toán', switchAccount: 'Đổi tài khoản khác', newAccount: 'Tài khoản mới · đã tự động đăng ký', paySuccess: 'Thanh toán thành công', expired: 'Liên kết thanh toán này đã hết hạn', balanceNext: 'Bạn có thể thanh toán phần còn lại sau bằng chính liên kết này', notFound: 'Không tìm thấy liên kết thanh toán', dir: 'ltr',
   },
   Malaysia: {
     title: 'Pembayaran', discount: 'Diskaun', total: 'Jumlah', choose: 'Pilih kaedah pembayaran', pay: 'Bayar sekarang',
-    cancel: 'Batal bila-bila masa · ', terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
+    terms: 'Terma Perkhidmatan', privacy: 'Dasar Privasi',
     first: 'Deposit', balance: 'Baki', packageDue: 'Harga pakej', installment: '', forLink: 'Pelanggan pautan ini', chooseSku: 'Pilih pelan',
-    summary: 'Ringkasan pesanan', dueNow: 'Perlu dibayar', paidTag: 'Telah dibayar', laterTag: 'Bayar kemudian', secure: 'Pembayaran selamat', account: 'ID pengguna', dueRule: 'Baki perlu dibayar dalam {days} hari selepas deposit. Jika lewat, deposit akan dibatalkan.', dueTitle: 'Tarikh akhir bayaran baki', dueWarn: 'Jika baki tidak dibayar tepat pada masanya, deposit anda akan dibatalkan.', timeLeft: 'Masa berbaki', overdueTitle: 'Tarikh akhir bayaran baki telah berlalu', overdueBody: 'Pautan ini tidak lagi boleh dibayar dan deposit akan dibatalkan. Sila hubungi perunding anda.', units: 'hari|jam|minit|saat', fullTag: 'Bayaran penuh', linkPaid: 'Pautan ini telah dibayar',
+    summary: 'Ringkasan pesanan', dueNow: 'Perlu dibayar', paidTag: 'Telah dibayar', laterTag: 'Bayar kemudian', secure: 'Pembayaran selamat', account: 'ID pengguna', dueRule: 'Sila bayar baki dalam {days} hari selepas deposit', dueLeft: 'Sila bayar baki dalam {days} hari', overdue: 'Tempoh bayaran baki telah tamat. Sila hubungi perunding anda.', fullTag: 'Bayaran penuh', linkPaid: 'Pautan ini telah dibayar',
     bindAfterLogin: 'Dipautkan selepas log masuk', loginTitle: 'Log masuk untuk teruskan pembayaran', loginSub: 'Pembayaran akan dipautkan ke akaun Dino AI yang anda log masuk', phone: 'Nombor telefon', getCode: 'Dapatkan kod', code: 'Kod pengesahan', codeHint: 'Demo: mana-mana 6 digit', login: 'Log masuk', orWith: 'atau', confirmTitle: 'Sahkan akaun pembayaran', confirmBody: 'Bayar dan aktifkan keahlian untuk akaun ini', confirmPay: 'Sahkan dan bayar', switchAccount: 'Tukar akaun', newAccount: 'Akaun baharu · didaftarkan secara automatik', paySuccess: 'Pembayaran berjaya', expired: 'Pautan pembayaran ini telah tamat tempoh', balanceNext: 'Baki boleh dibayar kemudian melalui pautan yang sama', notFound: 'Pautan pembayaran tidak dijumpai', dir: 'ltr',
   },
   'Saudi Arabia': {
     title: 'الدفع', discount: 'الخصم', total: 'الإجمالي', choose: 'اختر طريقة الدفع', pay: 'ادفع الآن',
-    cancel: 'يمكن الإلغاء في أي وقت · ', terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
+    terms: 'شروط الخدمة', privacy: 'سياسة الخصوصية',
     first: 'الدفعة الأولى', balance: 'الدفعة المتبقية', packageDue: 'سعر الباقة', installment: '', forLink: 'عميل رابط الدفع', chooseSku: 'اختر الباقة',
-    summary: 'ملخص الطلب', dueNow: 'المستحق الآن', paidTag: 'تم الدفع', laterTag: 'يدفع لاحقًا', secure: 'دفع آمن', account: 'معرّف المستخدم', dueRule: 'يجب دفع المبلغ المتبقي خلال {days} أيام من الدفعة الأولى، وإلا سيتم إلغاء الدفعة الأولى.', dueTitle: 'آخر موعد لدفع المبلغ المتبقي', dueWarn: 'إذا لم يُدفع المبلغ المتبقي في الموعد، سيتم إلغاء دفعتك الأولى.', timeLeft: 'الوقت المتبقي', overdueTitle: 'انتهى موعد دفع المبلغ المتبقي', overdueBody: 'لم يعد بالإمكان الدفع عبر هذا الرابط وسيتم إلغاء الدفعة الأولى. يرجى التواصل مع مستشارك.', units: 'يوم|ساعة|دقيقة|ثانية', fullTag: 'دفع كامل', linkPaid: 'تم دفع هذا الرابط',
+    summary: 'ملخص الطلب', dueNow: 'المستحق الآن', paidTag: 'تم الدفع', laterTag: 'يدفع لاحقًا', secure: 'دفع آمن', account: 'معرّف المستخدم', dueRule: 'يرجى دفع المبلغ المتبقي خلال {days} أيام بعد الدفعة الأولى', dueLeft: 'يرجى دفع المبلغ المتبقي خلال {days} أيام', overdue: 'انتهت مهلة دفع المبلغ المتبقي. يرجى التواصل مع مستشارك.', fullTag: 'دفع كامل', linkPaid: 'تم دفع هذا الرابط',
     bindAfterLogin: 'يُربط بعد تسجيل الدخول', loginTitle: 'سجّل الدخول لمتابعة الدفع', loginSub: 'سيتم ربط الدفع بحساب Dino AI الذي تسجّل الدخول به', phone: 'رقم الهاتف', getCode: 'إرسال الرمز', code: 'رمز التحقق', codeHint: 'عرض تجريبي: أي 6 أرقام', login: 'تسجيل الدخول', orWith: 'أو', confirmTitle: 'تأكيد حساب الدفع', confirmBody: 'سيتم الدفع وتفعيل العضوية لهذا الحساب', confirmPay: 'تأكيد والدفع', switchAccount: 'تبديل الحساب', newAccount: 'حساب جديد · تم التسجيل تلقائيًا', paySuccess: 'تم الدفع بنجاح', expired: 'انتهت صلاحية رابط الدفع هذا', balanceNext: 'يمكنك دفع المبلغ المتبقي لاحقًا عبر الرابط نفسه', notFound: 'لم يتم العثور على رابط الدفع', dir: 'rtl',
   },
   Thailand: {
     title: 'ชำระเงิน', discount: 'ส่วนลด', total: 'ยอดรวม', choose: 'เลือกวิธีชำระเงิน', pay: 'ชำระเงินตอนนี้',
-    cancel: 'ยกเลิกได้ทุกเมื่อ · ', terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
+    terms: 'ข้อกำหนดการให้บริการ', privacy: 'นโยบายความเป็นส่วนตัว',
     first: 'มัดจำ', balance: 'ยอดคงเหลือ', packageDue: 'ราคาแพ็กเกจ', installment: '', forLink: 'ลูกค้าของลิงก์นี้', chooseSku: 'เลือกแพ็กเกจ',
-    summary: 'สรุปคำสั่งซื้อ', dueNow: 'ชำระตอนนี้', paidTag: 'ชำระแล้ว', laterTag: 'ชำระภายหลัง', secure: 'ชำระเงินอย่างปลอดภัย', account: 'รหัสผู้ใช้', dueRule: 'ต้องชำระยอดคงเหลือภายใน {days} วันหลังชำระมัดจำ หากเกินกำหนด มัดจำจะถูกยกเลิก', dueTitle: 'กำหนดชำระยอดคงเหลือ', dueWarn: 'หากไม่ชำระยอดคงเหลือภายในกำหนด มัดจำของคุณจะถูกยกเลิก', timeLeft: 'เวลาที่เหลือ', overdueTitle: 'เลยกำหนดชำระยอดคงเหลือแล้ว', overdueBody: 'ลิงก์นี้ไม่สามารถชำระได้อีก และมัดจำจะถูกยกเลิก กรุณาติดต่อที่ปรึกษาของคุณ', units: 'วัน|ชม.|นาที|วินาที', fullTag: 'ชำระเต็มจำนวน', linkPaid: 'ลิงก์นี้ชำระเงินแล้ว',
+    summary: 'สรุปคำสั่งซื้อ', dueNow: 'ชำระตอนนี้', paidTag: 'ชำระแล้ว', laterTag: 'ชำระภายหลัง', secure: 'ชำระเงินอย่างปลอดภัย', account: 'รหัสผู้ใช้', dueRule: 'กรุณาชำระยอดคงเหลือภายใน {days} วันหลังชำระมัดจำ', dueLeft: 'กรุณาชำระยอดคงเหลือภายใน {days} วัน', overdue: 'เลยกำหนดชำระยอดคงเหลือแล้ว กรุณาติดต่อที่ปรึกษาของคุณ', fullTag: 'ชำระเต็มจำนวน', linkPaid: 'ลิงก์นี้ชำระเงินแล้ว',
     bindAfterLogin: 'เชื่อมหลังเข้าสู่ระบบ', loginTitle: 'เข้าสู่ระบบเพื่อชำระเงินต่อ', loginSub: 'การชำระเงินจะผูกกับบัญชี Dino AI ที่คุณเข้าสู่ระบบ', phone: 'หมายเลขโทรศัพท์', getCode: 'ขอรหัส', code: 'รหัสยืนยัน', codeHint: 'เดโม: ตัวเลข 6 หลักใดก็ได้', login: 'เข้าสู่ระบบ', orWith: 'หรือ', confirmTitle: 'ยืนยันบัญชีที่ชำระเงิน', confirmBody: 'ชำระเงินและเปิดสมาชิกให้บัญชีนี้', confirmPay: 'ยืนยันและชำระเงิน', switchAccount: 'เปลี่ยนบัญชี', newAccount: 'บัญชีใหม่ · สมัครให้อัตโนมัติ', paySuccess: 'ชำระเงินสำเร็จ', expired: 'ลิงก์ชำระเงินนี้หมดอายุแล้ว', balanceNext: 'ชำระยอดคงเหลือภายหลังได้ผ่านลิงก์เดิม', notFound: 'ไม่พบลิงก์ชำระเงิน', dir: 'ltr',
   },
   Indonesia: {
     title: 'Pembayaran', discount: 'Diskon', total: 'Total', choose: 'Pilih metode pembayaran', pay: 'Bayar sekarang',
-    cancel: 'Batalkan kapan saja · ', terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
+    terms: 'Ketentuan Layanan', privacy: 'Kebijakan Privasi',
     first: 'Uang muka', balance: 'Sisa pembayaran', packageDue: 'Harga paket', installment: '', forLink: 'Pelanggan tautan ini', chooseSku: 'Pilih paket',
-    summary: 'Ringkasan pesanan', dueNow: 'Tagihan saat ini', paidTag: 'Sudah dibayar', laterTag: 'Bayar nanti', secure: 'Pembayaran aman', account: 'ID pengguna', dueRule: 'Sisa pembayaran harus dibayar dalam {days} hari setelah uang muka. Jika terlambat, uang muka akan dibatalkan.', dueTitle: 'Batas waktu sisa pembayaran', dueWarn: 'Jika sisa pembayaran tidak dibayar tepat waktu, uang muka Anda akan dibatalkan.', timeLeft: 'Sisa waktu', overdueTitle: 'Batas waktu sisa pembayaran sudah lewat', overdueBody: 'Tautan ini tidak bisa dibayar lagi dan uang muka akan dibatalkan. Silakan hubungi konsultan Anda.', units: 'hari|jam|menit|detik', fullTag: 'Pembayaran penuh', linkPaid: 'Tautan ini sudah dibayar',
+    summary: 'Ringkasan pesanan', dueNow: 'Tagihan saat ini', paidTag: 'Sudah dibayar', laterTag: 'Bayar nanti', secure: 'Pembayaran aman', account: 'ID pengguna', dueRule: 'Harap lunasi sisa pembayaran dalam {days} hari setelah uang muka', dueLeft: 'Harap lunasi sisa pembayaran dalam {days} hari', overdue: 'Batas waktu sisa pembayaran sudah lewat. Silakan hubungi konsultan Anda.', fullTag: 'Pembayaran penuh', linkPaid: 'Tautan ini sudah dibayar',
     bindAfterLogin: 'Ditautkan setelah masuk', loginTitle: 'Masuk untuk melanjutkan pembayaran', loginSub: 'Pembayaran akan ditautkan ke akun Dino AI yang Anda gunakan untuk masuk', phone: 'Nomor telepon', getCode: 'Kirim kode', code: 'Kode verifikasi', codeHint: 'Demo: 6 digit apa saja', login: 'Masuk', orWith: 'atau', confirmTitle: 'Konfirmasi akun pembayaran', confirmBody: 'Bayar dan aktifkan keanggotaan untuk akun ini', confirmPay: 'Konfirmasi dan bayar', switchAccount: 'Ganti akun', newAccount: 'Akun baru · terdaftar otomatis', paySuccess: 'Pembayaran berhasil', expired: 'Tautan pembayaran ini sudah kedaluwarsa', balanceNext: 'Sisa pembayaran bisa dibayar nanti lewat tautan yang sama', notFound: 'Tautan pembayaran tidak ditemukan', dir: 'ltr',
   },
 }
@@ -150,19 +145,19 @@ export type ReviewLang = 'en' | 'zh' | 'local'
 
 const ZH: PayCopy = {
   title: '支付', discount: '优惠', total: '合计', choose: '选择支付方式', pay: '立即支付',
-  cancel: '可随时取消 · ', terms: '服务条款', privacy: '隐私政策',
+  terms: '服务条款', privacy: '隐私政策',
   first: '定金首款', balance: '定金尾款', packageDue: '套餐应付', installment: '分期支付需要在 3,000,000 越南盾以上。',
   forLink: '这条支付链接的客户', chooseSku: '选择套餐',
-    summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '用户 ID', dueRule: '首款付款后需在 {days} 天内付清尾款，逾期首款将被取消。', dueTitle: '尾款支付截止', dueWarn: '逾期未付清尾款，首款将被取消。', timeLeft: '剩余时间', overdueTitle: '尾款支付已逾期', overdueBody: '这条链接已不能再付款，首款将被取消。请联系你的课程顾问。', units: '天|时|分|秒', fullTag: '全款', linkPaid: '这条支付链接已支付',
+    summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '用户 ID', dueRule: '付首款后需在 {days} 天内付清尾款', dueLeft: '请在 {days} 天内付清尾款', overdue: '尾款支付期限已过，请联系你的课程顾问', fullTag: '全款', linkPaid: '这条支付链接已支付',
     bindAfterLogin: '登录后绑定', loginTitle: '登录后继续支付', loginSub: '付款将绑定到你登录的 Dino AI 账号', phone: '手机号', getCode: '获取验证码', code: '验证码', codeHint: '演示：任意 6 位数字', login: '登录', orWith: '或', confirmTitle: '确认付款账号', confirmBody: '将为这个账号付款并开通会员', confirmPay: '确认并去支付', switchAccount: '换个账号', newAccount: '新账号 · 已自动注册', paySuccess: '支付成功', expired: '这条支付链接已过期', balanceNext: '尾款之后可以通过同一条链接支付', notFound: '找不到这条支付链接', dir: 'ltr',
 }
 
 const EN: PayCopy = {
   title: 'Payment', discount: 'Discount', total: 'Total', choose: 'Choose Payment Method', pay: 'Pay now',
-  cancel: 'Cancel anytime · ', terms: 'Terms of Service', privacy: 'Privacy Policy',
+  terms: 'Terms of Service', privacy: 'Privacy Policy',
   first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: 'Instalments require at least 3,000,000 VND.',
   forLink: 'Payment link for', chooseSku: 'Choose a plan',
-    summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'User ID', dueRule: 'Pay the balance within {days} days of your deposit. If you miss it, the deposit is cancelled.', dueTitle: 'Balance due by', dueWarn: 'If the balance is not paid in time, your deposit will be cancelled.', timeLeft: 'Time left', overdueTitle: 'The balance deadline has passed', overdueBody: 'This link can no longer be paid and your deposit will be cancelled. Please contact your advisor.', units: 'd|h|m|s', fullTag: 'Full payment', linkPaid: 'This payment link has been paid',
+    summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'User ID', dueRule: 'Please pay the balance within {days} days after the deposit', dueLeft: 'Please pay the balance within {days} days', overdue: 'The balance payment period has ended. Please contact your advisor.', fullTag: 'Full payment', linkPaid: 'This payment link has been paid',
     bindAfterLogin: 'Linked after login', loginTitle: 'Log in to continue', loginSub: 'The payment is linked to the Dino AI account you log in with', phone: 'Phone number', getCode: 'Get code', code: 'Verification code', codeHint: 'Demo: any 6 digits', login: 'Log in', orWith: 'or', confirmTitle: 'Confirm the paying account', confirmBody: 'You will pay for this account and its membership opens', confirmPay: 'Confirm and pay', switchAccount: 'Use another account', newAccount: 'New account · signed up automatically', paySuccess: 'Payment successful', expired: 'This payment link has expired', balanceNext: 'You can pay the balance later with the same link', notFound: 'Payment link not found', dir: 'ltr',
 }
 

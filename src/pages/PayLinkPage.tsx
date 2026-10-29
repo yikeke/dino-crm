@@ -124,38 +124,6 @@ function LoginSheet({ line, copy, onClose, onConfirm }: {
   )
 }
 
-function Countdown({ due, copy }: { due: string; copy: ReturnType<typeof payCopy> }) {
-  const [tick, setTick] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-  const left = Math.max(parseTime(due) - tick, 0)
-  const parts = [Math.floor(left / 86_400_000), Math.floor(left / 3_600_000) % 24, Math.floor(left / 60_000) % 60, Math.floor(left / 1000) % 60]
-  const units = copy.units.split('|')
-  return (
-    <section className={`pay-deadline${left < 86_400_000 ? ' is-urgent' : ''}`}>
-      <div className="pay-deadline__head">
-        <span className="pay-deadline__icon" aria-hidden="true">⏳</span>
-        <div>
-          <p className="pay-deadline__title">{copy.dueTitle}</p>
-          <p className="pay-deadline__date">{due.slice(0, 16)}</p>
-        </div>
-      </div>
-      <p className="pay-deadline__label">{copy.timeLeft}</p>
-      <div className="pay-deadline__clock">
-        {parts.map((value, index) => (
-          <span key={units[index]} className="pay-deadline__cell">
-            <b>{String(value).padStart(2, '0')}</b>
-            <small>{units[index]}</small>
-          </span>
-        ))}
-      </div>
-      <p className="pay-deadline__warn">{copy.dueWarn}</p>
-    </section>
-  )
-}
-
 function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string; onChange: (next: ReviewLang) => void }) {
   const options: { id: ReviewLang; label: string }[] = [
     { id: 'en', label: 'EN' },
@@ -342,6 +310,14 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const dueAt = deposit ? balanceDeadline(link, orders) : null
   const overdue = deposit && balanceOverdue(link, orders)
   const dueDays = link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS
+  const daysText = (template: string, days: number) => template.replace('{days}', String(days)).replace(' 1 days', ' 1 day')
+  const dueNote = overdue
+    ? copy.overdue
+    : stage === 'DEPOSIT_FIRST' && !doneOrder
+      ? daysText(copy.dueRule, dueDays)
+      : stage === 'DEPOSIT_BALANCE' && dueAt
+        ? daysText(copy.dueLeft, Math.max(1, Math.ceil((parseTime(dueAt) - Date.now()) / 86_400_000)))
+        : ''
   const settledOrder = !stage && !open && !blockedLink && !overdue
     ? orders.filter((order) => order.status === 'COMPLETED').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
     : undefined
@@ -371,6 +347,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           <span className={`pay-due__tag${deposit ? ' is-deposit' : ''}`}>{kindTag}</span>
           <p className="pay-due__label">{copy.dueNow}</p>
           <p className="pay-due__amount">{formatMoney(amount, currency)}</p>
+          {dueNote && <p className="pay-due__rule">{dueNote}</p>}
           {skuName && (
             <p className="pay-due__sku">
               <span className={`tier-badge tier-${tier.toLowerCase()}`}>{tier}</span>
@@ -381,20 +358,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
             <span>{copy.account}</span>
             <strong className={open && !account ? 'is-muted' : ''}>{open ? (account?.userId || copy.bindAfterLogin) : (link.userId || '—')}</strong>
           </div>
-          {stage === 'DEPOSIT_FIRST' && !doneOrder && (
-            <p className="pay-due__rule">⏳ {copy.dueRule.replace('{days}', String(dueDays))}</p>
-          )}
         </section>
-
-        {stage === 'DEPOSIT_BALANCE' && dueAt && <Countdown due={dueAt} copy={copy} />}
-
-        {overdue && (
-          <section className="pay-card pay-overdue">
-            <p className="pay-overdue__title">{copy.overdueTitle}</p>
-            <p>{dueAt?.slice(0, 16)}</p>
-            <p>{copy.overdueBody}</p>
-          </section>
-        )}
 
         {(doneOrder || settledOrder) && (
           <section className="pay-card pay-done">
@@ -560,7 +524,6 @@ function PayLinkView({ linkId }: { linkId: string }) {
         )}
 
         <p className="pay-terms">
-          <span>{copy.cancel}</span>
           <button type="button">{copy.terms}</button>
           <span> · </span>
           <button type="button">{copy.privacy}</button>
