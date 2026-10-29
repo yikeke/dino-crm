@@ -710,3 +710,10 @@
 .pl-row--void > td {
   opacity: 0.55;
 }
+
+.pl-member-btn {
+  align-self: flex-start;
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}

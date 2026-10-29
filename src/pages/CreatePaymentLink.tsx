@@ -8,6 +8,7 @@ import {
   Input,
   InputNumber,
   Checkbox,
+  Dropdown,
   Modal,
   Segmented,
   Select,
@@ -17,7 +18,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, CopyOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -28,7 +29,8 @@ import {
   offersOnPlan,
   type LinkOffer,
 } from '../paymentLinkCatalog'
-import { useStore } from '../store'
+import dayjs from 'dayjs'
+import { setState, useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
 import {
@@ -54,13 +56,9 @@ import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
-type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'open' | 'done'
+type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done'
 
 const OPEN_ORDER_PREVIEW = 10
-
-function depositMethods(line: string) {
-  return methodsForLine(line).filter((method) => !method.code.includes('installment'))
-}
 
 function depositFloor(line: string, payable: number) {
   if (line === 'Vietnam' || line === '越南') {
@@ -125,6 +123,8 @@ export default function CreatePaymentLink() {
   const [methodTarget, setMethodTarget] = useState<{ link: PaymentLink; stage: PayStage } | null>(null)
   const [methodDraft, setMethodDraft] = useState<string[]>([])
   const [expanded, setExpanded] = useState<string[]>(focusLinkId ? [focusLinkId] : [])
+  const [memberTarget, setMemberTarget] = useState<string | null>(null)
+  const [memberDays, setMemberDays] = useState<number | null>(7)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { account, role } = useCurrentAccount()
@@ -249,9 +249,8 @@ export default function CreatePaymentLink() {
   }
 
   const openMode = tab === 'full' && audience === 'open'
-  const methodsFor = (mode: 'full' | 'deposit') => (mode === 'deposit'
-    ? depositMethods(activeLine)
-    : methodsForLine(activeLine).filter((method) => !(openMode && method.kind === 'manual')))
+  const methodsFor = (mode: 'full' | 'deposit') => methodsForLine(activeLine)
+    .filter((method) => !(mode === 'full' && openMode && method.kind === 'manual'))
 
   const requireCustomer = () => {
     if (!activeChannel?.plan || !shown.length) {
@@ -353,10 +352,6 @@ export default function CreatePaymentLink() {
         : (en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于这个套餐的应付金额'))
       return
     }
-    if (!payMethods.some((code) => !code.includes('installment'))) {
-      message.warning(en ? 'Select at least one payment method that is not an instalment' : '请至少选择一种非分期的支付方式')
-      return
-    }
     save(baseFields('deposit', amount, editingId || newId('PL')))
     message.success(editingId
       ? (en ? 'Deposit link updated' : '定金链接已更新')
@@ -417,10 +412,17 @@ export default function CreatePaymentLink() {
   const quickFirst = chosenDeposit
     ? [
       ...(floor.min > 1 ? [{ label: en ? 'Minimum' : '最低', value: floor.min }] : []),
+      { label: '10%', value: Math.max(floor.min, Math.round(depositPayable * 0.1)) },
       { label: '30%', value: Math.max(floor.min, roundFor(depositPayable * 0.3, chosenDeposit.currency)) },
       { label: '50%', value: Math.max(floor.min, roundFor(depositPayable * 0.5, chosenDeposit.currency)) },
     ].filter((item, index, all) => item.value < depositPayable && all.findIndex((other) => other.value === item.value) === index)
     : []
+
+  const defaultFirst = chosenDeposit ? Math.max(floor.min, Math.round(depositPayable * 0.1)) : 0
+  useEffect(() => {
+    if (tab !== 'deposit' || editingId || firstAmount !== null || !defaultFirst || defaultFirst >= depositPayable) return
+    setFirstAmount(defaultFirst)
+  }, [tab, editingId, firstAmount, defaultFirst, depositPayable])
 
   const previewDraft = (mode: 'full' | 'deposit') => {
     const draft = baseFields(mode, mode === 'full' ? 0 : firstValue, PREVIEW_LINK_ID)
@@ -661,7 +663,7 @@ export default function CreatePaymentLink() {
           <Card
             size="small"
             title={step(++stepNo, en ? 'Payment methods' : '支付方式', mode === 'deposit'
-              ? (en ? 'Offered for both payments; the customer picks per payment; no instalments' : '首款、尾款都提供，用户每次付款时单独选；不含分期')
+              ? (en ? 'Offered for both payments; the customer picks per payment. Methods with a minimum amount are checked against each payment.' : '首款、尾款都提供，用户每次付款时单独选；有最低金额的方式按每一笔金额判断')
               : (en ? 'The customer only sees the methods checked here' : '用户只会看到这里勾选的方式'))}
           >
             {hiddenManual && (
@@ -876,7 +878,16 @@ export default function CreatePaymentLink() {
           <Typography.Text className="pl-link-id">{row.id}</Typography.Text>
           {row.audience === 'open'
             ? <Typography.Text type="secondary">{en ? 'Bound at login' : '扫码登录后绑定'} · {row.eventName || '—'}</Typography.Text>
-            : <Typography.Text type="secondary" copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>}
+            : (
+              <>
+                <Typography.Text type="secondary" copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>
+                {row.userId && (
+                  <Button size="small" type="link" className="pl-member-btn" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberDays(7) }}>
+                    {en ? 'Add membership' : '添加会员'}
+                  </Button>
+                )}
+              </>
+            )}
         </div>
       ),
     },
@@ -1105,6 +1116,21 @@ export default function CreatePaymentLink() {
     message.success(en ? 'Payment methods updated. The link stays the same.' : '支付方式已更新，链接地址不变。')
   }
 
+  const addMembership = () => {
+    if (!memberTarget || !memberDays || memberDays <= 0) return
+    setState((prev) => ({
+      ...prev,
+      students: prev.students.map((student) => {
+        if (student.studentId !== memberTarget) return student
+        const current = student.expireTime ? dayjs(student.expireTime) : dayjs()
+        const base = current.isAfter(dayjs()) ? current : dayjs()
+        return { ...student, expireTime: base.add(memberDays, 'day').format('YYYY-MM-DD HH:mm:ss'), lastModifier: myEmail || student.lastModifier }
+      }),
+    }))
+    message.success(en ? `Added ${memberDays} days for ${memberTarget}` : `已为 ${memberTarget} 添加 ${memberDays} 天会员`)
+    setMemberTarget(null)
+  }
+
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
     return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...ordersOf(row.id).flatMap((order) => [order.orderNo, order.userId])]
@@ -1116,7 +1142,6 @@ export default function CreatePaymentLink() {
     if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((order) => order.status === 'PENDING' && !!order.declaredAt)
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
     if (value === 'balance') return row.kind === 'deposit' && stage === 'DEPOSIT_BALANCE'
-    if (value === 'open') return row.audience === 'open'
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
     if (value === 'done') return row.audience !== 'open' && row.status === 'ACTIVE' && !stage
     return true
@@ -1138,7 +1163,6 @@ export default function CreatePaymentLink() {
     { value: 'first', label: en ? 'First payment due' : '待付首款' },
     { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
     { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
-    { value: 'open', label: en ? 'Open links' : '通用链接' },
     { value: 'done', label: en ? 'Completed' : '已完成' },
   ]
   const lineOptions = Array.from(new Set(links.map((row) => row.line).filter(Boolean)))
@@ -1161,9 +1185,10 @@ export default function CreatePaymentLink() {
     setExpanded(depositKey ? depositKey.split('|') : [])
   }, [depositKey, focusLinkId])
 
-  const openCreate = (kind: 'full' | 'deposit') => {
+  const openCreate = (kind: 'full' | 'deposit', who: 'user' | 'open' = 'user') => {
     setEditingId(null)
     resetCustomer()
+    setAudience(kind === 'full' ? who : 'user')
     setTab(kind)
     setScreen('form')
   }
@@ -1185,17 +1210,6 @@ export default function CreatePaymentLink() {
                 : (en ? 'The customer pays a first payment now and the balance later, both with this link.' : '用户先付首款，之后用同一条链接再付尾款。')}
             </Typography.Text>
           </div>
-          {!editingId && (
-            <Segmented
-              className="pl-form-head__switch"
-              value={tab}
-              onChange={(value) => { setTab(value as 'full' | 'deposit'); setFirstAmount(null); if (value === 'deposit') setAudience('user') }}
-              options={[
-                { value: 'full', label: en ? 'Full payment' : '全款' },
-                { value: 'deposit', label: en ? 'Deposit' : '定金' },
-              ]}
-            />
-          )}
         </div>
         {formCard(tab)}
       </div>
@@ -1222,9 +1236,21 @@ export default function CreatePaymentLink() {
           })}
         />
         <Space>
-          <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New full payment link' : '新建全款支付链接'}</Button>
+          <Dropdown.Button
+            type="primary"
+            icon={<DownOutlined />}
+            onClick={() => openCreate('full')}
+            menu={{
+              items: [
+                { key: 'user', icon: <LinkOutlined />, label: en ? 'For a specific User ID (default)' : '指定用户 ID（默认）' },
+                { key: 'open', icon: <QrcodeOutlined />, label: en ? 'Open link · expo / printed QR' : '通用链接 · 展会 / 物料二维码' },
+              ],
+              onClick: ({ key }) => openCreate('full', key === 'open' ? 'open' : 'user'),
+            }}
+          >
+            <LinkOutlined /> {en ? 'New full payment link' : '新建全款支付链接'}
+          </Dropdown.Button>
           <Button icon={<LinkOutlined />} onClick={() => openCreate('deposit')}>{en ? 'New deposit link' : '新建定金支付链接'}</Button>
-          <Button icon={<QrcodeOutlined />} onClick={() => { openCreate('full'); setAudience('open') }}>{en ? 'New open link (QR)' : '新建通用支付链接'}</Button>
         </Space>
       </div>
       <Space wrap>
@@ -1284,12 +1310,12 @@ export default function CreatePaymentLink() {
       >
         <Typography.Paragraph type="secondary">
           {en
-            ? 'Only payments not yet made are affected. The customer still picks one method when paying, and that order keeps it. The link address does not change.'
-            : '只影响还没付的这一笔。用户付款时仍从这里选一种，生成的订单就用那一种。链接地址不变。'}
+            ? 'Pick again from every method on this line; you can add methods that were not offered before. Only the payment not yet made is affected. The customer still picks one method when paying, and that order keeps it. The link address does not change.'
+            : '从这条业务线的全部支付方式里重新勾选，可以新增原来没给的方式。只影响还没付的这一笔；用户付款时从中选一种，生成的订单就用那一种。链接地址不变。'}
         </Typography.Paragraph>
         <Checkbox.Group value={methodDraft} onChange={(value) => setMethodDraft(value as string[])}>
           <Space direction="vertical">
-            {methodTarget && (methodTarget.link.kind === 'deposit' ? depositMethods(methodTarget.link.line) : methodsForLine(methodTarget.link.line)).map((method) => (
+            {methodTarget && methodsForLine(methodTarget.link.line).filter((method) => !(methodTarget.link.audience === 'open' && method.kind === 'manual')).map((method) => (
               <Checkbox key={method.code} value={method.code}>
                 <span className="pl-method">
                   <img src={method.icon} alt="" />
@@ -1299,6 +1325,27 @@ export default function CreatePaymentLink() {
             ))}
           </Space>
         </Checkbox.Group>
+      </Modal>
+      <Modal
+        title={`${en ? 'Add membership' : '添加会员'} · ${memberTarget || ''}`}
+        open={!!memberTarget}
+        onCancel={() => setMemberTarget(null)}
+        onOk={addMembership}
+        okButtonProps={{ disabled: !memberDays || memberDays <= 0 }}
+        okText={en ? 'Save' : '保存'}
+        cancelText={en ? 'Cancel' : '取消'}
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary">
+          {en
+            ? 'For example, give trial days after the first payment. This only extends the membership; it does not create or change any order of this link.'
+            : '例如首款到账后先给用户开通体验天数。这里只延长会员有效期，不生成也不修改这条链接下的任何订单。'}
+        </Typography.Paragraph>
+        <div className="pl-label">{en ? 'Days' : '有效期天数'}</div>
+        <InputNumber min={1} max={365} value={memberDays} onChange={(value) => setMemberDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: '100%' }} />
+        <Typography.Text type="secondary" className="pl-field-hint">
+          {en ? 'No active membership: counted from now. Active membership: added after the current expiry.' : '无有效会员从当前时间起算；有效会员从当前到期时间向后续期。'}
+        </Typography.Text>
       </Modal>
       <Modal
         title={en ? 'Payment link QR code' : '支付链接二维码'}
