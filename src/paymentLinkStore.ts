@@ -491,7 +491,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const ops = 'ops.vn@dinoai.ai'
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
     'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，尾款期限 7 天'], [lead, '调整尾款截止', `首款后 7 天 → ${links[0].balanceDueAt?.slice(0, 16)}`, '2026-10-28 15:40']] },
-    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
+    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
     'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天']] },
     'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 3 天']] },
