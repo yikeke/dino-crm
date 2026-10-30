@@ -675,6 +675,50 @@
   font-size: 12px;
 }
 
+.pl-order-line.is-failed {
+  opacity: 0.75;
+}
+
+.pl-order-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f5f7ff;
+}
+
+.pl-order-head__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3f4ad6;
+}
+
+.pl-order-head .pl-order-no {
+  padding: 0;
+  height: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.pl-failed {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.pl-failed summary {
+  cursor: pointer;
+  color: #8c8c8c;
+}
+
+.pl-failed .pl-order-line {
+  margin-top: 4px;
+}
+
+.pl-confirm-row {
+  margin-top: 6px;
+}
+
 .pl-link-id {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;

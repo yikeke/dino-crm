@@ -41,24 +41,30 @@ import {
   PREVIEW_LINK_KEY,
   balanceDeadline,
   balanceOverdue,
-  completeOrder,
+  confirmBankPayment,
   currentStage,
+  declaredTxn,
   historyEntry,
   logLinkAction,
   ensurePaymentLinkData,
   isExpired,
   now,
+  orderState,
+  paidTxn,
   payLinkUrl,
   readLinkOrders,
+  readLinkTxns,
   parseTime,
   readPaymentLinks,
   setBalanceDeadline,
   stageAmount,
   stageMethods,
+  syncUpfrontOrder,
   voidPaymentLink,
   writePaymentLinks,
   type LinkHistoryEntry,
-  type LinkOrder,
+  type LinkTxn,
+  type WebOrder,
   type PayStage,
   type PaymentLink,
 } from '../paymentLinkStore'
@@ -110,7 +116,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     ensurePaymentLinkData()
     return readPaymentLinks()
   })
-  const [linkOrders, setLinkOrders] = useState<LinkOrder[]>(() => readLinkOrders())
+  const [linkOrders, setLinkOrders] = useState<WebOrder[]>(() => readLinkOrders())
+  const [linkTxns, setLinkTxns] = useState<LinkTxn[]>(() => readLinkTxns())
   const [line, setLine] = useState('')
   const [channelId, setChannelId] = useState('')
   const [usePromo, setUsePromo] = useState(true)
@@ -142,6 +149,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [dueDays, setDueDays] = useState<number | null>(DEFAULT_BALANCE_DUE_DAYS)
   const [dueTarget, setDueTarget] = useState<PaymentLink | null>(null)
   const [dueDraft, setDueDraft] = useState<dayjs.Dayjs | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string } | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { account, role } = useCurrentAccount()
@@ -172,6 +180,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const reload = () => {
     setLinks(readPaymentLinks())
     setLinkOrders(readLinkOrders())
+    setLinkTxns(readLinkTxns())
   }
 
   useEffect(() => {
@@ -242,12 +251,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const ordersBy = useMemo(() => {
-    const map = new Map<string, LinkOrder[]>()
+    const map = new Map<string, WebOrder[]>()
     linkOrders.forEach((order) => map.set(order.paymentLinkId, [...(map.get(order.paymentLinkId) || []), order]))
     return map
   }, [linkOrders])
+  const txnsBy = useMemo(() => {
+    const map = new Map<string, LinkTxn[]>()
+    linkTxns.forEach((txn) => map.set(txn.paymentLinkId, [...(map.get(txn.paymentLinkId) || []), txn]))
+    return map
+  }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && !ordersOf(row.id).some((order) => order.status !== 'CANCELLED')
+  const txnsOf = (id: string) => txnsBy.get(id) || []
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && !txnsOf(row.id).some((txn) => txn.status !== 'FAILED')
 
   const resetCustomer = () => {
     setUserQuery('')
@@ -345,6 +360,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         : `${row.offers.length} 个 SKU · ${methodText}`
     row = { ...row, history: [...(previous?.history || []), historyEntry(myEmail || 'admin@dinoai.ai', action, detail)] }
     persist(editingId ? links.map((item) => (item.id === editingId ? row : item)) : [row, ...links])
+    syncUpfrontOrder(row)
+    reload()
     setEditingId(null)
     setScreen('list')
     setKeyword('')
@@ -355,7 +372,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const blockedEdit = () => {
     const row = editingId ? links.find((item) => item.id === editingId) : undefined
     if (row && !editable(row)) {
-      message.warning(en ? 'This link already has orders and cannot be changed' : '这条链接已经有订单，不能再改')
+      message.warning(en ? 'Someone has started paying this link, so it cannot be changed' : '这条链接已经有人在付款，不能再改')
       return true
     }
     return false
@@ -393,7 +410,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const startEdit = (row: PaymentLink) => {
     if (!editable(row)) {
-      message.warning(en ? 'Links with orders cannot be edited' : '已经有订单的链接不能再编辑')
+      message.warning(en ? 'Links with payments in progress cannot be edited' : '已经有人在付款的链接不能再编辑')
       return
     }
     if (row.line !== activeLine) holdLineReset.current = true
@@ -413,28 +430,39 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setScreen('form')
   }
 
-  const confirmTransfer = (order: LinkOrder) => {
-    completeOrder(order.orderNo)
-    logAction(order.paymentLinkId, order.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : order.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
-      `${order.orderNo} · ${formatMoney(order.payAmount, order.currency)}${order.payStage === 'DEPOSIT_FIRST' ? '' : '，开通会员'}`)
+  const confirmTransfer = (row: PaymentLink, skuId?: string) => {
+    const txn = confirmBankPayment(row.id, skuId)
+    if (!txn || txn.status !== 'SUCCESS') return
+    logAction(row.id, txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
+      `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)}${txn.payStage === 'DEPOSIT_FIRST' ? '' : '，开通会员'}`)
     reload()
-    message.success(order.payStage === 'DEPOSIT_FIRST'
+    setConfirmTarget(null)
+    message.success(txn.payStage === 'DEPOSIT_FIRST'
       ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
       : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
+  }
+
+  const askConfirm = (row: PaymentLink) => {
+    const order = ordersOf(row.id).find((item) => !item.cancelled)
+    if (row.offers.length > 1 && !order?.skuId) {
+      setConfirmTarget({ link: row, skuId: row.offers[0]?.skuId || '' })
+      return
+    }
+    confirmTransfer(row)
   }
 
   const voidLink = (row: PaymentLink) => {
     Modal.confirm({
       title: en ? `Void ${row.id}?` : `作废 ${row.id}？`,
       content: en
-        ? 'The link stops accepting payments and its unpaid orders are cancelled. Paid orders stay as they are.'
-        : '作废后链接不能再付款，未支付的订单会一起取消；已支付的订单不受影响。',
+        ? 'The link stops accepting payments. Open payment attempts fail and orders with nothing paid are cancelled. Paid orders stay as they are.'
+        : '作废后链接不能再付款：进行中的交易记为失败，一笔都没付的订单一起取消；已支付的订单不受影响。',
       okText: en ? 'Void' : '作废',
       okButtonProps: { danger: true },
       cancelText: en ? 'Cancel' : '取消',
       onOk: () => {
         voidPaymentLink(row.id)
-        logAction(row.id, '作废链接', '未支付的订单一起取消')
+        logAction(row.id, '作废链接', '进行中的交易记为失败，未付款订单取消')
         reload()
       },
     })
@@ -866,8 +894,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     ? (en ? 'Full payment' : '全款')
     : stage === 'DEPOSIT_FIRST' ? (en ? 'First payment' : '首款') : (en ? 'Balance' : '尾款'))
 
-  const paidOf = (orders: LinkOrder[], stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'COMPLETED')
-  const declaredOf = (orders: LinkOrder[], stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'PENDING' && !!order.declaredAt)
+  const paidOf = paidTxn
+  const declaredOf = declaredTxn
 
   const leftText = (due: string) => {
     const left = parseTime(due) - Date.now()
@@ -882,7 +910,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const dueLine = (row: PaymentLink) => {
-    const orders = ordersOf(row.id)
+    const orders = txnsOf(row.id)
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return null
     const due = balanceDeadline(row, orders)
     if (!due) {
@@ -904,7 +932,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const openDue = (row: PaymentLink) => {
-    const due = balanceDeadline(row, ordersOf(row.id))
+    const due = balanceDeadline(row, txnsOf(row.id))
     setDueTarget(row)
     setDueDraft(due ? dayjs(due) : dayjs().add(1, 'day'))
   }
@@ -915,7 +943,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       message.warning(en ? 'Pick a time in the future' : '请选择一个晚于现在的时间')
       return
     }
-    const before = balanceDeadline(dueTarget, ordersOf(dueTarget.id))
+    const before = balanceDeadline(dueTarget, txnsOf(dueTarget.id))
     setBalanceDeadline(dueTarget.id, dueDraft.format('YYYY-MM-DD HH:mm:00'))
     logAction(dueTarget.id, '调整尾款截止', `${before ? before.slice(0, 16) : '—'} → ${dueDraft.format('YYYY-MM-DD HH:mm')}`)
     reload()
@@ -924,7 +952,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
-    const orders = ordersOf(row.id)
+    const orders = txnsOf(row.id)
     if (row.status === 'VOID') return { label: en ? 'Void' : '已作废', color: 'default' }
     if (row.audience === 'open') {
       return isExpired(row) ? { label: en ? 'Expired' : '已过期', color: 'default' } : { label: en ? 'Collecting' : '收款中', color: 'cyan' }
@@ -946,43 +974,57 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       : { label: en ? 'First payment due' : '待付首款', color: 'processing' }
   }
 
-  const collected = (row: PaymentLink) => ordersOf(row.id).filter((order) => order.status === 'COMPLETED')
+  const collected = (row: PaymentLink) => txnsOf(row.id).filter((txn) => txn.status === 'SUCCESS')
 
-  const openOrder = (order: LinkOrder) => {
-    const query = new URLSearchParams({ from: 'payment-links', sub: order.orderNo })
-    navigate(`/orders/${order.parentOrderNo || order.orderNo}?${query.toString()}`)
+  const openOrder = (orderNo: string, txnId?: string) => {
+    const query = new URLSearchParams({ from: 'payment-links', ...(txnId ? { sub: txnId } : {}) })
+    navigate(`/orders/${orderNo}?${query.toString()}`)
   }
 
-  const orderStatusTag = (order: LinkOrder) => {
-    if (order.status === 'COMPLETED') return <Tag color="success" bordered={false}>{en ? 'Paid' : '已支付'}</Tag>
-    if (order.status === 'CANCELLED') return <Tag bordered={false}>{en ? 'Cancelled' : '已取消'}</Tag>
-    if (order.declaredAt) return <Tag color="warning" bordered={false}>{en ? 'Transfer to confirm' : '转账待确认'}</Tag>
-    return <Tag color="processing" bordered={false}>{en ? 'Awaiting payment' : '待支付'}</Tag>
+  const txnStatusTag = (txn: LinkTxn) => {
+    if (txn.status === 'SUCCESS') return <Tag color="success" bordered={false}>SUCCESS</Tag>
+    if (txn.status === 'FAILED') return <Tag color="error" bordered={false}>FAILED</Tag>
+    if (txn.declaredAt) return <Tag color="warning" bordered={false}>{en ? 'PENDING · transfer declared' : 'PENDING · 用户已声明转账'}</Tag>
+    return <Tag color="processing" bordered={false}>PENDING</Tag>
   }
 
-  const orderLine = (row: PaymentLink, order: LinkOrder) => (
-    <div key={order.orderNo} className={`pl-order-line is-${order.status.toLowerCase()}`}>
-      <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(order)}>{order.orderNo}</Button>
-      <span className="pl-order-line__method">{methodName(row, order.method)}</span>
-      {orderStatusTag(order)}
+  const orderStateTag = (order: WebOrder) => {
+    const { state } = orderState(order, linkTxns)
+    const label: Record<string, [string, string, string]> = {
+      COMPLETED: ['success', 'Paid', '已支付'],
+      PARTIALLY_PAID: ['blue', 'Partially paid', '部分付款'],
+      CANCELLED: ['default', 'Cancelled', '已取消'],
+      PENDING: ['processing', 'Unpaid', '待支付'],
+    }
+    const [color, enText, zhText] = label[state]
+    return <Tag color={color} bordered={false}>{en ? enText : zhText}</Tag>
+  }
+
+  const txnLine = (row: PaymentLink, txn: LinkTxn) => (
+    <div key={txn.txnId} className={`pl-order-line is-${txn.status.toLowerCase()}`}>
+      <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(txn.orderNo, txn.txnId)}>{txn.txnId}</Button>
+      <span className="pl-order-line__method">{methodName(row, txn.method)}</span>
+      {txnStatusTag(txn)}
       <Typography.Text type="secondary" className="pl-order-line__time">
-        {order.status === 'COMPLETED'
-          ? `${en ? 'Paid' : '支付'} ${(order.paidAt || '').slice(0, 16)}`
-          : order.declaredAt
-            ? `${en ? 'Declared' : '用户声明转账'} ${order.declaredAt.slice(0, 16)}`
-            : `${en ? 'Ordered' : '下单'} ${order.createdAt.slice(0, 16)}`}
+        {txn.status === 'SUCCESS'
+          ? `${en ? 'Paid' : '支付'} ${(txn.paidAt || '').slice(0, 16)}`
+          : txn.declaredAt
+            ? `${en ? 'Declared' : '用户声明转账'} ${txn.declaredAt.slice(0, 16)}`
+            : `${en ? 'Started' : '发起'} ${txn.createdAt.slice(0, 16)}`}
       </Typography.Text>
-      {order.status === 'PENDING' && order.transferReference && (
-        <Typography.Text type="secondary" className="pl-leg__id">{en ? 'Transfer note' : '转账附言'} {order.transferReference}</Typography.Text>
-      )}
-      {canConfirmBank && order.status === 'PENDING' && order.method === 'bank_transfer' && row.status === 'ACTIVE' && (
-        <Button size="small" type="primary" onClick={() => confirmTransfer(order)}>
-          {order.payStage === 'DEPOSIT_FIRST'
-            ? (en ? 'Confirm first transfer' : '确认首款已到账')
-            : (en ? 'Confirm transfer & open membership' : '确认到账并开通会员')}
-        </Button>
+      {txn.status === 'FAILED' && txn.failReason && <Typography.Text type="secondary" className="pl-leg__id">{txn.failReason}</Typography.Text>}
+      {txn.status !== 'FAILED' && txn.transferReference && (
+        <Typography.Text type="secondary" className="pl-leg__id">{en ? 'Transfer note' : '转账附言'} {txn.transferReference}</Typography.Text>
       )}
     </div>
+  )
+
+  const confirmButton = (row: PaymentLink, stage: PayStage) => (
+    <Button size="small" type="primary" onClick={() => askConfirm(row)}>
+      {stage === 'DEPOSIT_FIRST'
+        ? (en ? 'Confirm first transfer' : '确认首款已到账')
+        : (en ? 'Confirm transfer & open membership' : '确认到账并开通会员')}
+    </Button>
   )
 
   const linkActions = (row: PaymentLink) => (
@@ -1087,10 +1129,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         if (!paid.length) return <Typography.Text type="secondary">{en ? 'Nothing yet' : '暂无'}</Typography.Text>
         return (
           <div className="pl-two-line">
-            <b>{formatMoney(paid.reduce((sum, order) => sum + order.payAmount, 0), row.currency || paid[0].currency)}</b>
-            <Typography.Text type="secondary">{en ? `${paid.length} paid order${paid.length > 1 ? 's' : ''}` : `${paid.length} 张已支付订单`}</Typography.Text>
+            <b>{formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)}</b>
+            <Typography.Text type="secondary">{en ? `${paid.length} successful transaction${paid.length > 1 ? 's' : ''}` : `${paid.length} 笔成功交易`}</Typography.Text>
             {row.audience === 'open' && (() => {
-              const payers = new Set(paid.map((order) => order.userId)).size
+              const payers = new Set(paid.map((txn) => ordersOf(row.id).find((order) => order.orderNo === txn.orderNo)?.userId)).size
               return <Typography.Text type="secondary">{en ? `${payers} payer${payers > 1 ? 's' : ''}` : `${payers} 位付款人`}</Typography.Text>
             })()}
           </div>
@@ -1111,7 +1153,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       title: en ? 'Created / Updated' : '创建 / 更新',
       width: 150,
       render: (_: unknown, row: PaymentLink) => {
-        const latest = [row.updatedAt, ...ordersOf(row.id).map((order) => (order.paidAt || order.declaredAt || order.createdAt).slice(0, 16))].sort().pop()
+        const latest = [row.updatedAt, ...txnsOf(row.id).map((txn) => (txn.paidAt || txn.declaredAt || txn.createdAt).slice(0, 16))].sort().pop()
         return (
           <div className="pl-two-line">
             <span>{row.createdAt}</span>
@@ -1132,7 +1174,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {row.status === 'ACTIVE' && (
             <Space size={4}>
               {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-              {(currentStage(row, ordersOf(row.id)) || balanceOverdue(row, ordersOf(row.id))) && (
+              {(currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
                 <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
               )}
             </Space>
@@ -1143,20 +1185,48 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   ]
 
   const stageRows = (row: PaymentLink) => {
-    const orders = ordersOf(row.id)
+    const txns = txnsOf(row.id)
+    const order = ordersOf(row.id).find((item) => !item.cancelled) || ordersOf(row.id)[0]
     const stages: PayStage[] = row.kind === 'full' ? ['FULL'] : ['DEPOSIT_FIRST', 'DEPOSIT_BALANCE']
-    const firstPaid = paidOf(orders, 'DEPOSIT_FIRST')
-    const offer = row.offers.length === 1 ? row.offers[0] : undefined
+    const firstPaid = paidOf(txns, 'DEPOSIT_FIRST')
+    const offer = row.offers.find((item) => item.skuId === order?.skuId) || (row.offers.length === 1 ? row.offers[0] : undefined)
+    const collectingStage = currentStage(row, txns)
+    const paidSum = order ? orderState(order, linkTxns).paid : 0
     return (
       <div className="pl-legs">
+        <div className="pl-order-head">
+          {order ? (
+            <>
+              <span className="pl-order-head__label">Web Order</span>
+              <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(order.orderNo)}>{order.orderNo}</Button>
+              {orderStateTag(order)}
+              <Typography.Text type="secondary">
+                {order.skuName || (en ? 'SKU picked by customer' : '用户付款时选 SKU')}
+                {order.payable ? ` · ${en ? 'Payable' : '应付'} ${formatMoney(order.payable, order.currency)} · ${en ? 'Paid' : '已付'} ${formatMoney(paidSum, order.currency)}` : ''}
+              </Typography.Text>
+              <Typography.Text type="secondary" className="pl-leg__relation">
+                {order.origin === 'link'
+                  ? (en ? 'Created with the link (bank transfer offered)' : '链接含银行转账，创建链接时已生成')
+                  : (en ? 'Created when the customer pressed pay' : '用户点支付时生成')}
+              </Typography.Text>
+            </>
+          ) : (
+            <>
+              <span className="pl-order-head__label">Web Order</span>
+              <Tag bordered={false}>{en ? 'Not created yet' : '未创建'}</Tag>
+              <Typography.Text type="secondary">{en ? 'Third-party methods only: the order is created when the customer presses pay.' : '只挂三方支付：用户点支付时才创建订单。'}</Typography.Text>
+            </>
+          )}
+        </div>
         {stages.map((stage, index) => {
-          const mine = orders.filter((order) => order.payStage === stage).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          const paid = mine.find((order) => order.status === 'COMPLETED')
-          const live = paid || mine.find((order) => order.status === 'PENDING')
-          const folded = mine.filter((order) => order !== live).length
+          const mine = txns.filter((txn) => txn.payStage === stage).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          const paid = mine.find((txn) => txn.status === 'SUCCESS')
+          const live = paid || mine.find((txn) => txn.status === 'PENDING')
+          const failed = mine.filter((txn) => txn.status === 'FAILED')
           const waiting = stage === 'DEPOSIT_BALANCE' && !firstPaid
-          const amount = stage === 'FULL' && !offer ? (live?.payAmount ?? 0) : stageAmount(row, stage, offer, orders)
-          const changeable = !paid && row.status === 'ACTIVE' && !!currentStage(row, orders)
+          const amount = stage === 'FULL' && !offer ? (live?.amount ?? 0) : stageAmount(row, stage, offer, txns)
+          const changeable = !paid && row.status === 'ACTIVE' && !!collectingStage
+          const canConfirm = canConfirmBank && row.status === 'ACTIVE' && collectingStage === stage && stageMethods(row, stage).includes('bank_transfer')
           return (
             <div key={stage} className={`pl-leg${paid ? ' is-paid' : ''}`}>
               <div className="pl-leg__step">
@@ -1168,23 +1238,22 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </div>
               <div className="pl-leg__amount">{amount ? formatMoney(amount, row.currency) : (en ? 'Customer picks SKU' : '用户选 SKU 后定')}</div>
               <div className="pl-leg__status">
-                {live ? orderLine(row, live) : (
+                {live ? txnLine(row, live) : (
                   <div className="pl-order-line is-none">
-                    <Tag bordered={false}>{waiting ? (en ? 'After first payment' : '首款付清后可付') : (en ? 'Awaiting payment · no order yet' : '待支付 · 未下单')}</Tag>
+                    <Tag bordered={false}>{waiting ? (en ? 'After first payment' : '首款付清后可付') : (en ? 'No transaction yet' : '暂无交易')}</Tag>
                     <Typography.Text type="secondary">
-                      {en ? 'Created when the customer picks a method and pays' : '用户选好支付方式开始付款时生成订单'}
+                      {en ? 'A transaction is created each time the customer presses pay' : '用户每点一次支付生成一笔交易'}
                     </Typography.Text>
                   </div>
                 )}
-                {live?.parentOrderNo && (
-                  <Typography.Text type="secondary" className="pl-leg__relation">parent_order_no = {live.parentOrderNo}</Typography.Text>
-                )}
                 {stage === 'DEPOSIT_BALANCE' && firstPaid && !paid && row.status === 'ACTIVE' && dueLine(row)}
-                {folded > 0 && (
-                  <Typography.Text type="secondary" className="pl-leg__relation">
-                    {en ? `${folded} abandoned attempt${folded > 1 ? 's' : ''} folded` : `另有 ${folded} 次未完成的尝试（已折叠）`}
-                  </Typography.Text>
+                {failed.length > 0 && (
+                  <details className="pl-failed">
+                    <summary>{en ? `${failed.length} failed attempt${failed.length > 1 ? 's' : ''}` : `${failed.length} 笔失败交易`}</summary>
+                    {failed.map((txn) => txnLine(row, txn))}
+                  </details>
                 )}
+                {canConfirm && <div className="pl-confirm-row">{confirmButton(row, stage)}</div>}
               </div>
               <div className="pl-leg__actions">
                 {methodsCell(row, stageMethods(row, stage))}
@@ -1200,36 +1269,40 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-legs__note">
           {row.kind === 'deposit'
             ? (en
-              ? 'One link, two payments. Each payment is its own web_order; the balance order carries parent_order_no pointing to the first. The order center shows them together under the first order no.'
-              : '一条链接分两次付。每次付款是一张独立的 web_order，尾款订单用 parent_order_no 指向首款订单；订单中心按首款单号合并展示。')
+              ? 'Payment link → one web order → two successful transactions (first payment, balance). Membership opens when the order is fully paid.'
+              : '支付链接 → 一张 Web Order → 两笔成功交易（首款、尾款）。订单付清后开通会员。')
             : (en
-              ? 'The order is created when the customer starts paying, with the method they picked.'
-              : '用户开始付款时按所选支付方式生成订单。')}
+              ? 'Payment link → one web order → one successful transaction. Failed attempts stay on the order as FAILED.'
+              : '支付链接 → 一张 Web Order → 一笔成功交易。失败的尝试也留在订单下，状态 FAILED。')}
         </div>
       </div>
     )
   }
 
   const openRows = (row: PaymentLink) => {
+    const txns = txnsOf(row.id)
     const orders = ordersOf(row.id)
-    const paid = orders.filter((order) => order.status === 'COMPLETED').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))
+    const paid = txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))
     return (
       <div className="pl-legs">
         {paid.length ? (
           <div className="pl-open-list">
-            {paid.slice(0, OPEN_ORDER_PREVIEW).map((order) => (
-              <div key={order.orderNo} className="pl-open-list__row">
-                <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(order)}>{order.orderNo}</Button>
-                <Typography.Text type="secondary">{order.userId}</Typography.Text>
-                <span>{order.skuName}</span>
-                <b>{formatMoney(order.payAmount, order.currency)}</b>
-                <span>{methodName(row, order.method)}</span>
-                <Typography.Text type="secondary">{(order.paidAt || '').slice(0, 16)}</Typography.Text>
-              </div>
-            ))}
+            {paid.slice(0, OPEN_ORDER_PREVIEW).map((txn) => {
+              const order = orders.find((item) => item.orderNo === txn.orderNo)
+              return (
+                <div key={txn.txnId} className="pl-open-list__row">
+                  <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(txn.orderNo, txn.txnId)}>{txn.orderNo}</Button>
+                  <Typography.Text type="secondary">{order?.userId}</Typography.Text>
+                  <span>{order?.skuName}</span>
+                  <b>{formatMoney(txn.amount, txn.currency)}</b>
+                  <span>{methodName(row, txn.method)} · {txn.txnId}</span>
+                  <Typography.Text type="secondary">{(txn.paidAt || '').slice(0, 16)}</Typography.Text>
+                </div>
+              )
+            })}
           </div>
         ) : (
-          <Typography.Text type="secondary">{en ? 'No one has paid yet. Each payment creates its own order.' : '还没有人付款。每笔付款各生成一张订单。'}</Typography.Text>
+          <Typography.Text type="secondary">{en ? 'No one has paid yet. Each payment is one order with one transaction.' : '还没有人付款。每笔付款是一张订单 + 一笔交易。'}</Typography.Text>
         )}
         <div className="pl-legs__note pl-open-foot">
           <span>
@@ -1266,6 +1339,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         history: [...(item.history || []), historyEntry(myEmail || 'admin@dinoai.ai', '修改支付方式', `${stageName(stage)}：${methodDraft.map((code) => methodName(item, code)).join('、')}`)],
       }
     }))
+    const changed = readPaymentLinks().find((item) => item.id === link.id)
+    if (changed) syncUpfrontOrder(changed)
+    reload()
     setMethodTarget(null)
     message.success(en ? 'Payment methods updated. The link stays the same.' : '支付方式已更新，链接地址不变。')
   }
@@ -1291,13 +1367,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
-    return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...ordersOf(row.id).flatMap((order) => [order.orderNo, order.userId])]
+    return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...ordersOf(row.id).flatMap((order) => [order.orderNo, order.userId]), ...txnsOf(row.id).map((txn) => txn.txnId)]
       .join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
   const sceneMatch = (row: PaymentLink, value: Scene) => {
-    const orders = ordersOf(row.id)
+    const orders = txnsOf(row.id)
     const stage = currentStage(row, orders)
-    if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((order) => order.status === 'PENDING' && !!order.declaredAt)
+    if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((txn) => txn.status === 'PENDING' && !!txn.declaredAt)
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
     if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE' || balanceOverdue(row, orders))
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
@@ -1428,11 +1504,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each payment is its own order. Expand a row to see the latest paid orders.'
-            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，每笔付款各生成一张订单；展开看最近的已支付订单。')
+            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each payment is one order with one transaction. Expand a row to see the latest paid orders.'
+            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，每笔付款是一张订单 + 一笔交易；展开看最近的已支付订单。')
           : en
-          ? `Each row is one payment link; expand it to see its orders. Orders are created when the customer starts paying. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
-          : `每一行是一条支付链接，展开看它下面的订单。订单在用户开始付款时才生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one payment link with one web order; expand it to see the order and its transactions. Links that offer bank transfer get the order when the link is created; otherwise when the customer presses pay. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
+          : `每一行是一条支付链接，对应一张 Web Order；展开看订单和它下面的交易。挂了银行转账的链接在创建时就生成订单，只挂三方支付的在用户点支付时生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"
@@ -1515,6 +1591,25 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         />
       </Drawer>
       <Modal
+        title={en ? 'Confirm bank transfer' : '确认银行转账'}
+        open={!!confirmTarget}
+        onCancel={() => setConfirmTarget(null)}
+        onOk={() => confirmTarget && confirmTransfer(confirmTarget.link, confirmTarget.skuId)}
+        okText={en ? 'Confirm' : '确认到账'}
+        cancelText={en ? 'Cancel' : '取消'}
+        destroyOnClose
+      >
+        <Typography.Paragraph type="secondary">
+          {en ? 'This link offers several SKUs and the customer has not picked one. Choose the SKU the transfer pays for; the order takes its price.' : '这条链接有多个 SKU，用户还没选。请选这笔转账买的 SKU，订单按它的价格记应付。'}
+        </Typography.Paragraph>
+        <Select
+          style={{ width: '100%' }}
+          value={confirmTarget?.skuId}
+          onChange={(skuId) => setConfirmTarget((current) => (current ? { ...current, skuId } : current))}
+          options={(confirmTarget?.link.offers || []).map((item) => ({ value: item.skuId, label: `${item.skuName} · ${formatMoney(item.payable, item.currency)}` }))}
+        />
+      </Modal>
+      <Modal
         title={`${en ? 'Balance deadline' : '调整尾款截止时间'} · ${dueTarget?.id || ''}`}
         open={!!dueTarget}
         onCancel={() => setDueTarget(null)}
@@ -1525,7 +1620,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         destroyOnClose
       >
         {dueTarget && (() => {
-          const current = balanceDeadline(dueTarget, ordersOf(dueTarget.id))
+          const current = balanceDeadline(dueTarget, txnsOf(dueTarget.id))
           return (
             <>
               <Typography.Paragraph type="secondary">

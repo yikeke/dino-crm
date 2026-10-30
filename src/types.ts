@@ -292,7 +292,7 @@ export type OrderTransaction = {
   id: string
   time: string
   event: string
-  status: OrderStatus
+  status: OrderStatus | '支付失败'
   amount: number
   paymentMethod?: string
   /** Third-party transaction id, or the bank transfer reference for manual transfers. */

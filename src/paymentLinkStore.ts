@@ -2,17 +2,22 @@ import { setState } from './store'
 import type { Order, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v6'
-export const LINK_ORDER_KEY = 'dino-cc-link-orders-v1'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v7'
+export const LINK_ORDER_KEY = 'dino-cc-link-orders-v2'
+export const LINK_TXN_KEY = 'dino-cc-link-txns-v1'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
-const LEGACY_PAYMENT_LINK_KEYS = ['dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4', 'dino-cc-payment-links-v5']
+const LEGACY_KEYS = [
+  'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
+  'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-link-orders-v1',
+]
 export const DEFAULT_BALANCE_DUE_DAYS = 7
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
-export type LinkOrderStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED'
+export type TxnStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
+export type OrderState = 'PENDING' | 'PARTIALLY_PAID' | 'COMPLETED' | 'CANCELLED'
 
-/** A payment link only holds what to charge. Payments live in web_order rows that point back to it. */
+/** Layer 1. A payment link only holds what to charge. */
 export type PaymentLink = {
   id: string
   kind: 'full' | 'deposit'
@@ -59,33 +64,49 @@ export type LinkHistoryEntry = {
   detail: string
 }
 
+/**
+ * Layer 2. One purchase of one package. A User ID link has at most one order (full or deposit);
+ * an open link gets one order per payer per payment.
+ */
+export type WebOrder = {
+  orderNo: string
+  paymentLinkId: string
+  userId?: string
+  /** Empty until the customer picks one, when the link offers several SKUs. */
+  skuId: string
+  skuName: string
+  payable: number
+  currency: string
+  cancelled?: boolean
+  /** link: created with the link because it offers bank transfer. checkout: created when the customer pressed pay. */
+  origin: 'link' | 'checkout'
+  createdAt: string
+}
+
+/** Layer 3. One payment attempt: created when the customer presses pay (or picks bank transfer), one method each. */
+export type LinkTxn = {
+  txnId: string
+  orderNo: string
+  paymentLinkId: string
+  payStage: PayStage
+  amount: number
+  currency: string
+  method: string
+  transferReference?: string
+  providerRef?: string
+  declaredAt?: string
+  status: TxnStatus
+  failReason?: string
+  createdAt: string
+  paidAt?: string
+}
+
 export function historyEntry(actor: string, action: string, detail: string, at = now()): LinkHistoryEntry {
   return { id: `H_${Math.random().toString(36).slice(2, 10)}`, at, actor, action, detail }
 }
 
 export function logLinkAction(id: string, actor: string, action: string, detail: string) {
   writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, history: [...(link.history || []), historyEntry(actor, action, detail)] } : link)))
-}
-
-/** One web_order. It is created when the customer picks a method and starts paying, so it always has one method. */
-export type LinkOrder = {
-  orderNo: string
-  paymentLinkId: string
-  payStage: PayStage
-  parentOrderNo?: string
-  userId: string
-  skuId: string
-  skuName: string
-  originalAmount: number
-  payAmount: number
-  currency: string
-  method: string
-  transferReference?: string
-  providerRef?: string
-  declaredAt?: string
-  status: LinkOrderStatus
-  createdAt: string
-  paidAt?: string
 }
 
 function readJson<T>(key: string): T[] {
@@ -105,13 +126,18 @@ export function writePaymentLinks(links: PaymentLink[]) {
   localStorage.setItem(PAYMENT_LINK_KEY, JSON.stringify(links))
 }
 
-export function readLinkOrders(): LinkOrder[] {
-  return readJson<LinkOrder>(LINK_ORDER_KEY)
+export function readLinkOrders(): WebOrder[] {
+  return readJson<WebOrder>(LINK_ORDER_KEY)
 }
 
-function writeLinkOrders(orders: LinkOrder[]) {
+export function readLinkTxns(): LinkTxn[] {
+  return readJson<LinkTxn>(LINK_TXN_KEY)
+}
+
+function writeAll(orders: WebOrder[], txns: LinkTxn[]) {
   localStorage.setItem(LINK_ORDER_KEY, JSON.stringify(orders))
-  syncOrderCenter(orders)
+  localStorage.setItem(LINK_TXN_KEY, JSON.stringify(txns))
+  syncOrderCenter(orders, txns)
 }
 
 export function findPaymentLink(id: string): PaymentLink | undefined {
@@ -129,6 +155,10 @@ export function ordersOfLink(id: string, orders = readLinkOrders()) {
   return orders.filter((order) => order.paymentLinkId === id)
 }
 
+export function txnsOfLink(id: string, txns = readLinkTxns()) {
+  return txns.filter((txn) => txn.paymentLinkId === id)
+}
+
 export function payLinkUrl(id: string) {
   const root = import.meta.env.BASE_URL.replace(/\/$/, '')
   return `${window.location.origin}${root}/#/lp/pay-link?link=${encodeURIComponent(id)}`
@@ -138,14 +168,22 @@ export function now() {
   return stamp(new Date())
 }
 
-function newOrderNo() {
+function dayCode() {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
-  return `WEB-${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+  return `${String(d.getFullYear()).slice(2)}${p(d.getMonth() + 1)}${p(d.getDate())}`
 }
 
-export function transferReference(orderNo: string) {
-  return `DINO${orderNo.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`
+function newOrderNo() {
+  return `WEB-${dayCode()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+}
+
+function newTxnId() {
+  return `TXN-${dayCode()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+}
+
+export function transferReference(txnId: string) {
+  return `DINO${txnId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`
 }
 
 function providerRef(method: string) {
@@ -166,20 +204,74 @@ export function parseTime(value: string) {
   return new Date(value.replace(' ', 'T')).getTime()
 }
 
+export function paidTxn(txns: LinkTxn[], stage: PayStage) {
+  return txns.find((txn) => txn.payStage === stage && txn.status === 'SUCCESS')
+}
+
+export function declaredTxn(txns: LinkTxn[], stage: PayStage) {
+  return txns.find((txn) => txn.payStage === stage && txn.status === 'PENDING' && !!txn.declaredAt)
+}
+
+/** Order status is derived from its transactions; nothing is stored on the order. */
+export function orderState(order: WebOrder, txns: LinkTxn[]): { state: OrderState; paid: number; paidAt?: string } {
+  const done = txns.filter((txn) => txn.orderNo === order.orderNo && txn.status === 'SUCCESS')
+  const paid = done.reduce((sum, txn) => sum + txn.amount, 0)
+  const paidAt = done.map((txn) => txn.paidAt || '').sort().pop()
+  if (paid > 0 && order.payable > 0 && paid >= order.payable) return { state: 'COMPLETED', paid, paidAt }
+  if (paid > 0) return { state: 'PARTIALLY_PAID', paid }
+  return { state: order.cancelled ? 'CANCELLED' : 'PENDING', paid }
+}
+
+/** User ID links that offer bank transfer get their web order when the link is created, so a manager can confirm a transfer. */
+export function needsUpfrontOrder(link: PaymentLink) {
+  return link.audience === 'user' && [...link.methods, ...(link.balanceMethods || [])].includes('bank_transfer')
+}
+
+function orderFor(link: PaymentLink, origin: WebOrder['origin'], userId?: string, skuId?: string): WebOrder {
+  const offer = link.offers.find((item) => item.skuId === skuId) || (link.offers.length === 1 ? link.offers[0] : undefined)
+  return {
+    orderNo: newOrderNo(),
+    paymentLinkId: link.id,
+    userId,
+    skuId: offer?.skuId || '',
+    skuName: offer ? `${offer.memberLevel || 'Pro'} · ${offer.skuName}` : '',
+    payable: offer?.payable ?? 0,
+    currency: offer?.currency || link.currency,
+    origin,
+    createdAt: now(),
+  }
+}
+
+/** After a User ID link is saved or its methods change: create, refresh or drop the upfront order while nothing is paid on it. */
+export function syncUpfrontOrder(link: PaymentLink) {
+  if (link.audience !== 'user' || link.id === PREVIEW_LINK_ID) return
+  const orders = readLinkOrders()
+  const txns = readLinkTxns()
+  const mine = orders.find((order) => order.paymentLinkId === link.id && !order.cancelled)
+  const untouched = mine && !txns.some((txn) => txn.orderNo === mine.orderNo)
+  if (!mine && needsUpfrontOrder(link)) {
+    writeAll([orderFor(link, 'link', link.userId), ...orders], txns)
+  } else if (mine && untouched && !needsUpfrontOrder(link)) {
+    writeAll(orders.filter((order) => order !== mine), txns)
+  } else if (mine && untouched) {
+    const fresh = orderFor(link, mine.origin, link.userId)
+    writeAll(orders.map((order) => (order === mine ? { ...mine, skuId: fresh.skuId, skuName: fresh.skuName, payable: fresh.payable, currency: fresh.currency, userId: link.userId } : order)), txns)
+  }
+}
+
 /** When the balance must be paid by. Null until the first payment has landed, and once the balance is paid. */
-export function balanceDeadline(link: PaymentLink, orders: LinkOrder[]): string | null {
+export function balanceDeadline(link: PaymentLink, txns: LinkTxn[]): string | null {
   if (link.kind !== 'deposit') return null
-  const done = (stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'COMPLETED')
-  const first = done('DEPOSIT_FIRST')
-  if (!first?.paidAt || done('DEPOSIT_BALANCE')) return null
+  const first = paidTxn(txns, 'DEPOSIT_FIRST')
+  if (!first?.paidAt || paidTxn(txns, 'DEPOSIT_BALANCE')) return null
   if (link.balanceDueAt) return link.balanceDueAt
   const due = new Date(parseTime(first.paidAt))
   due.setDate(due.getDate() + (link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS))
   return stamp(due)
 }
 
-export function balanceOverdue(link: PaymentLink, orders: LinkOrder[]) {
-  const due = balanceDeadline(link, orders)
+export function balanceOverdue(link: PaymentLink, txns: LinkTxn[]) {
+  const due = balanceDeadline(link, txns)
   return !!due && link.status === 'ACTIVE' && parseTime(due) < Date.now()
 }
 
@@ -188,21 +280,19 @@ export function setBalanceDeadline(id: string, dueAt: string) {
 }
 
 /** Which payment the link is collecting now; null when nothing more can be paid. */
-export function currentStage(link: PaymentLink, orders: LinkOrder[]): PayStage | null {
+export function currentStage(link: PaymentLink, txns: LinkTxn[]): PayStage | null {
   if (link.status === 'VOID' || isExpired(link)) return null
-  const paid = (stage: PayStage) => orders.find((order) => order.payStage === stage && order.status === 'COMPLETED')
   if (link.audience === 'open') return 'FULL'
-  if (link.kind === 'full') return paid('FULL') ? null : 'FULL'
-  if (!paid('DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'
-  if (paid('DEPOSIT_BALANCE') || balanceOverdue(link, orders)) return null
+  if (link.kind === 'full') return paidTxn(txns, 'FULL') ? null : 'FULL'
+  if (!paidTxn(txns, 'DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'
+  if (paidTxn(txns, 'DEPOSIT_BALANCE') || balanceOverdue(link, txns)) return null
   return 'DEPOSIT_BALANCE'
 }
 
-export function stageAmount(link: PaymentLink, stage: PayStage, offer: LinkOffer | undefined, orders: LinkOrder[]) {
+export function stageAmount(link: PaymentLink, stage: PayStage, offer: LinkOffer | undefined, txns: LinkTxn[]) {
   if (stage === 'FULL') return offer?.payable ?? link.payable
   if (stage === 'DEPOSIT_FIRST') return link.amount
-  const first = orders.find((order) => order.payStage === 'DEPOSIT_FIRST' && order.status === 'COMPLETED')
-  return Math.max(link.payable - (first?.payAmount ?? link.amount), 0)
+  return Math.max(link.payable - (paidTxn(txns, 'DEPOSIT_FIRST')?.amount ?? link.amount), 0)
 }
 
 export function stageMethods(link: PaymentLink, stage: PayStage) {
@@ -210,122 +300,149 @@ export function stageMethods(link: PaymentLink, stage: PayStage) {
 }
 
 /**
- * The customer picked a method and pressed pay (or chose bank transfer). Creates the web_order,
- * or reuses this customer's open attempt with the same method. Amount comes from the link, not the page.
+ * The customer pressed pay (or picked bank transfer). Finds or creates the order, then the transaction;
+ * an open attempt with the same method is reused. Amount comes from the link, not the page.
  */
 export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?: string; method: string; userId?: string }) {
   const link = findPaymentLink(linkId)
   if (!link || linkId === PREVIEW_LINK_ID) return undefined
-  const all = readLinkOrders()
-  const mine = ordersOfLink(linkId, all)
-  if (currentStage(link, mine) !== detail.stage) return undefined
+  let orders = readLinkOrders()
+  let txns = readLinkTxns()
+  const linkTxns = txnsOfLink(linkId, txns)
+  if (currentStage(link, linkTxns) !== detail.stage) return undefined
   const userId = link.audience === 'open' ? detail.userId : link.userId
   if (!userId) return undefined
-  const reuse = mine.find((order) => order.status === 'PENDING' && order.payStage === detail.stage && order.userId === userId && order.method === detail.method)
-  if (reuse) return reuse
   const offer = link.offers.find((item) => item.skuId === detail.skuId) || link.offers[0]
-  const orderNo = newOrderNo()
-  const order: LinkOrder = {
-    orderNo,
+  let order = ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.userId === userId
+    && (link.audience === 'user' || orderState(item, txns).state === 'PENDING'))
+  if (!order) {
+    order = orderFor(link, link.audience === 'user' && needsUpfrontOrder(link) ? 'link' : 'checkout', userId, offer?.skuId)
+    orders = [order, ...orders]
+  } else if (!order.skuId && offer) {
+    const picked = orderFor(link, order.origin, userId, offer.skuId)
+    order = { ...order, skuId: picked.skuId, skuName: picked.skuName, payable: picked.payable, currency: picked.currency }
+    const fixed = order
+    orders = orders.map((item) => (item.orderNo === fixed.orderNo ? fixed : item))
+  }
+  const reuse = txns.find((txn) => txn.orderNo === order.orderNo && txn.status === 'PENDING' && txn.payStage === detail.stage && txn.method === detail.method)
+  if (reuse) {
+    writeAll(orders, txns)
+    return { order, txn: reuse }
+  }
+  const txnId = newTxnId()
+  const txn: LinkTxn = {
+    txnId,
+    orderNo: order.orderNo,
     paymentLinkId: linkId,
     payStage: detail.stage,
-    parentOrderNo: detail.stage === 'DEPOSIT_BALANCE'
-      ? mine.find((item) => item.payStage === 'DEPOSIT_FIRST' && item.status === 'COMPLETED')?.orderNo
-      : undefined,
-    userId,
-    skuId: offer?.skuId || link.skuId,
-    skuName: `${offer?.memberLevel || 'Pro'} · ${offer?.skuName || link.skuName}`,
-    originalAmount: offer?.payable ?? link.payable,
-    payAmount: stageAmount(link, detail.stage, offer, mine),
-    currency: offer?.currency || link.currency,
+    amount: stageAmount(link, detail.stage, offer, linkTxns),
+    currency: order.currency || offer?.currency || link.currency,
     method: detail.method,
-    transferReference: detail.method === 'bank_transfer' ? transferReference(orderNo) : undefined,
+    transferReference: detail.method === 'bank_transfer' ? transferReference(txnId) : undefined,
     status: 'PENDING',
     createdAt: now(),
   }
-  writeLinkOrders([order, ...all])
-  return order
+  txns = [txn, ...txns]
+  writeAll(orders, txns)
+  return { order, txn }
 }
 
-/** Customer says they transferred. The order stays PENDING until an admin matches it to the bank statement. */
-export function declareTransfer(orderNo: string) {
-  const all = readLinkOrders()
-  writeLinkOrders(all.map((order) => (order.orderNo === orderNo && order.status === 'PENDING' ? { ...order, declaredAt: order.declaredAt || now() } : order)))
+/** Customer says they transferred. The transaction stays PENDING until a CC manager matches it to the bank statement. */
+export function declareTransfer(txnId: string) {
+  writeAll(readLinkOrders(), readLinkTxns().map((txn) => (txn.txnId === txnId && txn.status === 'PENDING' ? { ...txn, declaredAt: txn.declaredAt || now() } : txn)))
 }
 
-/** Third-party callback succeeded, or an admin confirmed the transfer. Only this order is written. */
-export function completeOrder(orderNo: string) {
-  const all = readLinkOrders()
-  const target = all.find((order) => order.orderNo === orderNo)
+/** Third-party callback succeeded, or a manager confirmed the transfer. Other open attempts on the same payment fail. */
+export function completeTxn(txnId: string) {
+  const txns = readLinkTxns()
+  const target = txns.find((txn) => txn.txnId === txnId)
   if (!target || target.status !== 'PENDING') return target
   const paidAt = now()
-  const next = all.map((order) => {
-    if (order.orderNo === orderNo) {
-      return { ...order, status: 'COMPLETED' as const, paidAt, providerRef: order.method === 'bank_transfer' ? undefined : providerRef(order.method) }
+  const next = txns.map((txn) => {
+    if (txn.txnId === txnId) {
+      return { ...txn, status: 'SUCCESS' as const, paidAt, providerRef: txn.method === 'bank_transfer' ? undefined : providerRef(txn.method) }
     }
-    const abandoned = order.paymentLinkId === target.paymentLinkId && order.payStage === target.payStage
-      && order.userId === target.userId && order.status === 'PENDING'
-    return abandoned ? { ...order, status: 'CANCELLED' as const } : order
+    const superseded = txn.orderNo === target.orderNo && txn.payStage === target.payStage && txn.status === 'PENDING'
+    return superseded ? { ...txn, status: 'FAILED' as const, failReason: '已用其他方式付款' } : txn
   })
-  writeLinkOrders(next)
-  return next.find((order) => order.orderNo === orderNo)
+  writeAll(readLinkOrders(), next)
+  return next.find((txn) => txn.txnId === txnId)
+}
+
+/** The provider reported a failure, or the customer abandoned the provider page. */
+export function failTxn(txnId: string, reason = '支付失败') {
+  writeAll(readLinkOrders(), readLinkTxns().map((txn) => (txn.txnId === txnId && txn.status === 'PENDING' ? { ...txn, status: 'FAILED', failReason: reason } : txn)))
+}
+
+/**
+ * CC manager confirms a bank transfer for the payment the link is collecting. Uses the customer's pending
+ * bank transaction when there is one; otherwise records a bank transaction on the order directly.
+ */
+export function confirmBankPayment(linkId: string, skuId?: string) {
+  const link = findPaymentLink(linkId)
+  if (!link) return undefined
+  const linkTxns = txnsOfLink(linkId)
+  const stage = currentStage(link, linkTxns)
+  if (!stage) return undefined
+  const pending = linkTxns.filter((txn) => txn.payStage === stage && txn.status === 'PENDING' && txn.method === 'bank_transfer')
+  const target = pending.find((txn) => txn.declaredAt) || pending[0]
+  if (target) return completeTxn(target.txnId)
+  const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
+  return started ? completeTxn(started.txn.txnId) : undefined
 }
 
 export function voidPaymentLink(id: string) {
   writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, status: 'VOID', updatedAt: now().slice(0, 16) } : link)))
-  writeLinkOrders(readLinkOrders().map((order) => (order.paymentLinkId === id && order.status === 'PENDING' ? { ...order, status: 'CANCELLED' } : order)))
+  const txns = readLinkTxns().map((txn) => (txn.paymentLinkId === id && txn.status === 'PENDING' ? { ...txn, status: 'FAILED' as const, failReason: '链接已作废' } : txn))
+  const orders = readLinkOrders().map((order) => (order.paymentLinkId === id && orderState(order, txns).paid === 0 ? { ...order, cancelled: true } : order))
+  writeAll(orders, txns)
 }
 
-const TXN_STATUS: Record<LinkOrderStatus, OrderStatus> = { PENDING: '待支付', COMPLETED: '已支付', CANCELLED: '已取消' }
+const TXN_STATUS: Record<TxnStatus, OrderTransaction['status']> = { PENDING: '待支付', SUCCESS: '已支付', FAILED: '支付失败' }
+const ORDER_STATUS: Record<OrderState, OrderStatus> = { PENDING: '待支付', PARTIALLY_PAID: '部分付款', COMPLETED: '已支付', CANCELLED: '已取消' }
 const STAGE_EVENT: Record<PayStage, string> = { FULL: '全款', DEPOSIT_FIRST: '定金首款', DEPOSIT_BALANCE: '定金尾款' }
 
-/** Order center view: group web_orders by COALESCE(parent_order_no, order_no). Nothing is written back to the orders. */
-function mainOrders(orders: LinkOrder[]): Order[] {
-  const groups = new Map<string, LinkOrder[]>()
-  orders.forEach((order) => {
-    const key = order.parentOrderNo || order.orderNo
-    groups.set(key, [...(groups.get(key) || []), order])
-  })
-  return Array.from(groups.entries()).map(([key, items]) => {
-    const root = items.find((item) => item.orderNo === key) || items[0]
-    const paid = items.filter((item) => item.status === 'COMPLETED')
-    const paidAmount = paid.reduce((sum, item) => sum + item.payAmount, 0)
-    const settled = paidAmount >= root.originalAmount && paid.length > 0
-    const orderStatus: OrderStatus = settled ? '已支付' : paidAmount > 0 ? '部分付款' : items.every((item) => item.status === 'CANCELLED') ? '已取消' : '待支付'
-    const transactions: OrderTransaction[] = items.map((item) => ({
-      id: item.orderNo,
-      time: item.paidAt || item.createdAt,
-      event: STAGE_EVENT[item.payStage],
-      payStage: item.payStage,
-      status: TXN_STATUS[item.status],
-      amount: item.payAmount,
-      paymentMethod: item.method,
-      channelRef: item.providerRef || item.transferReference,
-      note: item.declaredAt && item.status === 'PENDING' ? `用户已声明转账 ${item.declaredAt}` : undefined,
+/** Order center: one row per web order, its transactions underneath. */
+function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
+  return orders.map((order) => {
+    const mine = txns.filter((txn) => txn.orderNo === order.orderNo)
+    const { state, paid, paidAt } = orderState(order, txns)
+    const transactions: OrderTransaction[] = mine.map((txn) => ({
+      id: txn.txnId,
+      time: txn.paidAt || txn.createdAt,
+      event: STAGE_EVENT[txn.payStage],
+      payStage: txn.payStage,
+      status: TXN_STATUS[txn.status],
+      amount: txn.amount,
+      paymentMethod: txn.method,
+      channelRef: txn.providerRef || txn.transferReference,
+      note: txn.status === 'PENDING' && txn.declaredAt ? `用户已声明转账 ${txn.declaredAt}` : txn.failReason,
     }))
-    const order: Order & { sortKey: string } = {
-      orderId: key,
-      productName: root.skuName,
-      studentId: root.userId,
-      userStatus: settled ? '付费' : '未付费-体验中',
-      orderStatus,
-      originalPrice: root.originalAmount,
-      paidAmount,
-      payMethod: 'Payment Link',
-      currency: root.currency,
-      paidTime: settled ? paid.map((item) => item.paidAt || '').sort().pop() : undefined,
-      paymentLinkId: root.paymentLinkId,
-      transactions,
-      sortKey: items.map((item) => item.paidAt || item.createdAt).sort().pop() || '',
+    const sortKey = [order.createdAt, ...mine.map((txn) => txn.paidAt || txn.createdAt)].sort().pop() || ''
+    return {
+      sortKey,
+      order: {
+        orderId: order.orderNo,
+        productName: order.skuName || '待用户选择 SKU',
+        studentId: order.userId || '',
+        userStatus: state === 'COMPLETED' ? '付费' : '未付费-体验中',
+        orderStatus: ORDER_STATUS[state],
+        originalPrice: order.payable,
+        paidAmount: paid,
+        payMethod: 'Payment Link',
+        currency: order.currency,
+        paidTime: paidAt,
+        paymentLinkId: order.paymentLinkId,
+        transactions,
+      } as Order,
     }
-    return order
   })
     .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
-    .map(({ sortKey: _sortKey, ...order }) => order)
+    .map((item) => item.order)
 }
 
-export function syncOrderCenter(orders = readLinkOrders()) {
-  const built = mainOrders(orders)
+export function syncOrderCenter(orders = readLinkOrders(), txns = readLinkTxns()) {
+  const built = centerOrders(orders, txns)
   setState((prev) => ({ ...prev, orders: [...built, ...prev.orders.filter((order) => order.payMethod !== 'Payment Link')] }))
 }
 
@@ -345,7 +462,7 @@ function seedLink(row: Omit<PaymentLink, 'url' | 'status' | 'skuId' | 'skuName' 
   }
 }
 
-function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
+function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const shift = (hours: number) => stamp(new Date(Date.now() + hours * 3_600_000))
   const kr = [
     offer('KR-Q-2026', 'Pro Quarterly', 'Pro', 99000, 89100, 'KRW', '10% off'),
@@ -373,8 +490,8 @@ function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
   const cc = 'sales.kr@dinoai.ai'
   const ops = 'ops.vn@dinoai.ai'
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
-    'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，尾款期限 7 天'], [lead, '确认首款到账', 'WEB-261028-TF01 · 990 THB', '2026-10-28 11:20'], [lead, '调整尾款截止', `首款后 7 天 → ${links[0].balanceDueAt?.slice(0, 16)}`, '2026-10-28 15:40']] },
-    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'WEB-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
+    'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，尾款期限 7 天'], [lead, '调整尾款截止', `首款后 7 天 → ${links[0].balanceDueAt?.slice(0, 16)}`, '2026-10-28 15:40']] },
+    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
     'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天']] },
     'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 3 天']] },
@@ -392,34 +509,52 @@ function seed(): { links: PaymentLink[]; orders: LinkOrder[] } {
       history: meta.log.map(([actor, action, detail, at], step) => historyEntry(actor, action, detail, at || (step === 0 ? `${link.createdAt}:00` : `${link.updatedAt}:00`))),
     }
   })
-  const o = (row: Omit<LinkOrder, 'currency' | 'status'> & { status?: LinkOrderStatus; currency?: string }): LinkOrder => ({
-    currency: row.currency || (row.skuId.startsWith('KR') ? 'KRW' : row.skuId.startsWith('TH') ? 'THB' : 'VND'),
-    status: row.status || 'COMPLETED',
+  const thSku = { userId: '2060199610824355848', skuId: 'TH-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 9900, currency: 'THB' }
+  const vnSku = { skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 891000, currency: 'VND' }
+  const krQ = { skuId: 'KR-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 89100, currency: 'KRW' }
+  const krH = { skuId: 'KR-H-2026', skuName: 'Max · Max 6 Months', payable: 178000, currency: 'KRW' }
+  const orders: WebOrder[] = [
+    { orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', ...thSku, origin: 'checkout', createdAt: '2026-10-28 11:18:40' },
+    { orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', userId: '2090031938694049793', ...vnSku, origin: 'link', createdAt: '2026-10-27 18:30:00' },
+    { orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', userId: '2060199610824356009', ...vnSku, origin: 'link', createdAt: '2026-10-28 09:15:00' },
+    { orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', userId: '2060199610824356004', ...vnSku, origin: 'link', createdAt: `${shift(-218).slice(0, 16)}:00` },
+    { orderNo: 'WEB-261028-NW01', paymentLinkId: 'PL-DEP-NEW', userId: '2060199610824355844', ...vnSku, origin: 'link', createdAt: '2026-10-28 16:20:00' },
+    { orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', userId: '2090031938694049794', ...vnSku, origin: 'link', createdAt: '2026-10-28 13:05:00' },
+    { orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:15:00' },
+    { orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824356011', ...krH, origin: 'checkout', createdAt: '2026-10-28 10:05:00' },
+    { orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824355846', ...krH, origin: 'checkout', createdAt: '2026-10-27 11:38:00' },
+    { orderNo: 'WEB-261026-EX01', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824356004', ...krQ, origin: 'checkout', createdAt: '2026-10-26 14:10:00' },
+  ]
+  const t = (row: Omit<LinkTxn, 'status' | 'currency'> & { status?: TxnStatus }): LinkTxn => ({
+    status: row.status || 'SUCCESS',
+    currency: orders.find((order) => order.orderNo === row.orderNo)?.currency || 'VND',
     ...row,
   })
-  const orders: LinkOrder[] = [
-    o({ orderNo: 'WEB-261028-TB02', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_BALANCE', parentOrderNo: 'WEB-261028-TF01', userId: '2060199610824355848', skuId: 'TH-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 9900, payAmount: 8910, method: 'KPLUS', status: 'PENDING', createdAt: '2026-10-28 15:42:10' }),
-    o({ orderNo: 'WEB-261028-TF01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', userId: '2060199610824355848', skuId: 'TH-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 9900, payAmount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
-    o({ orderNo: 'WEB-261028-VB02', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', parentOrderNo: 'WEB-261027-VF01', userId: '2090031938694049793', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', declaredAt: '2026-10-28 15:30:00', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
-    o({ orderNo: 'WEB-261027-VF01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', userId: '2090031938694049793', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
-    o({ orderNo: 'WEB-261028-RF01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', userId: '2060199610824356009', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
-    o({ orderNo: 'WEB-261020-LF01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', userId: '2060199610824356004', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
-    o({ orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', userId: '2090031938694049794', skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 891000, payAmount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', declaredAt: '2026-10-28 13:22:00', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
-    o({ orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', userId: '2060199610824355846', skuId: 'KR-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 89100, payAmount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
-    o({ orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', userId: '2060199610824356011', skuId: 'KR-H-2026', skuName: 'Max · Max 6 Months', originalAmount: 178000, payAmount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),
-    o({ orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', userId: '2060199610824355846', skuId: 'KR-H-2026', skuName: 'Max · Max 6 Months', originalAmount: 178000, payAmount: 178000, method: 'card', providerRef: 'CARD-27114033KR', createdAt: '2026-10-27 11:38:00', paidAt: '2026-10-27 11:40:00' }),
-    o({ orderNo: 'WEB-261026-EX01', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', userId: '2060199610824356004', skuId: 'KR-Q-2026', skuName: 'Pro · Pro Quarterly', originalAmount: 89100, payAmount: 89100, method: 'kakaopay', providerRef: 'KAKAO-26141209KR', createdAt: '2026-10-26 14:10:00', paidAt: '2026-10-26 14:12:00' }),
+  const txns: LinkTxn[] = [
+    t({ txnId: 'TXN-261028-TB02', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_BALANCE', amount: 8910, method: 'KPLUS', status: 'PENDING', createdAt: '2026-10-28 15:42:10' }),
+    t({ txnId: 'TXN-261028-TF01', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', amount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
+    t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', declaredAt: '2026-10-28 15:30:00', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
+    t({ txnId: 'TXN-261027-VF01', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
+    t({ txnId: 'TXN-261028-RF01', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
+    t({ txnId: 'TXN-261020-LF01', orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
+    t({ txnId: 'TXN-261028-BK01', orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', amount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', declaredAt: '2026-10-28 13:22:00', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
+    t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),
+    t({ txnId: 'TXN-261027-KP01', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
+    t({ txnId: 'TXN-261028-EX03', orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),
+    t({ txnId: 'TXN-261027-EX02', orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', providerRef: 'CARD-27114033KR', createdAt: '2026-10-27 11:38:00', paidAt: '2026-10-27 11:40:00' }),
+    t({ txnId: 'TXN-261026-EX01', orderNo: 'WEB-261026-EX01', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 89100, method: 'kakaopay', providerRef: 'KAKAO-26141209KR', createdAt: '2026-10-26 14:10:00', paidAt: '2026-10-26 14:12:00' }),
   ]
-  return { links, orders }
+  return { links, orders, txns }
 }
 
-/** First run on this storage version: write demo links and orders, drop the old one-link-per-payment data. */
+/** First run on this storage version: write demo links, orders and transactions, drop older demo data. */
 export function ensurePaymentLinkData() {
   if (localStorage.getItem(PAYMENT_LINK_KEY) === null) {
-    const { links, orders } = seed()
+    const { links, orders, txns } = seed()
     writePaymentLinks(links)
     localStorage.setItem(LINK_ORDER_KEY, JSON.stringify(orders))
-    LEGACY_PAYMENT_LINK_KEYS.forEach((key) => localStorage.removeItem(key))
+    localStorage.setItem(LINK_TXN_KEY, JSON.stringify(txns))
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key))
   }
   syncOrderCenter()
 }

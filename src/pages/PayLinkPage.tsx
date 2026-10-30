@@ -7,19 +7,21 @@ import {
   PREVIEW_LINK_ID,
   balanceDeadline,
   balanceOverdue,
-  completeOrder,
+  completeTxn,
   currentStage,
   declareTransfer,
   ensurePaymentLinkData,
+  failTxn,
   findPaymentLink,
   isExpired,
-  ordersOfLink,
+  paidTxn,
   parseTime,
   stageAmount,
   stageMethods,
   startCheckout,
   transferReference,
-  type LinkOrder,
+  txnsOfLink,
+  type LinkTxn,
   type PayStage,
 } from '../paymentLinkStore'
 import { useStore } from '../store'
@@ -160,7 +162,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const link = useMemo(() => findPaymentLink(linkId), [linkId, version])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const orders = useMemo(() => ordersOfLink(linkId), [linkId, version])
+  const txns = useMemo(() => txnsOfLink(linkId), [linkId, version])
   const line = link?.line || 'Korea'
   const [lang, setLang] = useState<ReviewLang>('local')
   const copy = payCopy(line, lang)
@@ -168,15 +170,15 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const open = link?.audience === 'open'
   const [account, setAccount] = useState<Account | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
-  const [doneOrder, setDoneOrder] = useState<LinkOrder | null>(null)
+  const [doneTxn, setDoneTxn] = useState<LinkTxn | null>(null)
   const [previewAcked, setPreviewAcked] = useState(false)
-  const stage = link ? currentStage(link, orders) : null
+  const stage = link ? currentStage(link, txns) : null
   const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
   const offers = link?.offers || []
   const [pickedId, setPickedId] = useState('')
   const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
   const shownStage: PayStage = stage || (link?.kind === 'deposit' ? 'DEPOSIT_BALANCE' : 'FULL')
-  const amount = link ? stageAmount(link, shownStage, picked, orders) : 0
+  const amount = link ? stageAmount(link, shownStage, picked, txns) : 0
   const payable = picked?.payable ?? link?.payable ?? 0
   const list = picked?.listPrice ?? payable
   const currency = picked?.currency || link?.currency || ''
@@ -186,13 +188,15 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const [methodCode, setMethodCode] = useState('')
   const activeMethod = methods.find((method) => method.code === methodCode) || methods[0]
   const showBank = activeMethod?.kind === 'manual'
-  const [host, setHost] = useState<{ method: PayMethod; order?: LinkOrder } | null>(null)
+  const [host, setHost] = useState<{ method: PayMethod; orderNo?: string; txn?: LinkTxn } | null>(null)
   const [copied, setCopied] = useState('')
+  const [bankOrderNo, setBankOrderNo] = useState('')
   const bankRef = useRef<HTMLElement>(null)
   const payerId = open ? account?.userId : link?.userId
-  const collecting = !!stage && !doneOrder
-  const bankOrder = showBank && collecting
-    ? orders.find((order) => order.status === 'PENDING' && order.payStage === stage && order.method === activeMethod?.code && order.userId === payerId)
+  const collecting = !!stage && !doneTxn
+  const bankTxn = showBank && collecting && payerId
+    ? txns.find((txn) => txn.status === 'PENDING' && txn.payStage === stage && txn.method === activeMethod?.code
+      && (!open || txn.orderNo === bankOrderNo))
     : undefined
 
   useEffect(() => {
@@ -200,9 +204,13 @@ function PayLinkView({ linkId }: { linkId: string }) {
   }, [showBank])
 
   useEffect(() => {
-    if (!showBank || !collecting || preview || bankOrder || !stage || !activeMethod || !payerId) return
-    if (startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payerId })) refresh()
-  }, [showBank, collecting, preview, bankOrder, stage, activeMethod, payerId, linkId, picked?.skuId])
+    if (!showBank || !collecting || preview || bankTxn || !stage || !activeMethod || !payerId) return
+    const started = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payerId })
+    if (started) {
+      setBankOrderNo(started.order.orderNo)
+      refresh()
+    }
+  }, [showBank, collecting, preview, bankTxn, stage, activeMethod, payerId, linkId, picked?.skuId])
 
   const copyValue = async (key: string, value: string) => {
     try {
@@ -230,16 +238,22 @@ function PayLinkView({ linkId }: { linkId: string }) {
       setHost({ method: activeMethod })
       return
     }
-    const order = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payer?.userId })
-    if (!order) return
-    setHost({ method: activeMethod, order })
+    const started = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payer?.userId })
+    if (!started) return
+    setHost({ method: activeMethod, orderNo: started.order.orderNo, txn: started.txn })
     refresh()
   }
 
   const pay = () => {
     if (!host) return
-    const paid = !preview && host.order ? completeOrder(host.order.orderNo) : undefined
-    if (paid) setDoneOrder(paid)
+    const paid = !preview && host.txn ? completeTxn(host.txn.txnId) : undefined
+    if (paid) setDoneTxn(paid)
+    setHost(null)
+    refresh()
+  }
+
+  const leaveHost = (reason: string) => {
+    if (!preview && host?.txn) failTxn(host.txn.txnId, reason)
     setHost(null)
     refresh()
   }
@@ -271,8 +285,8 @@ function PayLinkView({ linkId }: { linkId: string }) {
       setPreviewAcked(true)
       return
     }
-    if (!bankOrder) return
-    declareTransfer(bankOrder.orderNo)
+    if (!bankTxn) return
+    declareTransfer(bankTxn.txnId)
     refresh()
   }
 
@@ -285,10 +299,12 @@ function PayLinkView({ linkId }: { linkId: string }) {
           <p className="psp-kicker">{host.method.name}</p>
           <h1>{formatMoney(amount, currency)}</h1>
           <p className="psp-sku">{skuName}</p>
-          {host.order && <p className="psp-sku">Order {host.order.orderNo}</p>}
+          {host.orderNo && <p className="psp-sku">Order {host.orderNo}</p>}
+          {host.txn && <p className="psp-sku">Transaction {host.txn.txnId}</p>}
           {open && account && <p className="psp-sku">ID {account.userId}</p>}
           <button className="psp-pay" type="button" onClick={pay}>{copy.pay}</button>
-          <button className="psp-cancel" type="button" onClick={() => setHost(null)}>{copy.choose}</button>
+          <button className="psp-cancel" type="button" onClick={() => leaveHost('用户返回，未完成支付')}>{copy.choose}</button>
+          <button className="psp-fail" type="button" onClick={() => leaveHost('支付失败')}>模拟支付失败 · Simulate failure</button>
         </div>
       </div>
     )
@@ -300,29 +316,29 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const chargeLabel = shownStage === 'DEPOSIT_FIRST' ? copy.first : shownStage === 'DEPOSIT_BALANCE' ? copy.balance : copy.total
   const kindTag = deposit ? `${chargeLabel} · ${shownStage === 'DEPOSIT_FIRST' ? 1 : 2}/2` : copy.fullTag
   const blocked = !!activeMethod?.minAmount && amount < activeMethod.minAmount
-  const firstPaid = orders.find((order) => order.payStage === 'DEPOSIT_FIRST' && order.status === 'COMPLETED')
-  const balancePaid = orders.find((order) => order.payStage === 'DEPOSIT_BALANCE' && order.status === 'COMPLETED')
+  const firstPaid = paidTxn(txns, 'DEPOSIT_FIRST')
+  const balancePaid = paidTxn(txns, 'DEPOSIT_BALANCE')
   const steps = [
-    { key: 'first', name: copy.first, value: firstPaid?.payAmount ?? link.amount, state: firstPaid ? 'paid' : 'now' },
-    { key: 'balance', name: copy.balance, value: Math.max(payable - (firstPaid?.payAmount ?? link.amount), 0), state: balancePaid ? 'paid' : firstPaid ? 'now' : 'later' },
+    { key: 'first', name: copy.first, value: firstPaid?.amount ?? link.amount, state: firstPaid ? 'paid' : 'now' },
+    { key: 'balance', name: copy.balance, value: Math.max(payable - (firstPaid?.amount ?? link.amount), 0), state: balancePaid ? 'paid' : firstPaid ? 'now' : 'later' },
   ]
   const stateLabel = (state: string) => (state === 'paid' ? copy.paidTag : state === 'now' ? copy.dueNow : copy.laterTag)
-  const dueAt = deposit ? balanceDeadline(link, orders) : null
-  const overdue = deposit && balanceOverdue(link, orders)
+  const dueAt = deposit ? balanceDeadline(link, txns) : null
+  const overdue = deposit && balanceOverdue(link, txns)
   const dueDays = link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS
   const daysText = (template: string, days: number) => template.replace('{days}', String(days)).replace(' 1 days', ' 1 day')
   const dueNote = overdue
     ? copy.overdue
-    : stage === 'DEPOSIT_FIRST' && !doneOrder
+    : stage === 'DEPOSIT_FIRST' && !doneTxn
       ? daysText(copy.dueRule, dueDays)
       : stage === 'DEPOSIT_BALANCE' && dueAt
         ? daysText(copy.dueLeft, Math.max(1, Math.ceil((parseTime(dueAt) - Date.now()) / 86_400_000)))
         : ''
-  const settledOrder = !stage && !open && !blockedLink && !overdue
-    ? orders.filter((order) => order.status === 'COMPLETED').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
+  const settledTxn = !stage && !open && !blockedLink && !overdue
+    ? txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
     : undefined
-  const note = bankOrder?.transferReference || transferReference(preview ? 'WEB-PREVIEW' : linkId)
-  const acked = preview ? previewAcked : !!bankOrder?.declaredAt
+  const note = bankTxn?.transferReference || transferReference(preview ? 'TXN-PREVIEW' : linkId)
+  const acked = preview ? previewAcked : !!bankTxn?.declaredAt
 
   return (
     <div className="pay-link-page" dir={copy.dir}>
@@ -360,13 +376,13 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </div>
         </section>
 
-        {(doneOrder || settledOrder) && (
+        {(doneTxn || settledTxn) && (
           <section className="pay-card pay-done">
             <span className="pay-done__icon">✓</span>
             <div>
-              <p className="pay-done__title">{doneOrder ? copy.paySuccess : copy.linkPaid}</p>
-              <p className="pay-done__order">Order {(doneOrder || settledOrder)?.orderNo}</p>
-              {doneOrder?.payStage === 'DEPOSIT_FIRST' && <p className="pay-done__order">{copy.balanceNext}</p>}
+              <p className="pay-done__title">{doneTxn ? copy.paySuccess : copy.linkPaid}</p>
+              <p className="pay-done__order">Order {(doneTxn || settledTxn)?.orderNo}</p>
+              {doneTxn?.payStage === 'DEPOSIT_FIRST' && <p className="pay-done__order">{copy.balanceNext}</p>}
             </div>
           </section>
         )}

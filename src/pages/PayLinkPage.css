@@ -698,6 +698,18 @@
   cursor: pointer;
 }
 
+.psp-fail {
+  display: block;
+  margin: 10px auto 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .pay-preview {
   padding: 8px 16px;
   background: #fff7e6;

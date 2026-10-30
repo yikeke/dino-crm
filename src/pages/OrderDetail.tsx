@@ -7,7 +7,7 @@ import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useStore } from '../store'
-import type { OrderStatus, OrderTransaction, UserStatus, UserType } from '../types'
+import type { OrderTransaction, UserStatus, UserType } from '../types'
 import { usePerm } from '../perm'
 import LocalTime from '../components/LocalTime'
 import { resolveUserType } from '../userType'
@@ -15,7 +15,8 @@ import { findPaymentLink } from '../paymentLinkStore'
 
 const { Text } = Typography
 
-const STATUS_COLOR: Record<OrderStatus, string> = {
+const STATUS_COLOR: Record<OrderTransaction['status'], string> = {
+  支付失败: 'red',
   待支付: 'orange',
   部分付款: 'blue',
   已支付: 'green',
@@ -83,7 +84,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
         : event),
     },
     { title: d('recordTime'), dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
-    { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{t(`enum.order.${status}`)}</Tag> },
+    { title: d('txnStatus'), dataIndex: 'status', width: 120, render: (status: OrderTransaction['status']) => <Tag color={STATUS_COLOR[status]}>{status === '支付失败' ? d('txnFailed') : t(`enum.order.${status}`)}</Tag> },
     { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
     { title: t('order.col.payMethod'), dataIndex: 'paymentMethod', width: 130, render: (method) => method || <Text type="secondary">—</Text> },
     { title: d('channelRef'), dataIndex: 'channelRef', width: 190, render: (ref) => (ref ? <Text code>{ref}</Text> : <Text type="secondary">—</Text>) },
