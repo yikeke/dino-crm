@@ -11,6 +11,7 @@ import type { OrderStatus, OrderTransaction, UserStatus, UserType } from '../typ
 import { usePerm } from '../perm'
 import LocalTime from '../components/LocalTime'
 import { resolveUserType } from '../userType'
+import { findPaymentLink } from '../paymentLinkStore'
 
 const { Text } = Typography
 
@@ -54,8 +55,9 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const order = useMemo(() => orders.find((item) => item.orderId === orderId), [orders, orderId])
   const student = useMemo(() => students.find((item) => item.studentId === order?.studentId), [students, order?.studentId])
   const inScope = order && (!scope || (student && scope.includes(student.businessLine)))
+  const linkPage = (id?: string) => `/marketing-center-v5/${id && findPaymentLink(id)?.audience === 'open' ? 'open-links' : 'payment-links'}${id ? `?link=${encodeURIComponent(id)}` : ''}`
   const back = fromLinks
-    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/marketing-center-v5/payment-links${order?.paymentLinkId ? `?link=${encodeURIComponent(order.paymentLinkId)}` : ''}`)}>{d('backPaymentLinks')}</Button>
+    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(linkPage(order?.paymentLinkId))}>{d('backPaymentLinks')}</Button>
     : <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
 
   if (!order || !inScope) {
@@ -105,7 +107,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
           <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
           {order.paymentLinkId && (
             <Descriptions.Item label={d('sourceLink')}>
-              <a onClick={() => navigate(`/marketing-center-v5/payment-links?link=${encodeURIComponent(order.paymentLinkId || '')}`)}>{order.paymentLinkId}</a>
+              <a onClick={() => navigate(linkPage(order.paymentLinkId))}>{order.paymentLinkId}</a>
             </Descriptions.Item>
           )}
           <Descriptions.Item label={t('order.col.paidTime')}><LocalTime time={order.paidTime} country={country} /></Descriptions.Item>
