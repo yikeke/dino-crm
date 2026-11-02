@@ -387,6 +387,7 @@ export default function LandingSkinManagement() {
   if (editing) {
     const pageType = normalizePageType(editing.pageType, editing.afterRegisterAction)
     const basicsLocked = skinHasLiveVersion(editing)
+    const noRegister = registerModeForPage(pageType, editing.registerMode) === 'none'
     const life = skinLifecycle(editing)
     const addAsset = (key: 'registerBefore' | 'registerAfter') =>
       setEditing({ ...editing, [key]: [...editing[key], emptySceneImage()] })
@@ -492,11 +493,16 @@ export default function LandingSkinManagement() {
             <div>
               <Radio.Group
                 className="skin-radio-stack"
-                disabled={basicsLocked || !editing.line}
+                disabled={basicsLocked || !editing.line || noRegister}
                 value={followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line)}
                 onChange={(e) => setEditing({ ...editing, afterRegisterAction: e.target.value })}
                 options={followUpOptions(pageType, editing.line).map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
               />
+              {noRegister ? (
+                <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
+                  {en ? 'No registration: the page does not go to a next interaction page.' : '无注册时不进入后续交互页面'}
+                </Text>
+              ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
                 {pageType === 'pay'
                   ? (en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。')
@@ -550,8 +556,8 @@ export default function LandingSkinManagement() {
                 {pageType === 'pay'
                   ? (en ? 'Payment landings cannot use “No register”, and must use OTP.' : '支付落地页不能选择无注册，且必须有验证。')
                   : (en
-                    ? 'No register hides the form. Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
-                    : '无注册则不展示表单。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
+                    ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
+                    : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
               </Text>
             </div>
           </div>
