@@ -1,6 +1,7 @@
 import { Navigate, Route, HashRouter, Routes } from 'react-router-dom'
 import { useSession } from './auth'
-import { usePerm } from './perm'
+import { useEffect } from 'react'
+import { setIdentity, useIdentityId, usePerm } from './perm'
 import type { ModuleKey } from './types'
 import Login from './pages/Login'
 import AppABTest from './pages/AppABTest'
@@ -73,6 +74,16 @@ function PaymentLinkGuard({ children }: { children: JSX.Element }) {
   return children
 }
 
+// The CC identity picked on payment-link pages has no landing permission; skin pages fall back to the default identity.
+function SkinGuard({ children }: { children: JSX.Element }) {
+  const { can } = usePerm()
+  const blocked = can('marketingV2_landing') === 'none' && Boolean(useIdentityId())
+  useEffect(() => {
+    if (blocked) setIdentity(null)
+  }, [blocked])
+  return blocked ? <></> : children
+}
+
 function HomeRedirect() {
   const { can } = usePerm()
   return <Navigate to={firstAllowedPath(can)} replace />
@@ -120,7 +131,7 @@ export default function App() {
           <Route path="marketing-center-v5/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
           <Route path="marketing-center-v5/payment-links" element={<PaymentLinkGuard><CreatePaymentLink /></PaymentLinkGuard>} />
           <Route path="marketing-center-v5/open-links" element={<PaymentLinkGuard><CreatePaymentLink key="open" scope="open" /></PaymentLinkGuard>} />
-          <Route path="marketing-center-v6/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
+          <Route path="marketing-center-v6/skins" element={<SkinGuard><LandingSkinManagement /></SkinGuard>} />
           <Route path="marketing-center/skins" element={<Navigate to="/marketing-center-v6/skins" replace />} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
