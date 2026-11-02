@@ -148,20 +148,27 @@ export default function AppLayout() {
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
   ].filter((n) => visible(n.key))
 
-  // 日本 10.3 原型：只演示营销中心，除落地页皮肤管理外都置灰
+  // 香港 10.4 原型：只演示营销中心。渠道 / SKU / 价格方案 / 落地页 / 皮肤都要能选香港。
   const untouched = (text: string) => (
     <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.25 }}>
       <span>{text}</span>
       <span style={{ fontSize: 11 }}>{lang === 'en' ? 'No change in this PRD' : '本期不涉及变动'}</span>
     </span>
   )
+  const HK_TABS = new Set([
+    '/marketing-center-v5/channels',
+    '/marketing-center-v5/skus',
+    '/marketing-center-v5/offers',
+    '/marketing-center-v5/landing',
+    '/marketing-center-v5/skins',
+  ])
   const NAV = [
     {
       key: 'marketing-v5',
       icon: <ShopOutlined />,
-      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.3', 'geekblue'),
+      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.4', 'geekblue'),
       children: marketingV5Children.map((n) =>
-        n.key === '/marketing-center-v5/skins'
+        HK_TABS.has(n.key)
           ? n
           : { ...n, disabled: true, label: untouched(typeof n.label === 'string' ? n.label : String(n.label)), style: { height: 'auto', lineHeight: 1.25, paddingTop: 8, paddingBottom: 8 } },
       ),

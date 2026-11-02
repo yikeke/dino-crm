@@ -277,6 +277,22 @@ const JP_SKUS = [
   { id: 'max-year', name: 'Max 年訂', price: '¥59,800', was: '' },
 ]
 
+const HK_SKUS = [
+  { id: 'pro-week', name: 'Pro 週包', price: 'HK$79', was: '' },
+  { id: 'pro-month', name: 'Pro 月包', price: 'HK$299', was: '' },
+  { id: 'pro-year', name: 'Pro 年包', price: 'HK$2,348', was: '' },
+  { id: 'max-month', name: 'Max 月包', price: 'HK$468', was: '' },
+  { id: 'max-year', name: 'Max 年包', price: 'HK$2,888', was: '' },
+]
+
+const HK_PAY_METHODS = [
+  { id: 'apple_google', name: 'Apple Pay / Google Pay', note: '展會前必須 · 只在支援的裝置出現' },
+  { id: 'card', name: 'Visa / Mastercard', note: '展會前必須' },
+  { id: 'alipayhk', name: 'AlipayHK', note: '展會前必須 · 電腦出動態收款碼' },
+  { id: 'alipay', name: 'Alipay', note: '可展會後' },
+  { id: 'octopus', name: 'Octopus', note: '可展會後' },
+]
+
 type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | 'onelink' | null
 
 const ONELINK_SAMPLE = 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_JP-KOL-SDKD4K&c=JP-KOL-SDKD4K&lp_id=LP-E57YSUCTP7'
@@ -442,7 +458,11 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
 function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: FlowStep; onStep: (next: FlowStep) => void; onClose: () => void; annotate: boolean; line?: string }) {
   if (!step) return null
   const jp = line === '日本'
-  const skus = jp ? JP_SKUS : SKUS
+  const hk = line === '香港'
+  const skus = jp ? JP_SKUS : hk ? HK_SKUS : SKUS
+  const onelinkUrl = hk
+    ? 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_HK-KOL-DEMO&c=HK-KOL-DEMO&lp_id=LP-HKDEMO01'
+    : ONELINK_SAMPLE
   return (
     <div className="lp-overlay" role="dialog" aria-modal="true">
       <div className="lp-overlay-card">
@@ -474,8 +494,24 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
         {step === 'pay' ? (
           <div className="lp-pay">
             <h2>确认支付</h2>
-            <p className="lp-overlay-copy">{jp ? '日本只有 PayPay：点了直接进 PayPay 付款页，确认到账后弹出下载 App。' : '原型演示：支付成功后弹出下载 App。'}</p>
-            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>{jp ? 'PayPay で支払う' : '完成支付'}</button>
+            {hk ? (
+              <>
+                <p className="lp-overlay-copy">香港收银台按优先级露出。点任一方式后，原型直接演示「确认到账 → 下载 App」。未开通的方式线上不露出。</p>
+                {HK_PAY_METHODS.map((method) => (
+                  <button type="button" className="lp-sku" key={method.id} onClick={() => onStep('download')}>
+                    <span>
+                      <b>{method.name}</b>
+                      <span className="lp-was">{method.note}</span>
+                    </span>
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <p className="lp-overlay-copy">{jp ? '日本只有 PayPay：点了直接进 PayPay 付款页，确认到账后弹出下载 App。' : '原型演示：支付成功后弹出下载 App。'}</p>
+                <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>{jp ? 'PayPay で支払う' : '完成支付'}</button>
+              </>
+            )}
           </div>
         ) : null}
         {step === 'download' ? (
@@ -490,7 +526,7 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
           <div className="lp-pay">
             <h2>正在打开 OneLink</h2>
             <p className="lp-overlay-copy">原型模拟，不会真实跳转。线上：已装 App 直接拉起 App，未装去 App Store / Google Play。链接由系统生成，带渠道、lp_id、promo_code 等归因参数，不需要在 CRM 填。</p>
-            <code className="lp-onelink-url">{ONELINK_SAMPLE}</code>
+            <code className="lp-onelink-url">{onelinkUrl}</code>
             <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onClose}>知道了</button>
           </div>
         ) : null}

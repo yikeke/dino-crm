@@ -204,7 +204,7 @@
       'KR-SUMMER':{name:'韩国开学季通用券包',code:'KR-SUMMER',line:'韩国',from:'2026-09-01',to:'2026-09-30',status:'生效中',rules:['季度包：5%','半年包：10%','年度包：15%']},
       'VN-MID-AUTUMN':{name:'越南中秋新客券包',code:'VN-MID-AUTUMN',line:'越南',from:'2026-09-01',to:'2026-10-05',status:'生效中',rules:['季度包：10%','半年包：15%','年度包：立减 500,000 VND']}
     };
-    const businessLines=['马来','印尼','泰国','新加坡','越南','韩国','沙特','日本','其他'];
+    const businessLines=['马来','印尼','泰国','新加坡','越南','韩国','沙特','日本','香港','其他'];
     const promotionTypes=Object.fromEntries(businessLines.map(line=>[line,['广告投放','KOL','销售']]));
     let links=[
       {id:'LK_8F2KQ',name:'Amy · 韩国暑期新客优惠',line:'韩国',lpType:'10',templateId:'KR_SKIN_A',channel:'销售',type:'销售',owner:'Amy Zhang',set:'CSP-AMY',status:'已上架',from:'2026-08-31',to:'2026-09-30',clicks:'1,824',paid:'¥38,400'},
@@ -214,7 +214,10 @@
       {id:'LK_VN3L8',name:'Linh · 越南中秋新客优惠',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'销售',type:'销售',owner:'Linh Nguyen',set:'CSP-LINH',status:'已上架',clicks:'1,286',paid:'₫12,860,000'},
       {id:'LK_VN8KM',name:'Minh · TikTok 中秋合作',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'KOL',type:'KOL',owner:'@minh_study',set:'CSP-MINH',contentId:'tt_minh_20260905',status:'已上架',clicks:'1,958',paid:'₫19,580,000'},
       {id:'LK_VNM2',name:'越南 Meta 中秋投放',line:'越南',lpType:'104',templateId:'DEFAULT',channel:'广告投放',type:'广告投放',owner:'越南 Meta 中秋投放',set:'CSP-VN-META',skuId:'VN-Y-2026',platform:'Meta',lpId:'LPID-META-VN829',status:'已上架',clicks:'3,426',paid:'₫34,260,000'},
-      {id:'LK_VNG7',name:'越南 Google 秋季拉新',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'广告投放',type:'广告投放',owner:'越南 Google 秋季拉新',set:'CSP-VN-GOOGLE',platform:'Google',lpId:'LPID-GOOG-VN4X8',status:'已下架',clicks:'2,804',paid:'₫28,040,000'}
+      {id:'LK_VNG7',name:'越南 Google 秋季拉新',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'广告投放',type:'广告投放',owner:'越南 Google 秋季拉新',set:'CSP-VN-GOOGLE',platform:'Google',lpId:'LPID-GOOG-VN4X8',status:'已下架',clicks:'2,804',paid:'₫28,040,000'},
+      {id:'LK_HK_PAY',name:'香港支付落地页 · 展会',line:'香港',lpType:'104',templateId:'HK_SKIN_A',channel:'广告投放',type:'广告投放',owner:'香港 Meta 展会投放',set:'CSP-HK-META',skuId:'HK-PRO-M',promoCode:'CSP-HK-META-PROMO',platform:'Meta',lpId:'LPID-HK-PAY01',status:'已上架',clicks:'0',paid:'HK$0'},
+      {id:'LK_HK_OL',name:'香港获客落地页 · 直接跳 OneLink',line:'香港',lpType:'10',templateId:'HK_SKIN_B',channel:'KOL',type:'KOL',owner:'@hk_dino_mom',set:'CSP-HK-KOL',contentId:'tt_hk_202612',status:'已上架',clicks:'0',paid:'HK$0'},
+      {id:'LK_HK_W2A',name:'香港获客落地页 · Web to App',line:'香港',lpType:'10',templateId:'HK_SKIN_C',channel:'销售',type:'销售',owner:'Chris Wong',set:'CSP-HK-SALES',status:'已上架',clicks:'0',paid:'HK$0'}
     ];
     let skus=[
       {id:'KR-Q-2026',productCode:'web-kr-pro-1q',name:'Dino English 季度包',line:'韩国',price:'99,000 KRW',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 90 天',scope:'Landing Page',best:false,status:'上架'},
@@ -222,7 +225,12 @@
       {id:'KR-Y-2026',productCode:'web-kr-pro-1y',name:'Dino English 年度包',line:'韩国',price:'298,000 KRW',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 365 天',scope:'Landing Page',best:true,status:'上架'},
       {id:'VN-Q-2026',productCode:'web-vn-pro-1q',name:'Dino English 季度包',line:'越南',price:'990,000 VND',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 90 天',scope:'Landing Page',best:false,status:'上架'},
       {id:'VN-H-2026',productCode:'web-vn-pro-6m',name:'Dino English 半年包',line:'越南',price:'1,790,000 VND',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 180 天',scope:'Landing Page',best:false,status:'上架'},
-      {id:'VN-Y-2026',productCode:'web-vn-pro-1y',name:'Dino English 年度包',line:'越南',price:'2,990,000 VND',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 365 天',scope:'Landing Page',best:true,status:'上架'}
+      {id:'VN-Y-2026',productCode:'web-vn-pro-1y',name:'Dino English 年度包',line:'越南',price:'2,990,000 VND',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 365 天',scope:'Landing Page',best:true,status:'上架'},
+      {id:'HK-PRO-W',productCode:'web-hk-pro-1w',name:'Dino English Pro 週包',line:'香港',price:'79 HKD',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 7 天',scope:'Landing Page',best:false,status:'上架'},
+      {id:'HK-PRO-M',productCode:'web-hk-pro-1m',name:'Dino English Pro 月包',line:'香港',price:'299 HKD',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 30 天',scope:'Landing Page',best:false,status:'上架'},
+      {id:'HK-PRO-Y',productCode:'web-hk-pro-1y',name:'Dino English Pro 年包',line:'香港',price:'2,348 HKD',paymentMode:'ONE_TIME',memberLevel:'PRO',valid:'购买后 365 天',scope:'Landing Page',best:true,status:'上架'},
+      {id:'HK-MAX-M',productCode:'web-hk-max-1m',name:'Dino English Max 月包',line:'香港',price:'468 HKD',paymentMode:'ONE_TIME',memberLevel:'PRO_MAX',valid:'购买后 30 天',scope:'Landing Page',best:false,status:'上架'},
+      {id:'HK-MAX-Y',productCode:'web-hk-max-1y',name:'Dino English Max 年包',line:'香港',price:'2,888 HKD',paymentMode:'ONE_TIME',memberLevel:'PRO_MAX',valid:'购买后 365 天',scope:'Landing Page',best:false,status:'上架'}
     ];
     skus.forEach(sku=>{sku.packageName=sku.packageName||sku.name;sku.productCode=sku.productCode||sku.id;sku.paymentMode=sku.paymentMode||'ONE_TIME';sku.memberLevel=sku.memberLevel||'PRO'});
     let distributors=[
@@ -232,6 +240,9 @@
       {id:'ad_kr_google',name:'韩国 Google 暑期拉新',type:'广告投放',channel:'广告投放',line:'韩国',platform:'Google',account:'Google Ads',lpId:'LPID-GOOG-4X8PM',lpIdSyncStatus:'已同步',manager:'Mia',source:'手工创建',enabled:true},
       {id:'sales_linh_nguyen',name:'Linh Nguyen',type:'销售',channel:'销售',line:'越南',account:'—',manager:'越南销售组',source:'手工创建',enabled:true},
       {id:'kol_minh_study',name:'@minh_study',type:'KOL',channel:'KOL',line:'越南',platform:'TikTok',account:'TikTok @minh_study',manager:'Hana',source:'手工创建',enabled:true},
+      {id:'ad_hk_meta',name:'香港 Meta 展会投放',type:'广告投放',channel:'广告投放',line:'香港',platform:'Meta',account:'Meta Ads',lpId:'LPID-HK-PAY01',lpIdSyncStatus:'已同步',manager:'Chris',source:'手工创建',enabled:true},
+      {id:'kol_hk_dino_mom',name:'@hk_dino_mom',type:'KOL',channel:'KOL',line:'香港',platform:'TikTok',account:'TikTok @hk_dino_mom',manager:'Chris',source:'手工创建',enabled:true},
+      {id:'sales_chris_wong',name:'Chris Wong',type:'销售',channel:'销售',line:'香港',account:'—',manager:'香港销售组',source:'手工创建',enabled:true},
       {id:'ad_vn_meta',name:'越南 Meta 中秋投放',type:'广告投放',channel:'广告投放',line:'越南',platform:'Meta',account:'Meta Ads',lpId:'LPID-META-VN829',lpIdSyncStatus:'已同步',manager:'Hana',source:'手工创建',enabled:true},
       {id:'ad_vn_google',name:'越南 Google 秋季拉新',type:'广告投放',channel:'广告投放',line:'越南',platform:'Google',account:'Google Ads',lpId:'LPID-GOOG-VN4X8',lpIdSyncStatus:'已同步',manager:'Hana',source:'手工创建',enabled:true}
     ];
@@ -275,7 +286,7 @@
     function loadLandingSkins(){try{const raw=JSON.parse(localStorage.getItem('dinoai_landing_skins_v11')||localStorage.getItem('dinoai_landing_skins_v10')||localStorage.getItem('dinoai_landing_skins_v9')||localStorage.getItem('dinoai_landing_skins_v8')||localStorage.getItem('dinoai_landing_skins_v7')||localStorage.getItem('dinoai_landing_skins_v6')||localStorage.getItem('dinoai_landing_skins_v5')||localStorage.getItem('dinoai_landing_skins_v4')||localStorage.getItem('dinoai_landing_skins_v3')||localStorage.getItem('dinoai_landing_skins_v2')||localStorage.getItem('dinoai_landing_skins_v1')||'null');return Array.isArray(raw&&raw.skins)?raw.skins:[]}catch(e){return []}}
     function skinIsLive(s){return s&&s.code&&(s.status==='published'||s.status==='published_draft'||s.lastPublishedRevision!=null)}
     function publishedSkins(line){return loadLandingSkins().filter(s=>skinIsLive(s)&&(!line||s.line===line))}
-    function templateLabel(id){const skin=loadLandingSkins().find(s=>s.id===id||s.code===id);if(skin)return skin.name+'（'+skin.code+'）';const names={KR_SKIN_A:'韩国标准样式（KR_SKIN_A）',KR_SKIN_B:'韩国落地页样式（KR_SKIN_B）',VN_SKIN_A:'越南标准样式（VN_SKIN_A）',JP_SKIN_A:'日本落地页（JP_SKIN_A）'};return names[id]||id||'未选皮肤'}
+    function templateLabel(id){const skin=loadLandingSkins().find(s=>s.id===id||s.code===id);if(skin)return skin.name+'（'+skin.code+'）';const names={KR_SKIN_A:'韩国标准样式（KR_SKIN_A）',KR_SKIN_B:'韩国落地页样式（KR_SKIN_B）',VN_SKIN_A:'越南标准样式（VN_SKIN_A）',JP_SKIN_A:'日本落地页（JP_SKIN_A）',HK_SKIN_A:'香港支付落地页（HK_SKIN_A）',HK_SKIN_B:'香港获客落地页 · OneLink（HK_SKIN_B）',HK_SKIN_C:'香港获客落地页 · Web to App（HK_SKIN_C）'};return names[id]||id||'未选皮肤'}
     function initBusinessLineOptions(){['link-line','owner-line','sku-line','set-line','new-set-line','owner-form-line','form-line'].forEach(id=>{const select=$(id);if(!select)return;const selected=select.value,isForm=id==='form-line',defaultToKorea=['new-set-line','owner-form-line'].includes(id);select.innerHTML=(id.endsWith('-line')&&!defaultToKorea?'<option value="">'+(isForm?'请选择业务线':'业务线')+'</option>':'')+businessLines.map(line=>'<option value="'+esc(line)+'">'+line+'</option>').join('');select.value=businessLines.includes(selected)?selected:(defaultToKorea?'韩国':'')})}
     function appBase(){const path=location.pathname.replace(/\/marketing-center-demo\.html.*$/,'');return path==='/'?'':path}
     function skinPreviewUrl(templateId,extra){const skin=loadLandingSkins().find(s=>s.id===templateId||s.code===templateId);const code=(skin&&skin.code)||templateId||'1mw';const query=['code='+encodeURIComponent(code),'preview=1'];if(extra)Object.keys(extra).forEach(k=>{if(extra[k])query.push(k+'='+encodeURIComponent(extra[k]))});return location.origin+appBase()+'/#/website/promotion/landingpage?'+query.join('&')}

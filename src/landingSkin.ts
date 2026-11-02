@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v11'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v12'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -338,7 +338,7 @@ export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: st
 export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
-    if (x.value === 'onelink') return line === '日本'
+    if (x.value === 'onelink') return line === '日本' || line === '香港'
     if (x.value === 'download_app') return line !== '越南' && line !== '马来'
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
@@ -375,7 +375,7 @@ export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[]
   return thirdPartyOptionsForLine(line).map((x) => x.value).filter((id) => picked.has(id))
 }
 
-export const SKIN_BUSINESS_LINES = ['韩国', '越南', '马来', '泰国', '印尼', '新加坡', '沙特', '日本'] as const
+export const SKIN_BUSINESS_LINES = ['韩国', '越南', '马来', '泰国', '印尼', '新加坡', '沙特', '日本', '香港'] as const
 
 const LINE_PREFIX: Record<string, string> = {
   韩国: 'KR',
@@ -386,6 +386,7 @@ const LINE_PREFIX: Record<string, string> = {
   新加坡: 'SG',
   沙特: 'SA',
   日本: 'JP',
+  香港: 'HK',
   其他: 'OT',
 }
 
@@ -398,6 +399,7 @@ const LINE_LANGUAGE: Record<string, string> = {
   新加坡: 'en',
   沙特: 'ar',
   日本: 'ja',
+  香港: 'zh-Hant',
   其他: 'en',
 }
 
@@ -410,6 +412,7 @@ export const LINE_NAME_PLACEHOLDER: Record<string, { zh: string; en: string }> =
   新加坡: { zh: '例如：新加坡试听课皮肤', en: 'e.g. Singapore trial skin' },
   沙特: { zh: '例如：沙特免费体验课皮肤', en: 'e.g. Saudi free trial skin' },
   日本: { zh: '例如：日本落地页皮肤', en: 'e.g. Japan landing skin' },
+  香港: { zh: '例如：香港落地頁皮膚', en: 'e.g. Hong Kong landing skin' },
   其他: { zh: '例如：其他市场落地页皮肤', en: 'e.g. Other-market landing skin' },
 }
 
@@ -422,6 +425,7 @@ export const LINE_PHONE: Record<string, { dial: string; flag: string }> = {
   新加坡: { dial: '+65', flag: '🇸🇬' },
   沙特: { dial: '+966', flag: '🇸🇦' },
   日本: { dial: '+81', flag: '🇯🇵' },
+  香港: { dial: '+852', flag: '🇭🇰' },
   其他: { dial: '+1', flag: '🌐' },
 }
 
@@ -507,14 +511,14 @@ export function normalizePageType(type?: string, action?: string): LandingPageKi
 
 export function followUpActionForPageType(pageType: LandingPageKind, action?: string, line?: string, registerMode?: string): AfterRegisterAction {
   if (pageType === 'pay') return 'sku_promo_pay'
-  // 日本获客 + 无注册 = 现状默认获客页：按钮直接跳 OneLink，后续交互锁定。
-  if (line === '日本' && normalizeRegisterMode(registerMode) === 'none') return 'onelink'
+  // 日本 / 香港获客 + 无注册：按钮直接跳 OneLink，后续交互锁定。
+  if ((line === '日本' || line === '香港') && normalizeRegisterMode(registerMode) === 'none') return 'onelink'
   const allowed = followUpOptions('lead', line).map((x) => x.value)
   const next = normalizeAfterRegisterAction(action)
   if (allowed.includes(next)) return next
   if (line === '越南') return 'lead_vn'
   if (line === '马来') return 'lead_my'
-  if (line === '日本') return 'onelink'
+  if (line === '日本' || line === '香港') return 'onelink'
   return 'download_app'
 }
 
@@ -1165,6 +1169,119 @@ export function seedLandingSkins(): LandingSkinStore {
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_C'),
       },
       {
+        id: 'SKIN_HK01',
+        code: 'HK_SKIN_A',
+        name: '香港支付落地页 · 手机号 + 三方',
+        line: '香港',
+        pageType: 'pay',
+        registerTitle: '登入後選擇方案',
+        registerSubtitle: '手機號、Google、Apple、Facebook 都可以登入',
+        seoTitle: 'Dino AI｜兒童 AI 英語 App 付費方案',
+        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習。登入後用 Apple Pay、Visa 或 AlipayHK 付款。',
+        language: 'zh-Hant',
+        registerMode: 'full',
+        verifyEnabled: true,
+        extraFields: [],
+        thirdPartyLogins: ['google', 'apple', 'facebook'],
+        afterRegisterAction: 'sku_promo_pay' as const,
+        ctaText: '登入並選擇方案',
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: { ...DEFAULT_CTA_STYLE },
+        registerAreaBgKind: 'color',
+        registerAreaBgColor: '#ffe3a3',
+        hero: { ...asset('hero-hk-top', lpAsset('family.png'), 'family.png'), alt: '孩子跟恐龍角色一起練英語口語' },
+        registerBefore: [withBottomCta(jpPanel, '查看方案', applyButtonPreset('midnight', true))],
+        registerAfter: [asset('after-hk', AFTER, 'after-hk.png')],
+        stickyBar: asset('sticky-hk', STICKY, 'sticky-hk.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: '登入並選擇方案',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID HK_SKIN_A'),
+      },
+      {
+        id: 'SKIN_HK02',
+        code: 'HK_SKIN_B',
+        name: '香港获客落地页 · 直接跳 OneLink',
+        line: '香港',
+        pageType: 'lead',
+        seoTitle: 'Dino AI｜兒童 AI 英語 App 7 天免費體驗',
+        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習、發音回饋。現在 7 天免費體驗。',
+        language: 'zh-Hant',
+        registerMode: 'none',
+        verifyEnabled: false,
+        extraFields: [],
+        thirdPartyLogins: [],
+        afterRegisterAction: 'onelink' as const,
+        ctaText: '免費試用 Dino AI',
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: applyButtonPreset('midnight', true),
+        hero: { ...asset('hero-hk-b', lpAsset('family.png'), 'family.png'), alt: '孩子跟恐龍角色一起練英語口語' },
+        registerBefore: [withBottomCta(jpPanel, '跟 AI 老師說說話 →', applyButtonPreset('midnight', true))],
+        registerAfter: [withBottomCta(asset('after-hk-b', AFTER, 'after-hk.png'), '免費開始學習 →', applyButtonPreset('midnight', true))],
+        stickyBar: asset('sticky-hk-b', STICKY, 'sticky-hk.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: '免費試用 Dino AI →',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID HK_SKIN_B'),
+      },
+      {
+        id: 'SKIN_HK03',
+        code: 'HK_SKIN_C',
+        name: '香港获客落地页 · Web to App（出下载弹窗）',
+        line: '香港',
+        pageType: 'lead',
+        registerTitle: '登入後免費體驗 7 天',
+        registerSubtitle: '下載 App，立刻開始',
+        seoTitle: 'Dino AI｜兒童 AI 英語 App 7 天免費體驗',
+        seoDescription: '適合 3–12 歲。用手機號或 Google、Apple、Facebook 登入，下載 App 免費體驗 7 天。',
+        language: 'zh-Hant',
+        registerMode: 'full',
+        verifyEnabled: true,
+        extraFields: [],
+        thirdPartyLogins: ['google', 'apple', 'facebook'],
+        afterRegisterAction: 'download_app' as const,
+        ctaText: '登入並免費體驗',
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: applyButtonPreset('midnight', true),
+        registerAreaBgKind: 'color',
+        registerAreaBgColor: '#e3f6ea',
+        hero: { ...asset('hero-hk-c', lpAsset('family.png'), 'family.png'), alt: '孩子跟恐龍角色一起練英語口語' },
+        registerBefore: [withBottomCta(jpPanel, 'App 裡免費體驗 7 天', applyButtonPreset('midnight', true))],
+        registerAfter: [asset('after-hk-c', AFTER, 'after-hk.png')],
+        stickyBar: asset('sticky-hk-c', STICKY, 'sticky-hk.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: '登入並免費體驗',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID HK_SKIN_C'),
+      },
+      {
         id: 'SKIN_VN01',
         code: 'VN_SKIN_A',
         name: '越南线索页 · 无验证注册',
@@ -1231,6 +1348,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v11')
         ?? localStorage.getItem('dinoai_landing_skins_v10')
         ?? localStorage.getItem('dinoai_landing_skins_v9')
         ?? localStorage.getItem('dinoai_landing_skins_v8')
@@ -1245,11 +1363,11 @@ export function loadLandingSkinStore(): LandingSkinStore {
     ) as { version?: number; skins?: LandingSkin[] } | null
     if (raw && Array.isArray(raw.skins)) {
       const skins: LandingSkin[] = []
-      // 10.3 日本：旧版本地数据升级时，用三张日本示例皮肤（JP_SKIN_A/B/C）替换旧的日本示例。
+      // 升级时补入日本 / 香港示例皮肤。
       if (!localStorage.getItem(LANDING_SKIN_STORAGE_KEY)) {
-        const jpSeeds = seedLandingSkins().skins.filter((x) => x.line === '日本')
-        const jpCodes = new Set(jpSeeds.map((x) => x.code))
-        raw.skins = [...jpSeeds, ...raw.skins.filter((x) => !jpCodes.has(x.code) && x.id !== 'SKIN_JP01')]
+        const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港')
+        const seedCodes = new Set(seeds.map((x) => x.code))
+        raw.skins = [...seeds, ...raw.skins.filter((x) => !seedCodes.has(x.code) && x.id !== 'SKIN_JP01' && !String(x.id || '').startsWith('SKIN_HK'))]
       }
       for (const skin of raw.skins) {
         const line = skin.line === '其他' && (skin.language === 'ja' || (skin.code || '').startsWith('JP_'))
