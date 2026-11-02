@@ -74,8 +74,7 @@ function PaymentLinkGuard({ children }: { children: JSX.Element }) {
 }
 
 function HomeRedirect() {
-  const { can } = usePerm()
-  return <Navigate to={firstAllowedPath(can)} replace />
+  return <Navigate to="/marketing-center-v5/skins" replace />
 }
 
 export default function App() {

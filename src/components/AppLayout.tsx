@@ -63,9 +63,7 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
-  const [openKeys, setOpenKeys] = useState<string[]>(() =>
-    location.pathname.startsWith('/marketing-center-v5') ? ['marketing-v5'] : [],
-  )
+  const [openKeys, setOpenKeys] = useState<string[]>(['marketing-v5'])
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
   const selectedPath = location.pathname.startsWith('/marketing-center') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
@@ -150,28 +148,24 @@ export default function AppLayout() {
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
   ].filter((n) => visible(n.key))
 
+  // 日本 10.3 原型：只演示营销中心，除落地页皮肤管理外都置灰
+  const untouched = (text: string) => (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.25 }}>
+      <span>{text}</span>
+      <span style={{ fontSize: 11 }}>{lang === 'en' ? 'No change in this PRD' : '本期不涉及变动'}</span>
+    </span>
+  )
   const NAV = [
-    ...topNav,
-    ...salesNav,
-    ...systemNav,
-    ...usersV2Nav,
-    ...usersV6Nav,
-    ...ordersV3Nav,
-    ...salesV3Nav,
-    ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
-    ...(marketingV5Children.length ? [{ key: 'marketing-v5', icon: <ShopOutlined />, label: appABPhaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV5Children }] : []),
-    ...(marketingBackupChildren.length
-      ? [
-          {
-            key: 'marketing-backup',
-            icon: <HistoryOutlined />,
-            label: phase4Label(lang === 'en' ? 'Marketing Center Backup' : '营销中心备份'),
-            children: [{ key: '/marketing-backup', icon: <HistoryOutlined />, label: lang === 'en' ? 'Backup overview' : '备份说明' }, ...marketingBackupChildren],
-          },
-        ]
-      : []),
-    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
-    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
+    {
+      key: 'marketing-v5',
+      icon: <ShopOutlined />,
+      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.3', 'geekblue'),
+      children: marketingV5Children.map((n) =>
+        n.key === '/marketing-center-v5/skins'
+          ? n
+          : { ...n, disabled: true, label: untouched(typeof n.label === 'string' ? n.label : String(n.label)), style: { height: 'auto', lineHeight: 1.25, paddingTop: 8, paddingBottom: 8 } },
+      ),
+    },
   ]
 
   const TITLES: Record<string, string> = {
