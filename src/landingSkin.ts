@@ -319,15 +319,11 @@ export const REGISTER_MODE_OPTIONS: { value: RegisterMode; zh: string; en: strin
   { value: 'oauth', zh: '仅三方登录（没有手机号）', en: 'Social login only (no phone)' },
 ]
 
-/** 「仅三方登录」只给日本（10.3 最小改动），其他业务线仍是无注册 / 手机号两项。日本把 none 写成「无手机号注册」。 */
+/** 「仅三方登录」只给日本（10.3 最小改动），其他业务线仍是无注册 / 手机号两项。 */
 export function registerModeOptions(line?: string) {
   return REGISTER_MODE_OPTIONS
     .filter((x) => x.value !== 'oauth' || line === '日本')
-    .map((x) => {
-      if (line === '日本' && x.value === 'none') return { ...x, zh: '无手机号注册', en: 'No phone register' }
-      if (line === '日本' && x.value === 'oauth') return { ...x, zh: '仅三方登录', en: 'Social login only' }
-      return x
-    })
+    .map((x) => (line === '日本' && x.value === 'oauth' ? { ...x, zh: '仅三方登录', en: 'Social login only' } : x))
 }
 
 export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: string; en: string }[] = [

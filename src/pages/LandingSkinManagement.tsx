@@ -177,9 +177,7 @@ export default function LandingSkinManagement() {
     // Full checks only on submit; temporary save only needs line + name.
     if (!publish) return true
     if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
-      message.error(en
-        ? (editing.line === '日本' ? 'Payment landings cannot use “No phone register”.' : 'Payment landings cannot use “No register”.')
-        : (editing.line === '日本' ? '支付落地页不能选择无手机号注册' : '支付落地页不能选择无注册'))
+      message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
       return false
     }
     if (normalizeRegisterMode(editing.registerMode) === 'oauth' && !thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, 'oauth').length) {
@@ -518,7 +516,7 @@ export default function LandingSkinManagement() {
               />
               {jpOneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No phone register (Japan): every button on the page opens OneLink directly.' : '无手机号注册时，页面上的按钮直接跳转 OneLink'}
+                  {en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -530,8 +528,8 @@ export default function LandingSkinManagement() {
                   ? (en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。')
                   : editing.line === '日本'
                     ? (en
-                      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, usually No phone register) / Download-app popup (Web to App, Social login only).'
-                      : '日本有两种获客页：直接跳转 OneLink（现状默认获客页，一般配「无手机号注册」）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
+                      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
+                      : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -584,19 +582,13 @@ export default function LandingSkinManagement() {
               {editing.line === '日本' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {en
-                    ? 'Three types: 1) No phone register — no third-party, today’s default. 2) Phone register as account — third-party optional. 3) Social login only — no register button below; icons sit where the form was.'
-                    : '三种注册类型：1）无手机号注册：不支持选择三方，现状默认。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
+                    ? 'Three types: 1) No register — today’s default; no phone and no third-party; for pages whose buttons open OneLink. 2) Phone register as account — third-party optional. 3) Social login only — no register button below; icons sit where the form was.'
+                    : '三种注册类型：1）无注册：现状默认，不能配手机号也不能配三方，给页面上配按钮、点了跳 OneLink 的落地页用。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
                 </Text>
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en
-                    ? (editing.line === '日本'
-                      ? 'Payment landings cannot use “No phone register”; phone register must use OTP.'
-                      : 'Payment landings cannot use “No register”; phone register must use OTP.')
-                    : (editing.line === '日本'
-                      ? '支付落地页不能选择无手机号注册；选手机号注册时必须有验证。'
-                      : '支付落地页不能选择无注册；选手机号注册时必须有验证。'))
+                  ? (en ? 'Payment landings cannot use “No register”; phone register must use OTP.' : '支付落地页不能选择无注册；选手机号注册时必须有验证。')
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -692,7 +684,7 @@ export default function LandingSkinManagement() {
               <Text type="secondary">
                 {en
                   ? 'Not available for this register type.'
-                  : (editing.line === '日本' ? '无手机号注册不支持选择三方。' : '无注册不支持选择三方。')}
+                  : '无注册不支持选择手机号，也不支持选择三方。用于按钮直接跳 OneLink 的落地页。'}
               </Text>
             </div>
           ) : (
