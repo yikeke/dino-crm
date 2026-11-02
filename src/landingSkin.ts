@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v10'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v11'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -8,11 +8,11 @@ export const DEFAULT_SCENE_CTA_RECT = { left: 8, top: 86, width: 84, height: 11 
 /** Default hotspot when sticky button is overlaid on the sticky image. */
 export const DEFAULT_STICKY_CTA_RECT = { left: 8, top: 30, width: 84, height: 48 }
 
-export type RegisterMode = 'none' | 'full'
+export type RegisterMode = 'none' | 'full' | 'oauth'
 export type RegisterBgKind = 'color' | 'image'
 export type RegisterAreaBgKind = 'none' | 'color' | 'image'
-export type AfterRegisterAction = 'sku_promo_pay' | 'download_app' | 'lead_my' | 'lead_vn'
-export type ThirdPartyLogin = 'google' | 'apple' | 'facebook' | 'kakao'
+export type AfterRegisterAction = 'sku_promo_pay' | 'onelink' | 'download_app' | 'lead_my' | 'lead_vn'
+export type ThirdPartyLogin = 'line' | 'google' | 'apple' | 'facebook' | 'kakao'
 /** Two kinds, aligned with 落地页管理: payment vs acquisition (CC lead + KOL web-to-app). */
 export type LandingPageKind = 'pay' | 'lead'
 /**
@@ -316,10 +316,17 @@ export const LANGUAGE_OPTIONS = [
 export const REGISTER_MODE_OPTIONS: { value: RegisterMode; zh: string; en: string }[] = [
   { value: 'none', zh: '无注册', en: 'No register' },
   { value: 'full', zh: '手机号注册成账号', en: 'Phone register as account' },
+  { value: 'oauth', zh: '仅三方登录（没有手机号）', en: 'Social login only (no phone)' },
 ]
+
+/** 「仅三方登录」只给日本（10.3 最小改动），其他业务线仍是无注册 / 手机号两项。 */
+export function registerModeOptions(line?: string) {
+  return REGISTER_MODE_OPTIONS.filter((x) => x.value !== 'oauth' || line === '日本')
+}
 
 export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: string; en: string }[] = [
   { value: 'sku_promo_pay', zh: '跳转 SKU 列表 -> 输入 promo code -> 支付 -> 出下载 app 弹窗', en: 'SKU list → promo code → pay → download-app popup' },
+  { value: 'onelink', zh: '直接跳转 OneLink', en: 'Open OneLink directly' },
   { value: 'download_app', zh: '直接出下载 App 弹窗（Web to App）', en: 'Download-app popup (Web to App)' },
   { value: 'lead_my', zh: '出收集四个留资页面（马来版）-> 出下载 App 弹窗', en: 'Four lead pages (Malaysia) → download-app popup' },
   { value: 'lead_vn', zh: '出收集两个留资页面（越南版）-> 出下载 App 弹窗', en: 'Two lead pages (Vietnam) → download-app popup' },
@@ -329,6 +336,7 @@ export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: st
 export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
+    if (x.value === 'onelink') return line === '日本'
     if (x.value === 'download_app') return line !== '越南' && line !== '马来'
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
@@ -342,11 +350,27 @@ export function followUpLabel(action: AfterRegisterAction, en = false) {
 }
 
 export const THIRD_PARTY_OPTIONS: { value: ThirdPartyLogin; zh: string }[] = [
+  { value: 'line', zh: 'LINE' },
   { value: 'google', zh: 'Google' },
   { value: 'apple', zh: 'Apple' },
   { value: 'facebook', zh: 'Facebook' },
   { value: 'kakao', zh: 'Kakao' },
 ]
+
+const JP_THIRD_PARTY_ORDER: ThirdPartyLogin[] = ['line', 'apple', 'google', 'facebook']
+
+/** LINE 只给日本；日本固定按 LINE、Apple、Google、Facebook 排。 */
+export function thirdPartyOptionsForLine(line?: string) {
+  if (line === '日本') {
+    return JP_THIRD_PARTY_ORDER.map((id) => THIRD_PARTY_OPTIONS.find((x) => x.value === id)!)
+  }
+  return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line')
+}
+
+export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[]): ThirdPartyLogin[] {
+  const picked = new Set(normalizeThirdPartyLogins(ids))
+  return thirdPartyOptionsForLine(line).map((x) => x.value).filter((id) => picked.has(id))
+}
 
 export const SKIN_BUSINESS_LINES = ['韩国', '越南', '马来', '泰国', '印尼', '新加坡', '沙特', '日本'] as const
 
@@ -478,13 +502,16 @@ export function normalizePageType(type?: string, action?: string): LandingPageKi
   return 'pay'
 }
 
-export function followUpActionForPageType(pageType: LandingPageKind, action?: string, line?: string): AfterRegisterAction {
+export function followUpActionForPageType(pageType: LandingPageKind, action?: string, line?: string, registerMode?: string): AfterRegisterAction {
   if (pageType === 'pay') return 'sku_promo_pay'
+  // 日本获客 + 无注册 = 现状默认获客页：按钮直接跳 OneLink，后续交互锁定。
+  if (line === '日本' && normalizeRegisterMode(registerMode) === 'none') return 'onelink'
   const allowed = followUpOptions('lead', line).map((x) => x.value)
   const next = normalizeAfterRegisterAction(action)
   if (allowed.includes(next)) return next
   if (line === '越南') return 'lead_vn'
   if (line === '马来') return 'lead_my'
+  if (line === '日本') return 'onelink'
   return 'download_app'
 }
 
@@ -517,13 +544,19 @@ export function normalizeThirdPartyLogins(ids?: string[]): ThirdPartyLogin[] {
 
 export function normalizeRegisterMode(mode?: string): RegisterMode {
   if (mode === 'none') return 'none'
+  if (mode === 'oauth') return 'oauth'
   return 'full'
 }
 
-/** Payment landings always create a phone account. Acquisition pages may stay register-free. */
-export function registerModeForPage(pageType: LandingPageKind, mode?: string): RegisterMode {
+/**
+ * Payment landings never go register-free. 「仅三方登录」only exists for 日本;
+ * other lines fall back to phone register.
+ */
+export function registerModeForPage(pageType: LandingPageKind, mode?: string, line?: string): RegisterMode {
+  const next = normalizeRegisterMode(mode)
+  if (next === 'oauth') return line === '日本' ? 'oauth' : 'full'
   if (pageType === 'pay') return 'full'
-  return normalizeRegisterMode(mode)
+  return next
 }
 
 /**
@@ -535,8 +568,8 @@ export function verifyEnabledForPage(
   mode?: string,
   verifyEnabled?: boolean,
 ): boolean {
+  if (normalizeRegisterMode(mode) !== 'full') return false
   if (pageType === 'pay') return true
-  if (normalizeRegisterMode(mode) === 'none') return false
   return !!verifyEnabled
 }
 
@@ -687,7 +720,7 @@ export function collectSkinAssets(skin: LandingSkin): SkinSlot[] {
 }
 
 export function normalizeAfterRegisterAction(action?: string): AfterRegisterAction {
-  if (action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'sku_promo_pay') return action
+  if (action === 'onelink' || action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'sku_promo_pay') return action
   return 'sku_promo_pay'
 }
 
@@ -712,6 +745,7 @@ export function normalizeVerifyEnabled(skin: {
   verifyEnabled?: boolean
 }) {
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
+  if (skin.registerMode === 'oauth') return false
   if (pageType === 'pay') return true
   if (typeof skin.verifyEnabled === 'boolean') return skin.verifyEnabled
   return skin.registerMode === 'full'
@@ -770,9 +804,9 @@ const SCENE_BUTTON_ON = (item: SkinAsset) => !!item.ctaMode && item.ctaMode !== 
  * keep their own event ids, but they are not listed in this reference.
  * Index follows the current list (1-based). Copy, color, and position do not change the id.
  */
-export function skinTrackButtons(skin: Pick<LandingSkin, 'thirdPartyLogins' | 'registerBefore' | 'registerAfter' | 'stickyButtonEnabled'>): SkinTrackButton[] {
+export function skinTrackButtons(skin: Pick<LandingSkin, 'thirdPartyLogins' | 'registerBefore' | 'registerAfter' | 'stickyButtonEnabled'> & { registerMode?: RegisterMode }): SkinTrackButton[] {
   const rows: SkinTrackButton[] = []
-  rows.push({ key: 'form', zh: '注册按钮', en: 'Register button', eventId: 'h5_lead_submit' })
+  if (skin.registerMode !== 'oauth') rows.push({ key: 'form', zh: '注册按钮', en: 'Register button', eventId: 'h5_lead_submit' })
   for (const provider of skin.thirdPartyLogins || []) {
     rows.push({
       key: `oauth-${provider}`,
@@ -831,12 +865,12 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
     : (skin.registerBefore || [])
   return {
       ...rest,
-      thirdPartyLogins: normalizeThirdPartyLogins(skin.thirdPartyLogins),
+      thirdPartyLogins: thirdPartyLoginsForLine(skin.line, skin.thirdPartyLogins),
       pageType,
-      registerMode: registerModeForPage(pageType, skin.registerMode),
-      verifyEnabled: verifyEnabledForPage(pageType, skin.registerMode, skin.verifyEnabled),
-      extraFields: extraFieldsForPage(pageType, skin.extraFields),
-      afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line),
+      registerMode: registerModeForPage(pageType, skin.registerMode, skin.line),
+      verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, skin.registerMode, skin.line), skin.verifyEnabled),
+      extraFields: registerModeForPage(pageType, skin.registerMode, skin.line) === 'oauth' ? [] : extraFieldsForPage(pageType, skin.extraFields),
+      afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, registerModeForPage(pageType, skin.registerMode, skin.line)),
       registerBgKind: normalizeRegisterBgKind(skin.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(skin.registerBgColor),
       registerAreaBgKind: normalizeRegisterAreaBgKind(skin.registerAreaBgKind),
@@ -1015,29 +1049,29 @@ export function seedLandingSkins(): LandingSkinStore {
       {
         id: 'SKIN_JP01',
         code: 'JP_SKIN_A',
-        name: '日本落地页皮肤',
+        name: '日本支付落地页 · 仅三方登录',
         line: '日本',
-        pageType: 'lead',
-        registerTitle: '7日間無料で体験しよう',
-        registerSubtitle: '電話番号だけで、すぐに始められます',
-        seoTitle: 'Dino AI｜子ども向けAI英会話アプリ 7日間無料体験',
-        seoDescription: '3〜12歳の子ども向けAI英会話アプリ。ゲーム感覚で毎日15分、発音フィードバック付き。今なら7日間無料。',
+        pageType: 'pay',
+        registerTitle: 'ログインしてプランを選ぶ',
+        registerSubtitle: 'LINE・Apple・Google・Facebookで、すぐに始められます',
+        seoTitle: 'Dino AI｜子ども向けAI英会話アプリ 有料プラン',
+        seoDescription: '3〜12歳の子ども向けAI英会話アプリ。LINEでログインして、PayPayでお支払い。',
         language: 'ja',
-        registerMode: 'full',
-        verifyEnabled: true,
+        registerMode: 'oauth',
+        verifyEnabled: false,
         extraFields: [],
-        thirdPartyLogins: ['google', 'apple', 'facebook'],
-        afterRegisterAction: 'download_app' as const,
+        thirdPartyLogins: ['line', 'apple', 'google', 'facebook'],
+        afterRegisterAction: 'sku_promo_pay' as const,
         ctaStyle: applyButtonPreset('midnight', false),
         stickyCtaStyle: { ...DEFAULT_CTA_STYLE },
         registerAreaBgKind: 'color',
         registerAreaBgColor: '#ffe3a3',
         hero: { ...asset('hero-jp-top', lpAsset('family.png'), 'family.png'), alt: '恐竜のキャラクターと一緒に英語を学ぶ子ども' },
-        registerBefore: [withBottomCta(jpPanel, 'アプリで7日間の無料体験', applyButtonPreset('midnight', true))],
-        registerAfter: [withBottomCta(asset('after-jp', AFTER, 'after-jp.png'), 'アプリで7日間の無料体験', applyButtonPreset('midnight', true))],
+        registerBefore: [withBottomCta(jpPanel, 'プランを見る', applyButtonPreset('midnight', true))],
+        registerAfter: [asset('after-jp', AFTER, 'after-jp.png')],
         stickyBar: asset('sticky-jp', STICKY, 'sticky-jp.png'),
-        stickyImageEnabled: true,
-        stickyBarCta: '7日間の無料体験',
+        stickyImageEnabled: false,
+        stickyBarCta: 'ログインしてプランを選ぶ',
         stickyButtonEnabled: true,
         stickyCtaMode: 'custom' as const,
         stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
@@ -1049,6 +1083,79 @@ export function seedLandingSkins(): LandingSkinStore {
         updatedAt: t,
         updatedBy: 'admin@dinoai.ai',
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_A'),
+      },
+      {
+        id: 'SKIN_JP02',
+        code: 'JP_SKIN_B',
+        name: '日本获客落地页 · 默认（直接跳 OneLink）',
+        line: '日本',
+        pageType: 'lead',
+        seoTitle: 'Dino AI｜子ども向けAI英会話アプリ 7日間無料体験',
+        seoDescription: '3〜12歳の子ども向けAI英会話アプリ。ゲーム感覚で毎日15分、発音フィードバック付き。今なら7日間無料。',
+        language: 'ja',
+        registerMode: 'none',
+        verifyEnabled: false,
+        extraFields: [],
+        thirdPartyLogins: [],
+        afterRegisterAction: 'onelink' as const,
+        ctaText: '無料でDinoAIを試してみる',
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: applyButtonPreset('midnight', true),
+        hero: { ...asset('hero-jp-b', lpAsset('family.png'), 'family.png'), alt: '恐竜のキャラクターと一緒に英語を学ぶ子ども' },
+        registerBefore: [withBottomCta(jpPanel, 'AIの先生と話してみる →', applyButtonPreset('midnight', true))],
+        registerAfter: [withBottomCta(asset('after-jp-b', AFTER, 'after-jp.png'), '無料で学習を始める →', applyButtonPreset('midnight', true))],
+        stickyBar: asset('sticky-jp-b', STICKY, 'sticky-jp.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: '無料でDinoAIを試してみる →',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_B'),
+      },
+      {
+        id: 'SKIN_JP03',
+        code: 'JP_SKIN_C',
+        name: '日本获客落地页 · Web to App（出下载弹窗）',
+        line: '日本',
+        pageType: 'lead',
+        registerTitle: 'ログインして7日間無料体験',
+        registerSubtitle: 'アプリをダウンロードして、すぐに始めよう',
+        seoTitle: 'Dino AI｜子ども向けAI英会話アプリ 7日間無料体験',
+        seoDescription: '3〜12歳の子ども向けAI英会話アプリ。LINEでログインして、アプリで7日間無料体験。',
+        language: 'ja',
+        registerMode: 'oauth',
+        verifyEnabled: false,
+        extraFields: [],
+        thirdPartyLogins: ['line', 'apple', 'google', 'facebook'],
+        afterRegisterAction: 'download_app' as const,
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: applyButtonPreset('midnight', true),
+        registerAreaBgKind: 'color',
+        registerAreaBgColor: '#e3f6ea',
+        hero: { ...asset('hero-jp-c', lpAsset('family.png'), 'family.png'), alt: '恐竜のキャラクターと一緒に英語を学ぶ子ども' },
+        registerBefore: [withBottomCta(jpPanel, 'アプリで7日間の無料体験', applyButtonPreset('midnight', true))],
+        registerAfter: [asset('after-jp-c', AFTER, 'after-jp.png')],
+        stickyBar: asset('sticky-jp-c', STICKY, 'sticky-jp.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: 'LINEでログインして無料体験',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_C'),
       },
       {
         id: 'SKIN_VN01',
@@ -1117,6 +1224,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v10')
         ?? localStorage.getItem('dinoai_landing_skins_v9')
         ?? localStorage.getItem('dinoai_landing_skins_v8')
         ?? localStorage.getItem('dinoai_landing_skins_v7')
@@ -1130,6 +1238,12 @@ export function loadLandingSkinStore(): LandingSkinStore {
     ) as { version?: number; skins?: LandingSkin[] } | null
     if (raw && Array.isArray(raw.skins)) {
       const skins: LandingSkin[] = []
+      // 10.3 日本：旧版本地数据升级时，用三张日本示例皮肤（JP_SKIN_A/B/C）替换旧的日本示例。
+      if (!localStorage.getItem(LANDING_SKIN_STORAGE_KEY)) {
+        const jpSeeds = seedLandingSkins().skins.filter((x) => x.line === '日本')
+        const jpCodes = new Set(jpSeeds.map((x) => x.code))
+        raw.skins = [...jpSeeds, ...raw.skins.filter((x) => !jpCodes.has(x.code) && x.id !== 'SKIN_JP01')]
+      }
       for (const skin of raw.skins) {
         const line = skin.line === '其他' && (skin.language === 'ja' || (skin.code || '').startsWith('JP_'))
           ? '日本'
@@ -1141,14 +1255,19 @@ export function loadLandingSkinStore(): LandingSkinStore {
           code: codeOk ? skin.code : allocateTemplateCode(line || '', skins, ''),
           pageType: normalizePageType(skin.pageType, (skin as LandingSkin).afterRegisterAction),
           language: line ? defaultLanguageForLine(line) : (skin.language === 'zh' ? 'zh-Hant' : skin.language),
-          registerMode: normalizeRegisterMode(skin.registerMode),
+          registerMode: registerModeForPage(
+            normalizePageType(skin.pageType, (skin as LandingSkin).afterRegisterAction),
+            skin.registerMode,
+            line,
+          ),
           verifyEnabled: normalizeVerifyEnabled(skin),
           extraFields: Array.isArray(skin.extraFields) ? skin.extraFields.map(normalizeRegisterField) : [],
-          thirdPartyLogins: normalizeThirdPartyLogins(skin.thirdPartyLogins),
+          thirdPartyLogins: thirdPartyLoginsForLine(line, skin.thirdPartyLogins),
           afterRegisterAction: followUpActionForPageType(
             normalizePageType(skin.pageType, (skin as LandingSkin).afterRegisterAction),
             (skin as LandingSkin).afterRegisterAction,
             line,
+            skin.registerMode,
           ),
           ctaStyle: normalizeCtaStyle(skin.ctaStyle),
           stickyCtaStyle: normalizeCtaStyle(skin.stickyCtaStyle ?? skin.ctaStyle),
@@ -1223,6 +1342,10 @@ export function registerModeLabel(mode: RegisterMode, en = false) {
 export function registerSummary(skin: LandingSkin, en = false) {
   const registerMode = normalizeRegisterMode(skin.registerMode)
   if (registerMode === 'none') return en ? 'No register' : '无注册'
+  if (registerMode === 'oauth') {
+    const names = thirdPartyLoginsForLine(skin.line, skin.thirdPartyLogins).map((id) => THIRD_PARTY_OPTIONS.find((x) => x.value === id)?.zh ?? id)
+    return `${registerModeLabel(registerMode, en)}${names.length ? ` · ${names.join('/')}` : ''}`
+  }
   const mode = registerModeLabel(registerMode, en)
   const verify = skin.verifyEnabled ? (en ? 'with OTP' : '有验证') : (en ? 'no OTP' : '无验证')
   const extra = skin.extraFields.length

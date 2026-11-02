@@ -426,3 +426,6 @@
   .is-workbench .lp-overlay { position: fixed; }
   .lpw-panel { width: min(375px, 100%); max-height: none; padding: 0 12px; box-sizing: border-box; }
 }
+.lp-thirds .line::after { content: 'LINE'; color: #fff; font: 800 10px/40px Arial, sans-serif; letter-spacing: .2px; }
+.lp-thirds.is-primary { margin: 8px 0 4px; }
+.lp-onelink-url { display: block; margin: 0 0 14px; padding: 8px 10px; border-radius: 8px; background: #f3f4f6; font-size: 11px; word-break: break-all; color: #374151; }

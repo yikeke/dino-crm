@@ -202,10 +202,19 @@ function RegisterBlock({ skin, children }: { skin: LandingSkin; children: ReactN
   )
 }
 
-function LeadForm({ skin, onSubmit }: { skin: LandingSkin; onSubmit: () => void }) {
+function LeadForm({ skin, onSubmit, onOauth }: { skin: LandingSkin; onSubmit: () => void; onOauth: () => void }) {
   const copy = copyFor(skin.language)
   const phone = LINE_PHONE[skin.line || ''] || LINE_PHONE.其他
-  const showForm = normalizeRegisterMode(skin.registerMode) !== 'none'
+  const mode = normalizeRegisterMode(skin.registerMode)
+  const showForm = mode === 'full'
+  const oauthOnly = mode === 'oauth'
+  const thirds = skin.thirdPartyLogins.length ? (
+    <div className={`lp-thirds ${oauthOnly ? 'is-primary' : ''}`} data-slot="slot-register-thirds">
+      {skin.thirdPartyLogins.map((id) => (
+        <button type="button" className={id} key={id} aria-label={thirdLabel(id)} onClick={onOauth} />
+      ))}
+    </div>
+  ) : null
   const titleColor = normalizeTitleColor(skin.registerTitleColor)
   return (
     <form className="lp-lead" onSubmit={(e) => { e.preventDefault(); onSubmit() }}>
@@ -243,17 +252,13 @@ function LeadForm({ skin, onSubmit }: { skin: LandingSkin; onSubmit: () => void 
           ) : null}
         </>
       ) : null}
-      <div data-slot="slot-register-cta">
-        <button {...ctaProps(skin.ctaStyle)} type="submit">{skin.ctaText || copy.cta}</button>
-      </div>
-      <p className="lp-terms">{copy.agree}</p>
-      {skin.thirdPartyLogins.length ? (
-        <div className="lp-thirds" data-slot="slot-register-thirds">
-          {skin.thirdPartyLogins.map((id) => (
-            <button type="button" className={id} key={id} aria-label={thirdLabel(id)} />
-          ))}
+      {oauthOnly ? thirds : (
+        <div data-slot="slot-register-cta">
+          <button {...ctaProps(skin.ctaStyle)} type="submit">{skin.ctaText || copy.cta}</button>
         </div>
-      ) : null}
+      )}
+      <p className="lp-terms">{copy.agree}</p>
+      {oauthOnly ? null : thirds}
     </form>
   )
 }
@@ -264,7 +269,17 @@ const SKUS = [
   { id: 'year', name: 'Annual plan', price: '₩399,000', was: '₩599,000' },
 ]
 
-type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | null
+// 10.3 日本：Pro 5 档、Max 4 档，日元；原型只列几档示意。
+const JP_SKUS = [
+  { id: 'pro-month', name: 'Pro 月訂', price: '¥6,480', was: '' },
+  { id: 'pro-year', name: 'Pro 年訂', price: '¥39,800', was: '' },
+  { id: 'max-month', name: 'Max 月訂', price: '¥9,800', was: '' },
+  { id: 'max-year', name: 'Max 年訂', price: '¥59,800', was: '' },
+]
+
+type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | 'onelink' | null
+
+const ONELINK_SAMPLE = 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_JP-KOL-SDKD4K&c=JP-KOL-SDKD4K&lp_id=LP-E57YSUCTP7'
 
 const CHILD_AGES = ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13+']
 const LEARNING_GOALS = [
@@ -421,10 +436,13 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   lead_my: '后续交互 Page 2 · 马来补充资料（四项选填 + 预约）',
   lead_vn: '后续交互 Page 2 · 越南补充资料（两项选填 + 预约）',
   lead_done: '后续交互 Page 3 · 完成 → 下一步出下载 App',
+  onelink: '打开 OneLink（原型模拟）',
 }
 
-function AfterRegisterLayer({ step, onStep, onClose, annotate }: { step: FlowStep; onStep: (next: FlowStep) => void; onClose: () => void; annotate: boolean }) {
+function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: FlowStep; onStep: (next: FlowStep) => void; onClose: () => void; annotate: boolean; line?: string }) {
   if (!step) return null
+  const jp = line === '日本'
+  const skus = jp ? JP_SKUS : SKUS
   return (
     <div className="lp-overlay" role="dialog" aria-modal="true">
       <div className="lp-overlay-card">
@@ -433,11 +451,11 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate }: { step: FlowSte
         {step === 'sku' ? (
           <div className="lp-pay">
             <h2>选择课程套餐</h2>
-            {SKUS.map((sku) => (
+            {skus.map((sku) => (
               <button type="button" className="lp-sku" key={sku.id} onClick={() => onStep('promo')}>
                 <span>
                   <b>{sku.name}</b>
-                  <span className="lp-was">{sku.was}</span>
+                  {sku.was ? <span className="lp-was">{sku.was}</span> : null}
                 </span>
                 <strong>{sku.price}</strong>
               </button>
@@ -456,8 +474,8 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate }: { step: FlowSte
         {step === 'pay' ? (
           <div className="lp-pay">
             <h2>确认支付</h2>
-            <p className="lp-overlay-copy">原型演示：支付成功后弹出下载 App。</p>
-            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>完成支付</button>
+            <p className="lp-overlay-copy">{jp ? '日本只有 PayPay：点了直接进 PayPay 付款页，确认到账后弹出下载 App。' : '原型演示：支付成功后弹出下载 App。'}</p>
+            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>{jp ? 'PayPay で支払う' : '完成支付'}</button>
           </div>
         ) : null}
         {step === 'download' ? (
@@ -465,7 +483,15 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate }: { step: FlowSte
             <h2>下载 Dino AI App</h2>
             <p className="lp-overlay-copy">注册完成，打开 App 继续学习。</p>
             <div className="lp-download-fake">APP</div>
-            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onClose}>前往 App Store / Google Play</button>
+            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('onelink')}>前往 App Store / Google Play</button>
+          </div>
+        ) : null}
+        {step === 'onelink' ? (
+          <div className="lp-pay">
+            <h2>正在打开 OneLink</h2>
+            <p className="lp-overlay-copy">原型模拟，不会真实跳转。线上：已装 App 直接拉起 App，未装去 App Store / Google Play。链接由系统生成，带渠道、lp_id、promo_code 等归因参数，不需要在 CRM 填。</p>
+            <code className="lp-onelink-url">{ONELINK_SAMPLE}</code>
+            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onClose}>知道了</button>
           </div>
         ) : null}
         {step === 'lead_my' ? <MalaysiaLeadExtra onContinue={() => onStep('lead_done')} /> : null}
@@ -483,6 +509,7 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate }: { step: FlowSte
 }
 
 function startStep(action: AfterRegisterAction): FlowStep {
+  if (action === 'onelink') return 'onelink'
   if (action === 'download_app') return 'download'
   if (action === 'lead_my') return 'lead_my'
   if (action === 'lead_vn') return 'lead_vn'
@@ -579,8 +606,8 @@ function ConfigPanel({
   onDemoFlow: () => void
 }) {
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
-  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line)
   const mode = normalizeRegisterMode(skin.registerMode)
+  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, mode)
   const areaKind = normalizeRegisterAreaBgKind(skin.registerAreaBgKind)
   const formKind = normalizeRegisterBgKind(skin.registerBgKind)
   const slots = useMemo(() => collectSkinAssets(skin), [skin])
@@ -623,7 +650,7 @@ function ConfigPanel({
         <Row label="落地页类型" onFocus={onFocus}>{pageTypeLabel(pageType)}</Row>
         <Row label="后续交互页面" onFocus={onFocus}>
           {followUpLabel(action)}
-          {mode !== 'none' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无注册，不进入后续交互</em>}
+          {mode !== 'none' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无注册，不进入后续交互</em>}
         </Row>
       </section>
 
@@ -638,7 +665,7 @@ function ConfigPanel({
             </>
           ) : '未配置，不展示'}
         </Row>
-        {mode !== 'none' ? (
+        {mode === 'full' ? (
           <>
             <Row label="是否验证" slot={skin.verifyEnabled ? 'slot-register-otp' : 'slot-register-fields'} onFocus={onFocus}>{skin.verifyEnabled ? '有验证' : '无验证'}</Row>
             <Row label="其他字段" slot="slot-register-fields" onFocus={onFocus} muted={!skin.extraFields.length}>
@@ -822,13 +849,22 @@ export default function LandingSkinPreview() {
 
   const copy = copyFor(skin.language)
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
-  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line)
+  const mode = normalizeRegisterMode(skin.registerMode)
+  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, mode)
   const openAfterRegister = () => {
-    if (normalizeRegisterMode(skin.registerMode) === 'none') {
+    if (mode === 'none' && action !== 'onelink') {
       focusLead()
       return
     }
     setFlow(startStep(action))
+  }
+  // 配图叠按钮 / 吸底按钮：日本默认获客页（无注册 + OneLink）直接跳 OneLink，其余滚到注册区。
+  const onPageCta = () => {
+    if (mode === 'none' && action === 'onelink') {
+      setFlow('onelink')
+      return
+    }
+    focusLead()
   }
   const focusSlot = (slot?: string, scroll = false) => {
     setActive(slot)
@@ -847,22 +883,22 @@ export default function LandingSkinPreview() {
       <div ref={stageRef} className="lp-stage">
         {skin.registerBefore.map((asset, i) => (asset.src ? (
           <Slot key={asset.id} id={`slot-before-${i}`} label={`前置配图 ${i + 1}`}>
-            <SceneBlock asset={asset} onCta={focusLead} />
+            <SceneBlock asset={asset} onCta={onPageCta} />
           </Slot>
         ) : null))}
         <RegisterBlock skin={skin}>
-          <LeadForm skin={skin} onSubmit={openAfterRegister} />
+          <LeadForm skin={skin} onSubmit={openAfterRegister} onOauth={() => setFlow(startStep(action))} />
         </RegisterBlock>
         {skin.registerAfter.map((asset, i) => (asset.src ? (
           <Slot key={asset.id} id={`slot-after-${i}`} label={`后置配图 ${i + 1}`}>
-            <SceneBlock asset={asset} onCta={focusLead} />
+            <SceneBlock asset={asset} onCta={onPageCta} />
           </Slot>
         ) : null))}
       </div>
       {showSticky ? (
         <div className={`lp-sticky lp-slot ${showStickyImage ? 'has-art' : ''}`} data-slot="slot-sticky" data-label="吸底栏">
           {showStickyImage ? (
-            <button type="button" className="lp-sticky-hit" onClick={focusLead}>
+            <button type="button" className="lp-sticky-hit" onClick={onPageCta}>
               <SkinMedia asset={skin.stickyBar} alt={skin.stickyBar!.alt || stickyButtonLabel(skin, copy.cta)} />
             </button>
           ) : null}
@@ -884,14 +920,14 @@ export default function LandingSkinPreview() {
                     }
                   : {}),
               }}
-              onClick={focusLead}
+              onClick={onPageCta}
             >
               {stickyButtonLabel(skin, copy.cta)}
             </button>
           ) : null}
         </div>
       ) : null}
-      <AfterRegisterLayer step={flow} onStep={setFlow} onClose={() => setFlow(null)} annotate={false} />
+      <AfterRegisterLayer step={flow} onStep={setFlow} onClose={() => setFlow(null)} annotate={false} line={skin.line} />
     </div>
   )
 
