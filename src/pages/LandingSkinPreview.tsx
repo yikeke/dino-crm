@@ -815,7 +815,7 @@ export default function LandingSkinPreview() {
   if (!skin) {
     return (
       <div className="lp-skin">
-        <Result status="404" title="Skin not found" subTitle={`code=${code || '—'}`} extra={<Button href="#/marketing-center-v5/skins">返回皮肤管理</Button>} />
+        <Result status="404" title="Skin not found" subTitle={`code=${code || '—'}`} extra={<Button href="#/marketing-center-v6/skins">返回皮肤管理</Button>} />
       </div>
     )
   }
@@ -915,7 +915,7 @@ export default function LandingSkinPreview() {
           <span className="lp-preview-ribbon-name">{skin.name || '未命名皮肤'}</span>
           {code === 'draft' || skin.status === 'draft' ? <em>草稿</em> : null}
         </div>
-        <a className="lp-preview-ribbon-back" href="#/marketing-center-v5/skins">返回配置后台</a>
+        <a className="lp-preview-ribbon-back" href="#/marketing-center-v6/skins">返回配置后台</a>
       </div>
       <div className="lp-preview-h5">{page}</div>
     </div>
