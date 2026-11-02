@@ -319,9 +319,15 @@ export const REGISTER_MODE_OPTIONS: { value: RegisterMode; zh: string; en: strin
   { value: 'oauth', zh: '仅三方登录（没有手机号）', en: 'Social login only (no phone)' },
 ]
 
-/** 「仅三方登录」只给日本（10.3 最小改动），其他业务线仍是无注册 / 手机号两项。 */
+/** 「仅三方登录」只给日本（10.3 最小改动），其他业务线仍是无注册 / 手机号两项。日本把 none 写成「无手机号注册」。 */
 export function registerModeOptions(line?: string) {
-  return REGISTER_MODE_OPTIONS.filter((x) => x.value !== 'oauth' || line === '日本')
+  return REGISTER_MODE_OPTIONS
+    .filter((x) => x.value !== 'oauth' || line === '日本')
+    .map((x) => {
+      if (line === '日本' && x.value === 'none') return { ...x, zh: '无手机号注册', en: 'No phone register' }
+      if (line === '日本' && x.value === 'oauth') return { ...x, zh: '仅三方登录', en: 'Social login only' }
+      return x
+    })
 }
 
 export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: string; en: string }[] = [
@@ -367,7 +373,8 @@ export function thirdPartyOptionsForLine(line?: string) {
   return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line')
 }
 
-export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[]): ThirdPartyLogin[] {
+export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[], registerMode?: string): ThirdPartyLogin[] {
+  if (normalizeRegisterMode(registerMode) === 'none') return []
   const picked = new Set(normalizeThirdPartyLogins(ids))
   return thirdPartyOptionsForLine(line).map((x) => x.value).filter((id) => picked.has(id))
 }
@@ -865,7 +872,11 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
     : (skin.registerBefore || [])
   return {
       ...rest,
-      thirdPartyLogins: thirdPartyLoginsForLine(skin.line, skin.thirdPartyLogins),
+      thirdPartyLogins: thirdPartyLoginsForLine(
+        skin.line,
+        skin.thirdPartyLogins,
+        registerModeForPage(pageType, skin.registerMode, skin.line),
+      ),
       pageType,
       registerMode: registerModeForPage(pageType, skin.registerMode, skin.line),
       verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, skin.registerMode, skin.line), skin.verifyEnabled),
@@ -1262,7 +1273,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
           ),
           verifyEnabled: normalizeVerifyEnabled(skin),
           extraFields: Array.isArray(skin.extraFields) ? skin.extraFields.map(normalizeRegisterField) : [],
-          thirdPartyLogins: thirdPartyLoginsForLine(line, skin.thirdPartyLogins),
+          thirdPartyLogins: thirdPartyLoginsForLine(line, skin.thirdPartyLogins, skin.registerMode),
           afterRegisterAction: followUpActionForPageType(
             normalizePageType(skin.pageType, (skin as LandingSkin).afterRegisterAction),
             (skin as LandingSkin).afterRegisterAction,
@@ -1334,19 +1345,19 @@ export function pageTypeLabel(type: LandingPageKind | string, en = false) {
   return en ? hit?.en ?? type : hit?.zh ?? type
 }
 
-export function registerModeLabel(mode: RegisterMode, en = false) {
-  const hit = REGISTER_MODE_OPTIONS.find((x) => x.value === mode)
+export function registerModeLabel(mode: RegisterMode, en = false, line?: string) {
+  const hit = registerModeOptions(line).find((x) => x.value === mode)
   return en ? hit?.en ?? mode : hit?.zh ?? mode
 }
 
 export function registerSummary(skin: LandingSkin, en = false) {
   const registerMode = normalizeRegisterMode(skin.registerMode)
-  if (registerMode === 'none') return en ? 'No register' : '无注册'
+  if (registerMode === 'none') return registerModeLabel('none', en, skin.line)
   if (registerMode === 'oauth') {
-    const names = thirdPartyLoginsForLine(skin.line, skin.thirdPartyLogins).map((id) => THIRD_PARTY_OPTIONS.find((x) => x.value === id)?.zh ?? id)
-    return `${registerModeLabel(registerMode, en)}${names.length ? ` · ${names.join('/')}` : ''}`
+    const names = thirdPartyLoginsForLine(skin.line, skin.thirdPartyLogins, registerMode).map((id) => THIRD_PARTY_OPTIONS.find((x) => x.value === id)?.zh ?? id)
+    return `${registerModeLabel(registerMode, en, skin.line)}${names.length ? ` · ${names.join('/')}` : ''}`
   }
-  const mode = registerModeLabel(registerMode, en)
+  const mode = registerModeLabel(registerMode, en, skin.line)
   const verify = skin.verifyEnabled ? (en ? 'with OTP' : '有验证') : (en ? 'no OTP' : '无验证')
   const extra = skin.extraFields.length
     ? ` + ${skin.extraFields.map((f) => `${f.label}${f.required ? '*' : ''}`).join('/')}`

@@ -177,10 +177,12 @@ export default function LandingSkinManagement() {
     // Full checks only on submit; temporary save only needs line + name.
     if (!publish) return true
     if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
-      message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
+      message.error(en
+        ? (editing.line === '日本' ? 'Payment landings cannot use “No phone register”.' : 'Payment landings cannot use “No register”.')
+        : (editing.line === '日本' ? '支付落地页不能选择无手机号注册' : '支付落地页不能选择无注册'))
       return false
     }
-    if (normalizeRegisterMode(editing.registerMode) === 'oauth' && !thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins).length) {
+    if (normalizeRegisterMode(editing.registerMode) === 'oauth' && !thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, 'oauth').length) {
       message.error(en ? 'Social login only: pick at least one provider.' : '请至少选择一种三方登录')
       return false
     }
@@ -287,7 +289,7 @@ export default function LandingSkinManagement() {
       extraFields: registerModeForPage(nextPageType, editing.registerMode, editing.line) === 'oauth'
         ? []
         : extraFieldsForPage(nextPageType, editing.extraFields),
-      thirdPartyLogins: thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins),
+      thirdPartyLogins: thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, editing.registerMode),
       language: lockedBasics?.language ?? defaultLanguageForLine(editing.line),
       pageType: nextPageType,
       afterRegisterAction: lockedBasics?.afterRegisterAction
@@ -457,7 +459,7 @@ export default function LandingSkinManagement() {
                 language: defaultLanguageForLine(line),
                 registerMode: registerModeForPage(pageType, editing.registerMode, line),
                 verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, editing.registerMode, line), editing.verifyEnabled),
-                thirdPartyLogins: thirdPartyLoginsForLine(line, editing.thirdPartyLogins),
+                thirdPartyLogins: thirdPartyLoginsForLine(line, editing.thirdPartyLogins, registerModeForPage(pageType, editing.registerMode, line)),
                 afterRegisterAction: followUpActionForPageType(
                   normalizePageType(editing.pageType, editing.afterRegisterAction),
                   editing.afterRegisterAction,
@@ -516,7 +518,7 @@ export default function LandingSkinManagement() {
               />
               {jpOneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No registration (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
+                  {en ? 'No phone register (Japan): every button on the page opens OneLink directly.' : '无手机号注册时，页面上的按钮直接跳转 OneLink'}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -528,8 +530,8 @@ export default function LandingSkinManagement() {
                   ? (en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。')
                   : editing.line === '日本'
                     ? (en
-                      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, usually with No register) / Download-app popup (Web to App, with Social login only).'
-                      : '日本有两种获客页：直接跳转 OneLink（现状默认获客页，一般配「无注册」）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
+                      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, usually No phone register) / Download-app popup (Web to App, Social login only).'
+                      : '日本有两种获客页：直接跳转 OneLink（现状默认获客页，一般配「无手机号注册」）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -567,6 +569,7 @@ export default function LandingSkinManagement() {
                     ...editing,
                     registerMode: mode,
                     verifyEnabled: verifyEnabledForPage(pageType, mode, mode === 'full' ? editing.verifyEnabled : false),
+                    thirdPartyLogins: mode === 'none' ? [] : editing.thirdPartyLogins,
                     afterRegisterAction: basicsLocked
                       ? editing.afterRegisterAction
                       : followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, mode),
@@ -581,13 +584,19 @@ export default function LandingSkinManagement() {
               {editing.line === '日本' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {en
-                    ? 'Japan only: “Social login only” hides the phone form and the main button; social icons sit where the form was. Pick at least one provider below.'
-                    : '仅日本：「仅三方登录」不出手机号表单和主按钮，三方图标放在原表单位置；下方至少勾一家三方。'}
+                    ? 'Three types: 1) No phone register — no third-party, today’s default. 2) Phone register as account — third-party optional. 3) Social login only — no register button below; icons sit where the form was.'
+                    : '三种注册类型：1）无手机号注册：不支持选择三方，现状默认。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
                 </Text>
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en ? 'Payment landings cannot use “No register”; phone register must use OTP.' : '支付落地页不能选择无注册；选手机号注册时必须有验证。')
+                  ? (en
+                    ? (editing.line === '日本'
+                      ? 'Payment landings cannot use “No phone register”; phone register must use OTP.'
+                      : 'Payment landings cannot use “No register”; phone register must use OTP.')
+                    : (editing.line === '日本'
+                      ? '支付落地页不能选择无手机号注册；选手机号注册时必须有验证。'
+                      : '支付落地页不能选择无注册；选手机号注册时必须有验证。'))
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -677,6 +686,16 @@ export default function LandingSkinManagement() {
               </div>
             </div>
           ) : null}
+          {regMode === 'none' ? (
+            <div className="skin-form-row">
+              <label>{en ? 'Third-party login' : '三方登录'}</label>
+              <Text type="secondary">
+                {en
+                  ? 'Not available for this register type.'
+                  : (editing.line === '日本' ? '无手机号注册不支持选择三方。' : '无注册不支持选择三方。')}
+              </Text>
+            </div>
+          ) : (
           <div className="skin-form-row">
             <label>{regMode === 'oauth' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
             <div>
@@ -684,7 +703,7 @@ export default function LandingSkinManagement() {
                 disabled={!editing.line}
                 value={editing.thirdPartyLogins}
                 options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
-                onChange={(vals) => setEditing({ ...editing, thirdPartyLogins: thirdPartyLoginsForLine(editing.line, vals as ThirdPartyLogin[]) })}
+                onChange={(vals) => setEditing({ ...editing, thirdPartyLogins: thirdPartyLoginsForLine(editing.line, vals as ThirdPartyLogin[], regMode) })}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {regMode === 'oauth'
@@ -696,6 +715,7 @@ export default function LandingSkinManagement() {
               </Text>
             </div>
           </div>
+          )}
           </div>
           <div className="skin-reg-block">
             <div className="skin-reg-head">
@@ -745,23 +765,30 @@ export default function LandingSkinManagement() {
               </div>
             </div>
           </div>
+          {regMode === 'oauth' ? (
+            <div className="skin-reg-block">
+              <div className="skin-reg-head">
+                <em>3</em>
+                <b>{en ? 'Register button' : '注册按钮'}</b>
+                <span>{en ? 'Hidden on this register type' : '这种注册类型没有主按钮'}</span>
+              </div>
+              <Alert
+                type="info"
+                showIcon
+                style={{ maxWidth: 640 }}
+                message={en ? 'Social login only: the page has no register button, so copy and style are not used.' : '仅三方登录时页面没有注册按钮，文案和样式不出现。'}
+              />
+            </div>
+          ) : (
           <div className="skin-reg-block">
             <div className="skin-reg-head">
               <em>3</em>
               <b>{en ? 'Register button' : '注册按钮'}</b>
               <span>{en ? 'The main button at the bottom of the form' : '表单底部的主按钮'}</span>
             </div>
-          {regMode === 'oauth' ? (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 12, maxWidth: 640 }}
-              message={en ? 'Social login only: the page has no main button, so copy and style are not used.' : '仅三方登录时页面没有主按钮，文案和样式不生效。'}
-            />
-          ) : null}
           <div className="skin-form-row">
             <label>{en ? 'CTA text' : '注册按钮文案'}</label>
-            <Input disabled={!editing.line || regMode === 'oauth'} value={editing.ctaText} placeholder={en ? 'e.g. Log in / Start now' : '例如：立即开始 / 바로 시작하기'} onChange={(e) => setEditing({ ...editing, ctaText: e.target.value })} />
+            <Input disabled={!editing.line} value={editing.ctaText} placeholder={en ? 'e.g. Log in / Start now' : '例如：立即开始 / 바로 시작하기'} onChange={(e) => setEditing({ ...editing, ctaText: e.target.value })} />
           </div>
           <div className="skin-form-row skin-form-row-wide">
             <label>{en ? 'Register button style' : '注册按钮样式'}</label>
@@ -773,6 +800,7 @@ export default function LandingSkinManagement() {
             />
           </div>
           </div>
+          )}
           <div className="skin-reg-block">
             <div className="skin-reg-head">
               <em>4</em>

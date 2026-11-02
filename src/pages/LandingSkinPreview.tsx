@@ -650,13 +650,13 @@ function ConfigPanel({
         <Row label="落地页类型" onFocus={onFocus}>{pageTypeLabel(pageType)}</Row>
         <Row label="后续交互页面" onFocus={onFocus}>
           {followUpLabel(action)}
-          {mode !== 'none' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无注册，不进入后续交互</em>}
+          {mode !== 'none' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">{skin.line === '日本' ? '无手机号注册，不进入后续交互' : '无注册，不进入后续交互'}</em>}
         </Row>
       </section>
 
       <section className="lpw-card">
         <h3>注册配置</h3>
-        <Row label="注册类型" slot="slot-register-fields" onFocus={onFocus}>{registerModeLabel(mode)}</Row>
+        <Row label="注册类型" slot="slot-register-fields" onFocus={onFocus}>{registerModeLabel(mode, false, skin.line)}</Row>
         <Row label="注册表单标题" slot={skin.registerTitle || skin.registerSubtitle ? 'slot-register-title' : undefined} onFocus={onFocus} muted={!skin.registerTitle && !skin.registerSubtitle}>
           {skin.registerTitle || skin.registerSubtitle ? (
             <>
