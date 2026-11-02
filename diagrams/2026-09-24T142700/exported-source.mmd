@@ -1,0 +1,86 @@
+flowchart TB
+    subgraph P1["一期｜人工核账 + Pro CRM / Max 受控 SQL"]
+        direction TB
+        P1A["用户点击<br/>I have transferred"] --> P1B["服务端按 order_id<br/>幂等记录 notice"]
+        P1B --> P1C["机器人向指定 Lark 群<br/>发送消息卡片并自动 @财务<br/>同一订单只发一次"]
+        P1C --> P1D["财务按附言 + 金额<br/>核对银行真实入账"]
+        P1D --> P1O{"本单等级"}
+
+        P1O -->|"Pro 订单"| P1E["财务在同一群消息/线程<br/>@越南销售负责人"]
+        P1E --> P1F["越南销售复用现有 CRM<br/>按本单天数开通 Pro"]
+        P1F --> P1G{"当前权益"}
+        P1G -->|"非会员 / 已过期"| P1H["Pro 从 now 起算"]
+        P1G -->|"有效 Pro"| P1I["Pro 从原到期日顺延"]
+        P1G -->|"有效 Max"| P1X["禁止跨等级升降级<br/>转异常处理"]
+        P1H --> P1J["开通完成<br/>进入 C 端等待页"]
+        P1I --> P1J
+
+        P1O -->|"Max 订单"| M1["通知授权技术人员"]
+        M1 --> M2["手动执行受控 SQL<br/>校验 order_id / user / 订单等级"]
+        M2 --> M3["幂等保护 + 事务执行"]
+        M3 --> M4{"当前权益"}
+        M4 -->|"非会员 / 已过期"| M5["从 now 创建 Max"]
+        M4 -->|"有效 Max"| M6["Max 从原到期日顺延"]
+        M4 -->|"有效 Pro"| P1X
+        M5 --> M7["执行后回查<br/>会员等级 + expire_at"]
+        M6 --> M7
+        M7 --> P1J
+
+        P1J --> P1K["进入 / 恢复等待页<br/>携带 order_id"]
+        P1K --> P1K1["order_id 仅用于恢复 / 展示订单<br/>并读取本单应购套餐<br/>不参与会员接口查询或成功校验"]
+        P1K1 --> P1K2["记录进入等待页快照<br/>当前是否有效、Pro / Max、expire_time<br/>会员包若有则一并记录"]
+        P1K2 --> P1K3["手动刷新：立即查询一次<br/>自动轮询：1 小时内每 30 秒一次"]
+        P1K3 --> P1KAPI["会员接口仅查询当前登录用户<br/>返回会员状态、Pro / Max、expire_time<br/>会员包可选；无法按 order_id 查询"]
+        P1KAPI --> P1K4{"等待页快照 × 本单等级"}
+        P1K4 -->|"原本无有效会员"| P1K5{"当前有效，且等级<br/>与本单一致？"}
+        P1K4 -->|"原本同等级有效"| P1K6{"当前仍为同等级，且 expire_time<br/>比进入等待页快照增加？"}
+        P1K4 -->|"原本跨等级有效"| P1X
+        P1K5 -->|"是"| P1R["粗粒度判定成功<br/>会员包若有，仅辅助比对"]
+        P1K6 -->|"是"| P1R
+        P1R --> P1L["Membership opened<br/>+ Download App"]
+        P1K5 -->|"否 / 无法判断"| P1K7{"已等待超过 1 小时？"}
+        P1K6 -->|"否 / 无法判断"| P1K7
+        P1K7 -->|"否"| P1K8["保持 Pending<br/>30 秒后再查<br/>手动刷新则立即查"]
+        P1K8 --> P1K3
+        P1K7 -->|"是"| P1S["保持 Pending<br/>引导联系 support"]
+    end
+
+    subgraph P1RULE["一期边界"]
+        direction LR
+        R1["notice 不代表到账"]
+        R2["群消息不代表到账"]
+        R3["不在 CRM 新增<br/>银行转账记录视图 / Tab"]
+        R4["Pro：越南销售复用现有 CRM"]
+        R5["Max：授权技术人员手动受控 SQL"]
+        R6["禁止 Pro / Max 跨等级升降级"]
+        R7["会员接口不知道<br/>人工开通对应哪笔订单"]
+        R8["一期接受风险：其他渠道同级开通 / 续期<br/>可能误判为本单成功"]
+        R9["无法判断保持 Pending<br/>超 1 小时引导 support"]
+    end
+
+    subgraph P2["二期｜CRM Max / SKU 测试通过后上线"]
+        direction TB
+        P2A["CRM Max / SKU 功能<br/>即使开发完成也不发布生产"] --> P2B{"测试是否通过？"}
+        P2B -->|"否"| P2H["继续沿用一期流程"]
+        P2B -->|"是"| P2C["作为二期发布生产"]
+        P2C --> P2D["CRM 读取本单 SKU"]
+        P2D --> P2E{"当前有效付费会员"}
+        P2E -->|"无"| P2F["按 SKU 发 Pro / Max"]
+        P2E -->|"有效 Pro + Pro SKU"| P2G["仅续 Pro"]
+        P2E -->|"有效 Max + Max SKU"| P2I["仅续 Max"]
+        P2E -->|"有效 Pro + Max SKU<br/>或有效 Max + Pro SKU"| P2X["禁止跨等级升降级<br/>转异常处理"]
+        P2F --> P2J["按 order_id 写入 grant<br/>同一订单只发一次"]
+        P2G --> P2J
+        P2I --> P2J
+    end
+
+    P1L -.->|"后续能力演进"| P2A
+
+    classDef phase1 fill:#EAF2FF,stroke:#2563EB,color:#102A56,stroke-width:2px;
+    classDef phase2 fill:#ECFDF5,stroke:#059669,color:#064E3B,stroke-width:2px;
+    classDef rule fill:#FFF7E6,stroke:#D97706,color:#7C2D12,stroke-width:2px;
+    classDef exception fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D,stroke-width:2px;
+    class P1A,P1B,P1C,P1D,P1O,P1E,P1F,P1G,P1H,P1I,P1J,M1,M2,M3,M4,M5,M6,M7,P1K,P1K1,P1K2,P1K3,P1KAPI,P1K4,P1K5,P1K6,P1K7,P1K8,P1S,P1L phase1;
+    class P2A,P2B,P2C,P2D,P2E,P2F,P2G,P2H,P2I,P2J phase2;
+    class R1,R2,R3,R4,R5,R6,R7,R8,R9,P1R rule;
+    class P1X,P2X exception;

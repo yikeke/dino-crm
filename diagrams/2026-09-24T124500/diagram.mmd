@@ -1,0 +1,26 @@
+flowchart TD
+    A["收银台选择<br/>Chuyển khoản"] --> B["展示我方账户、订单金额<br/>唯一 transfer content"]
+    B --> C["用户在银行 App 转账"]
+
+    C --> D["点击 I have transferred<br/>仅记录 notice，不代表到账"]
+    D --> E["弹窗提示：财务确认后才开通<br/>工作日通常 1 小时"]
+    E --> F["等待页 Pending<br/>按 order_id 每 2–3 秒轮询<br/>本单 grant / opening 状态"]
+
+    C --> G["银行真实入账"]
+    G --> H["财务按附言 + 金额<br/>确认到账"]
+    H --> I["CRM 银行转账 Tab<br/>进入待开通"]
+    I --> J["专人按天数<br/>或 Pro / Max SKU 添加会员"]
+    J --> K["写入本单 grant<br/>并标记已开通"]
+    K --> L["轮询命中本单 grant 成功<br/>C 端切换 Membership opened<br/>显示 Download App"]
+    F -->|持续轮询本单| L
+
+    N["关键规则：不能只判断用户已有会员<br/>否则老会员会误判"] -.-> F
+
+    classDef notice fill:#FFF4E5,stroke:#F59E0B,color:#7C2D12,stroke-width:2px;
+    classDef pending fill:#EFF6FF,stroke:#2563EB,color:#1E3A8A,stroke-width:2px;
+    classDef success fill:#ECFDF5,stroke:#059669,color:#064E3B,stroke-width:2px;
+    classDef warning fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D,stroke-width:3px;
+    class D,E notice;
+    class F pending;
+    class K,L success;
+    class N warning;

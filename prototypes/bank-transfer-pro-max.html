@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>手动银行转账 Pro / Max</title>
+<style>
+  :root { --primary:#409eff; --text:#303133; --label:#606266; --muted:#909399; --border:#dcdfe6; --danger:#f56c6c; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif; background:#f5f7fa; color:var(--text); font-size:14px; }
+  button, input, select { font-family: inherit; }
+  .bar { display:flex; gap:12px; align-items:center; padding:16px; color:#64748b; font-size:12px; flex-wrap:wrap; }
+  .bar select { height:32px; border:1px solid var(--border); border-radius:4px; padding:0 8px; background:#fff; color:var(--text); }
+  .overlay { min-height:calc(100vh - 64px); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .dialog { width:560px; max-width:100%; background:#fff; border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.12); }
+  .head { display:flex; justify-content:space-between; align-items:center; padding:16px 20px 0; }
+  .head h2 { margin:0; font-size:16px; font-weight:500; }
+  .close { border:0; background:transparent; color:#909399; font-size:20px; cursor:pointer; }
+  .body { padding:18px 20px 8px; }
+  .field { display:flex; align-items:flex-start; margin-bottom:16px; }
+  .field[hidden] { display:none; }
+  .label { width:110px; text-align:right; padding:6px 12px 0 0; color:var(--label); flex-shrink:0; }
+  .req { color:var(--danger); margin-right:4px; }
+  .main { flex:1; min-width:0; }
+  .radio { display:flex; gap:8px; margin:0 0 10px; cursor:pointer; }
+  .radio input { margin-top:3px; accent-color:var(--primary); }
+  .radio.is-disabled { cursor:not-allowed; }
+  .radio.is-disabled span { color:#c0c4cc; }
+  .title { display:block; line-height:20px; }
+  .desc { display:block; margin-top:2px; color:var(--muted); font-size:12px; line-height:1.45; }
+  .radio.is-disabled .desc { color:#c0c4cc; }
+  .lock { margin:0 0 8px; color:#e6a23c; font-size:12px; line-height:1.45; }
+  .lock:empty { display:none; }
+  .days { display:flex; align-items:center; gap:8px; }
+  .number { width:160px; height:32px; display:flex; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+  .number.error { border-color:var(--danger); }
+  .number input { width:100%; border:0; text-align:center; outline:none; }
+  .stepper { width:32px; border-left:1px solid var(--border); display:flex; flex-direction:column; }
+  .stepper button { flex:1; border:0; background:#f5f7fa; color:var(--label); cursor:pointer; }
+  .tip, .err { margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--muted); white-space:pre-line; }
+  .err { color:var(--danger); }
+  .err:empty { display:none; }
+  .foot { display:flex; justify-content:flex-end; gap:12px; padding:8px 20px 16px; }
+  .btn { height:32px; padding:0 16px; border-radius:4px; cursor:pointer; }
+  .plain { background:#fff; border:1px solid var(--border); color:var(--label); }
+  .primary { background:var(--primary); border:1px solid var(--primary); color:#fff; }
+  .mask { position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .mask[hidden], .toast[hidden] { display:none; }
+  .box { width:460px; max-width:100%; background:#fff; border-radius:8px; padding:16px 20px; }
+  .box h3 { margin:0 0 12px; font-size:16px; }
+  .warn { display:flex; gap:8px; color:var(--label); line-height:1.5; }
+  .dot { width:20px; height:20px; border-radius:50%; background:#e6a23c; color:#fff; display:grid; place-items:center; flex-shrink:0; font-weight:700; }
+  .actions { display:flex; justify-content:flex-end; gap:12px; margin-top:16px; }
+  .toast { position:fixed; top:16px; left:50%; transform:translateX(-50%); background:#f0f9eb; color:#67c23a; border:1px solid #e1f3d8; border-radius:4px; padding:10px 16px; }
+  .toast.error { background:#fef0f0; color:#f56c6c; border-color:#fde2e2; }
+  .toast[hidden] { display:none; }
+  .bar label { display:flex; gap:6px; align-items:center; }
+  .empty { width:560px; max-width:100%; background:#fff; border:1px dashed var(--border); border-radius:12px; padding:40px 24px; text-align:center; color:var(--muted); line-height:1.6; }
+  .empty[hidden], .dialog[hidden] { display:none; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <label>操作人 <select id="operator" aria-label="操作人"></select></label>
+    <label>用户状态 <select id="user" aria-label="用户状态"></select></label>
+    <span>当前已是 Pro 时 Max 禁用；当前已是 Max 时 Pro 禁用。过期不算「已经是」。</span>
+  </div>
+  <div class="overlay">
+    <div class="empty" id="noAccess" hidden>没有「添加会员」权限：用户中心看不到「添加会员」入口，也打不开这个弹窗。</div>
+    <div class="dialog" id="dialog" role="dialog" aria-labelledby="title">
+      <div class="head"><h2 id="title">添加会员 · 2113472384384479234</h2><button class="close" id="close" type="button">×</button></div>
+      <div class="body">
+        <div class="field">
+          <div class="label">开通类型</div>
+          <div class="main" id="grants"></div>
+        </div>
+        <div class="field" id="levelField">
+          <div class="label"><span class="req">*</span>会员等级</div>
+          <div class="main">
+            <p class="lock" id="lock"></p>
+            <div id="levels"></div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="label"><span class="req">*</span>有效期天数</div>
+          <div class="main">
+            <div class="days">
+              <div class="number" id="number">
+                <input id="days" inputmode="numeric" value="30" />
+                <div class="stepper"><button type="button" id="up">⌃</button><button type="button" id="down">⌄</button></div>
+              </div>
+              <span>天</span>
+            </div>
+            <p class="tip" id="tip"></p>
+            <p class="err" id="err"></p>
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <button class="btn plain" id="cancel" type="button">取消</button>
+        <button class="btn primary" id="ok" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+  <div class="mask" id="mask" hidden>
+    <div class="box">
+      <h3 id="boxTitle">确认添加会员</h3>
+      <div class="warn"><span class="dot">!</span><div id="boxMsg"></div></div>
+      <div class="actions">
+        <button class="btn plain" id="boxCancel" type="button">取消</button>
+        <button class="btn primary" id="boxOk" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+<script>
+const OPERATORS = [
+  ["manager", "CC Manager（一线销售的管理者）"],
+  ["cc", "CC（一线销售）"],
+  ["none", "没有「添加会员」权限"]
+];
+const USERS = [
+  ["new", "新用户（从没开过会员）", { level:"none", channel:"none" }],
+  ["trial", "未付费，已经在体验", { level:"trial", channel:"none" }],
+  ["trial_expired", "体验已过期，从没付过费", { level:"trial_expired", channel:"none" }],
+  ["web_pro", "Web 开通的有效 Pro", { level:"pro", channel:"web" }],
+  ["web_max", "Web 开通的有效 Max", { level:"max", channel:"web" }],
+  ["store_pro", "App Store / Google Play 订阅中的 Pro", { level:"pro", channel:"store" }],
+  ["store_max", "App Store / Google Play 订阅中的 Max", { level:"max", channel:"store" }],
+  ["pro_expired", "Pro 已过期", { level:"pro_expired", channel:"none" }],
+  ["max_expired", "Max 已过期", { level:"max_expired", channel:"none" }]
+];
+const TRIAL_TIP = "新用户：从当前时间起算，给予体验天数。\n未付费、且已经在体验：在当前体验到期时间上累加，原来没用完的体验天数还在。\n已付费正式会员：从当前时间起算，并行添加体验天数，不接到正式会员的到期日后面。";
+const BANK_TIP = "不论新用户、未付费仅体验，还是已付费正式会员：都从当前时间起算，给予会员天数。";
+const $ = (id) => document.getElementById(id);
+let grant = "MANUAL";
+let level = "PRO";
+let operator = "manager";
+let scene = USERS[0][2];
+
+function activeLevel() {
+  return scene.level === "pro" || scene.level === "max" ? scene.level : null;
+}
+function isCc() { return operator === "cc"; }
+function bankDisabled() { return isCc(); }
+function levelDisabled(value) {
+  const current = activeLevel();
+  if (!current || grant !== "WEB") return false;
+  return (current === "pro" && value === "MAX") || (current === "max" && value === "PRO");
+}
+function dayLimit() {
+  if (isCc() || grant === "MANUAL") return isCc() ? 3 : 365;
+  return 1095;
+}
+
+function renderSceneOptions() {
+  $("operator").innerHTML = OPERATORS.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  $("user").innerHTML = USERS.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+}
+function render() {
+  const grants = [
+    ["MANUAL", "添加体验天数", "能看到头像框，钻石入口仍可打开付费墙。不选 Pro / Max。"],
+    ["WEB", "手动银行转账", "按普通会员开通。能看到头像框，钻石入口不再打开付费墙。"]
+  ];
+  $("grants").innerHTML = grants.map(([value, title, desc]) => {
+    const disabled = value === "WEB" && bankDisabled();
+    return `<label class="radio${disabled ? " is-disabled" : ""}"><input type="radio" name="grant" value="${value}" ${grant === value ? "checked" : ""} ${disabled ? "disabled" : ""}><span><span class="title">${title}</span><span class="desc">${desc}${disabled ? " CC 不可选。" : ""}</span></span></label>`;
+  }).join("");
+  const showLevel = grant === "WEB" && !bankDisabled();
+  $("levelField").hidden = !showLevel;
+  const current = activeLevel();
+  if (showLevel && current === "pro") level = "PRO";
+  if (showLevel && current === "max") level = "MAX";
+  $("lock").textContent = !showLevel ? "" : current === "pro"
+    ? "用户已经是 Pro，Max 禁用。"
+    : current === "max"
+      ? "用户已经是 Max，Pro 禁用。"
+      : scene.level === "pro_expired" || scene.level === "max_expired"
+        ? "会员已过期，不算当前仍是该等级，Pro 和 Max 都可以选。"
+        : "";
+  $("levels").innerHTML = [["PRO","Pro"],["MAX","Max"]].map(([value, title]) => {
+    const disabled = levelDisabled(value);
+    return `<label class="radio${disabled ? " is-disabled" : ""}"><input type="radio" name="level" value="${value}" ${level === value ? "checked" : ""} ${disabled ? "disabled" : ""}><span><span class="title">${title}</span></span></label>`;
+  }).join("");
+  const limit = dayLimit();
+  $("tip").textContent = (grant === "WEB" ? BANK_TIP : TRIAL_TIP) + "\n本次最多 " + limit + " 天。";
+  $("err").textContent = "";
+  $("number").classList.remove("error");
+}
+
+function parseDays() {
+  const raw = $("days").value.trim();
+  const limit = dayLimit();
+  if (!/^\d+$/.test(raw)) return { ok:false, message:"请输入有效期天数" };
+  const days = Number(raw);
+  if (days < 1 || days > limit) return { ok:false, message:`有效期天数为 1-${limit}` };
+  return { ok:true, days };
+}
+function fail(message) {
+  $("err").textContent = message;
+  $("number").classList.add("error");
+}
+function toast(message, error) {
+  const el = $("toast");
+  el.hidden = false;
+  el.textContent = message;
+  el.classList.toggle("error", Boolean(error));
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.hidden = true; }, 2400);
+}
+function applyScene() {
+  operator = $("operator").value;
+  scene = USERS.find((item) => item[0] === $("user").value)[2];
+  const noAccess = operator === "none";
+  $("noAccess").hidden = !noAccess;
+  $("dialog").hidden = noAccess;
+  $("user").disabled = noAccess;
+  grant = "MANUAL";
+  level = activeLevel() === "max" ? "MAX" : "PRO";
+  $("days").value = isCc() ? "1" : "30";
+  $("mask").hidden = true;
+  render();
+}
+
+$("operator").addEventListener("change", applyScene);
+$("user").addEventListener("change", applyScene);
+$("grants").addEventListener("change", (event) => {
+  if (event.target.name !== "grant" || event.target.disabled) return;
+  grant = event.target.value;
+  if (grant === "WEB" && activeLevel() === "max") level = "MAX";
+  if (grant === "WEB" && activeLevel() === "pro") level = "PRO";
+  const current = Number($("days").value);
+  if (Number.isFinite(current) && current > dayLimit()) $("days").value = String(dayLimit());
+  render();
+});
+$("levels").addEventListener("change", (event) => {
+  if (event.target.name === "level" && !event.target.disabled) level = event.target.value;
+});
+$("levels").addEventListener("click", (event) => {
+  const input = event.target.closest("label")?.querySelector("input");
+  if (input?.disabled) $("lock").textContent = input.value === "MAX" ? "用户已经是 Pro，Max 禁用。" : "用户已经是 Max，Pro 禁用。";
+});
+$("up").addEventListener("click", () => { $("days").value = String(Math.min(dayLimit(), (Number($("days").value) || 0) + 1)); });
+$("down").addEventListener("click", () => { $("days").value = String(Math.max(1, (Number($("days").value) || 1) - 1)); });
+$("ok").addEventListener("click", () => {
+  if (grant === "WEB" && bankDisabled()) return fail("CC 不能选择手动银行转账。");
+  if (grant === "WEB" && levelDisabled(level)) return fail(level === "MAX" ? "用户已经是 Pro，不能开通 Max。" : "用户已经是 Max，不能开通 Pro。");
+  const parsed = parseDays();
+  if (!parsed.ok) return fail(parsed.message);
+  if (scene.channel === "store") {
+    $("boxTitle").textContent = "添加会员失败";
+    $("boxMsg").textContent = "当前用户存在有效的 App Store/Google Play 订阅订单，不能手动添加会员";
+    $("boxOk").hidden = true;
+    $("mask").hidden = false;
+    return;
+  }
+  $("boxOk").hidden = false;
+  $("boxTitle").textContent = "确认添加会员";
+  const grantName = grant === "WEB" ? "手动银行转账" : "添加体验天数";
+  const levelName = grant === "WEB" ? (level === "MAX" ? "Max" : "Pro") : "";
+  $("boxMsg").textContent = `确认为该用户添加 ${parsed.days} 天吗？开通类型：${grantName}${levelName ? "。会员等级：" + levelName : ""}。`;
+  $("mask").hidden = false;
+});
+$("boxCancel").addEventListener("click", () => { $("mask").hidden = true; });
+$("boxOk").addEventListener("click", () => {
+  $("mask").hidden = true;
+  toast(grant === "WEB" ? `已提交${level === "MAX" ? " Max" : " Pro"} 会员` : "已提交体验天数");
+});
+$("cancel").addEventListener("click", applyScene);
+$("close").addEventListener("click", applyScene);
+renderSceneOptions();
+applyScene();
+</script>
+</body>
+</html>

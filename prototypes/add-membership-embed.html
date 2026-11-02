@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="use-iframe" content="true">
+  <meta name="html-box-height-mode" content="auto">
+  <meta name="description" content="可交互的添加会员弹窗原型：开通类型单选，以及有效期天数。">
+  <title>添加会员弹窗</title>
+  <style>
+    :root { --primary: #409eff; --text: #303133; --label: #606266; --muted: #909399; --border: #dcdfe6; --danger: #f56c6c; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      width: 100%;
+      max-width: 100%;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: #f5f7fa;
+      font-size: 14px;
+    }
+    button, input { font-family: inherit; }
+    .stage { position: relative; width: 100%; padding: 16px 16px 20px; }
+    .langs { display: flex; justify-content: flex-end; gap: 6px; max-width: 520px; margin: 0 auto 10px; }
+    .langs button { border: 1px solid var(--border); background: #fff; color: var(--label); border-radius: 4px; height: 28px; padding: 0 10px; cursor: pointer; }
+    .langs button.active { color: var(--primary); border-color: #a0cfff; background: #ecf5ff; }
+    .dialog { width: 100%; max-width: 520px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.12); overflow: hidden; }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 0; }
+    .dialog-head h2 { margin: 0; font-size: 16px; font-weight: 500; }
+    .close { border: 0; background: transparent; color: #909399; font-size: 20px; line-height: 1; cursor: pointer; }
+    .dialog-body { padding: 22px 20px 8px; }
+    .field { display: flex; align-items: flex-start; margin-bottom: 18px; }
+    .field-label { width: 110px; flex-shrink: 0; text-align: right; padding: 6px 12px 0 0; color: var(--label); line-height: 20px; }
+    .req { color: var(--danger); margin-right: 4px; }
+    .field-main { flex: 1; min-width: 0; }
+    .radio { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; margin: 0 0 12px; }
+    .radio:last-child { margin-bottom: 0; }
+    .radio input { width: 14px; height: 14px; margin: 3px 0 0; accent-color: var(--primary); flex-shrink: 0; }
+    .radio-title { display: block; line-height: 20px; }
+    .radio-desc { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .days { display: flex; align-items: center; gap: 8px; }
+    .number { width: 160px; height: 32px; display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background: #fff; }
+    .number:focus-within { border-color: var(--primary); }
+    .number.error { border-color: var(--danger); }
+    .number input { width: 100%; border: 0; outline: none; text-align: center; font-size: 14px; color: var(--text); }
+    .stepper { width: 32px; border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+    .stepper button { flex: 1; border: 0; background: #f5f7fa; color: var(--label); cursor: pointer; font-size: 10px; padding: 0; }
+    .stepper button + button { border-top: 1px solid var(--border); }
+    .unit { color: var(--label); font-size: 13px; }
+    .tip { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+    .err { margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--danger); }
+    .err:empty { display: none; }
+    .dialog-foot { display: flex; justify-content: flex-end; gap: 12px; padding: 8px 20px 16px; }
+    .btn { height: 32px; padding: 0 16px; border-radius: 4px; font-size: 14px; cursor: pointer; }
+    .btn-plain { background: #fff; color: var(--label); border: 1px solid var(--border); }
+    .btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+    .msgbox { position: absolute; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .msgbox[hidden], .toast[hidden], .payload[hidden] { display: none; }
+    .box { width: min(460px, 100%); background: #fff; border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,.16); padding: 16px 20px; }
+    .box h3 { margin: 0 0 12px; font-size: 16px; }
+    .box-msg { display: flex; gap: 10px; color: var(--label); line-height: 1.5; }
+    .warn { width: 20px; height: 20px; border-radius: 50%; background: #e6a23c; color: #fff; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; }
+    .box-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+    .toast { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: #f0f9eb; border: 1px solid #e1f3d8; color: #67c23a; border-radius: 4px; padding: 10px 16px; }
+    .payload { max-width: 520px; margin: 12px auto 0; color: #64748b; font-size: 12px; font-family: Consolas, Monaco, monospace; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="langs">
+      <button type="button" data-lang="zh" class="active">中文</button>
+      <button type="button" data-lang="en">English</button>
+      <button type="button" data-lang="ko">한국어</button>
+    </div>
+    <div class="dialog" role="dialog" aria-labelledby="dialogTitle">
+      <div class="dialog-head">
+        <h2 id="dialogTitle"></h2>
+        <button class="close" id="closeBtn" type="button" aria-label="close">×</button>
+      </div>
+      <form class="dialog-body" id="form">
+        <div class="field">
+          <div class="field-label" id="typeLabel"></div>
+          <div class="field-main" id="radios"></div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span class="req">*</span><span id="daysLabel"></span></div>
+          <div class="field-main">
+            <div class="days">
+              <div class="number" id="number">
+                <input id="days" inputmode="numeric" value="30" aria-labelledby="daysLabel">
+                <div class="stepper">
+                  <button type="button" id="up" aria-label="increase">⌃</button>
+                  <button type="button" id="down" aria-label="decrease">⌄</button>
+                </div>
+              </div>
+              <span class="unit" id="unit"></span>
+            </div>
+            <p class="tip" id="daysTip"></p>
+            <p class="err" id="daysErr"></p>
+          </div>
+        </div>
+      </form>
+      <div class="dialog-foot">
+        <button class="btn btn-plain" id="cancelBtn" type="button"></button>
+        <button class="btn btn-primary" id="okBtn" type="button"></button>
+      </div>
+    </div>
+    <p class="payload" id="payload" hidden></p>
+    <div class="msgbox" id="msgbox" hidden>
+      <div class="box" role="alertdialog">
+        <h3 id="confirmTitle"></h3>
+        <div class="box-msg"><span class="warn">!</span><div id="confirmMsg"></div></div>
+        <div class="box-actions">
+          <button class="btn btn-plain" id="confirmCancel" type="button"></button>
+          <button class="btn btn-primary" id="confirmOk" type="button"></button>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast" hidden></div>
+  </div>
+<script>
+const COPY = {
+  zh: {
+    title: "添加会员 · 2113472384384479234",
+    type: "开通类型",
+    options: [
+      ["MANUAL", "添加体验天数", "用户在 App 可以看到会员头像框，但是仍可点击钻石入口，打开付费墙继续续费。"],
+      ["WEB", "手动银行转账", "按普通会员开通。用户在 App 能看到会员头像框，钻石入口不再打开付费墙。"]
+    ],
+    days: "有效期天数", unit: "天",
+    tip: "未付费、已付费、逾期：都从当前时间起算。",
+    required: "请输入有效期天数", range: "有效期天数为 1-365",
+    cancel: "取消", confirm: "确认", confirmTitle: "确认添加会员",
+    confirmMsg: "确认为该用户添加 {days} 天会员吗？<br>开通类型：{type}<br>请注意，此次添加的会员天数是从现在重新计算，不保留原本没用完的天数。",
+    success: "会员有效期已更新",
+    sent: "POST /rest/dino-mgt/v1/users/2113472384384479234/add-membership"
+  },
+  en: {
+    title: "Add membership · 2113472384384479234",
+    type: "Grant type",
+    options: [
+      ["MANUAL", "Add trial days", "The user can see the membership avatar frame in the App, but can still tap the diamond entry to open the paywall and renew."],
+      ["WEB", "Manual bank transfer", "Granted as a normal membership. The user sees the avatar frame, and the diamond entry no longer opens the paywall."]
+    ],
+    days: "Validity days", unit: "days",
+    tip: "Unpaid, paid, and expired: all start from now.",
+    required: "Please enter validity days", range: "Validity days must be 1-365",
+    cancel: "Cancel", confirm: "Confirm", confirmTitle: "Confirm add membership",
+    confirmMsg: "Add {days} days of membership for this user?<br>Grant type: {type}<br>Please note: these days start over from now. Previously unused days are not kept.",
+    success: "Membership expiry updated",
+    sent: "POST /rest/dino-mgt/v1/users/2113472384384479234/add-membership"
+  },
+  ko: {
+    title: "멤버십 추가 · 2113472384384479234",
+    type: "지급 유형",
+    options: [
+      ["MANUAL", "체험 일수 추가", "앱에서 멤버십 아바타 프레임을 볼 수 있지만, 다이아몬드 입구를 눌러 페이월을 열고 계속 결제할 수 있습니다."],
+      ["WEB", "수동 계좌이체", "일반 멤버십으로 지급합니다. 아바타 프레임은 보이며, 다이아몬드 입구에서는 페이월이 열리지 않습니다."]
+    ],
+    days: "유효 기간(일)", unit: "일",
+    tip: "미결제, 유료, 만료 모두 현재 시각부터 계산합니다.",
+    required: "유효 기간을 입력하세요", range: "유효 기간은 1-365일입니다",
+    cancel: "취소", confirm: "확인", confirmTitle: "멤버십 추가 확인",
+    confirmMsg: "이 사용자에게 {days}일 멤버십을 추가하시겠습니까?<br>지급 유형: {type}<br>참고: 이번에 추가하는 일수는 지금 시각부터 다시 계산되며, 원래 남은 일수는 유지되지 않습니다.",
+    success: "멤버십 만료일이 업데이트되었습니다",
+    sent: "POST /rest/dino-mgt/v1/users/2113472384384479234/add-membership"
+  }
+};
+const $ = (id) => document.getElementById(id);
+let lang = "zh";
+let sourceType = "MANUAL";
+const t = () => COPY[lang];
+function render() {
+  const c = t();
+  $("dialogTitle").textContent = c.title;
+  $("typeLabel").textContent = c.type;
+  $("daysLabel").textContent = c.days;
+  $("unit").textContent = c.unit;
+  $("daysTip").textContent = c.tip;
+  $("cancelBtn").textContent = c.cancel;
+  $("okBtn").textContent = c.confirm;
+  $("confirmTitle").textContent = c.confirmTitle;
+  $("confirmCancel").textContent = c.cancel;
+  $("confirmOk").textContent = c.confirm;
+  $("radios").innerHTML = c.options.map(([value, title, desc]) =>
+    `<label class="radio"><input type="radio" name="sourceType" value="${value}" ${value === sourceType ? "checked" : ""}><span><span class="radio-title">${title}</span><span class="radio-desc">${desc}</span></span></label>`
+  ).join("");
+  document.querySelectorAll(".langs button").forEach((btn) => btn.classList.toggle("active", btn.dataset.lang === lang));
+}
+function selectedTypeName() {
+  const found = t().options.find(([value]) => value === sourceType);
+  return found ? found[1] : sourceType;
+}
+function parseDays() {
+  const raw = $("days").value.trim();
+  if (!raw) return { ok: false, message: t().required };
+  if (!/^\d+$/.test(raw)) return { ok: false, message: t().range };
+  const days = Number(raw);
+  if (days < 1 || days > 365) return { ok: false, message: t().range };
+  return { ok: true, days };
+}
+function showError(message) {
+  $("daysErr").textContent = message || "";
+  $("number").classList.toggle("error", Boolean(message));
+}
+function resetForm() {
+  sourceType = "MANUAL";
+  $("days").value = "30";
+  showError("");
+  $("msgbox").hidden = true;
+  render();
+}
+function step(delta) {
+  const current = Number($("days").value);
+  const base = Number.isFinite(current) ? current : 0;
+  $("days").value = String(Math.min(365, Math.max(1, (Number.isFinite(base) ? base : 0) + delta)));
+  showError("");
+}
+$("up").addEventListener("click", () => step(1));
+$("down").addEventListener("click", () => step(-1));
+$("days").addEventListener("input", () => showError(""));
+$("radios").addEventListener("change", (event) => { if (event.target.name === "sourceType") sourceType = event.target.value; });
+document.querySelector(".langs").addEventListener("click", (event) => {
+  const btn = event.target.closest("button");
+  if (!btn) return;
+  lang = btn.dataset.lang;
+  render();
+});
+$("closeBtn").addEventListener("click", resetForm);
+$("cancelBtn").addEventListener("click", resetForm);
+$("form").addEventListener("submit", (event) => event.preventDefault());
+$("okBtn").addEventListener("click", () => {
+  const parsed = parseDays();
+  if (!parsed.ok) { showError(parsed.message); return; }
+  showError("");
+  $("confirmMsg").innerHTML = t().confirmMsg.replace("{days}", String(parsed.days)).replace("{type}", selectedTypeName());
+  $("msgbox").hidden = false;
+});
+$("confirmCancel").addEventListener("click", () => { $("msgbox").hidden = true; });
+$("confirmOk").addEventListener("click", () => {
+  const parsed = parseDays();
+  $("msgbox").hidden = true;
+  $("payload").hidden = false;
+  $("payload").textContent = t().sent + "  " + JSON.stringify({ days: parsed.days, sourceType });
+  const toast = $("toast");
+  toast.hidden = false;
+  toast.textContent = t().success;
+  clearTimeout(showError._timer);
+  showError._timer = setTimeout(() => { toast.hidden = true; }, 2200);
+});
+render();
+</script>
+</body>
+</html>

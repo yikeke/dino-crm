@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>用户详情 · 落地页收集信息原型</title>
+<style>
+  :root {
+    --primary: #1677ff;
+    --text: #1f2937;
+    --label: #4b5563;
+    --muted: #9ca3af;
+    --border: #e5e7eb;
+    --page: #f5f7fa;
+    --cell: #fafafa;
+    --note: #fff7e6;
+    --note-border: #ffd591;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: var(--page);
+    font-size: 14px;
+  }
+  button { font-family: inherit; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  .proto-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-bottom: 12px; color: #64748b; font-size: 12px; flex-wrap: wrap;
+  }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button {
+    border: 1px solid var(--border); background: #fff; color: var(--label);
+    border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer; font-size: 12px;
+  }
+  .seg button.active { color: var(--primary); border-color: #91caff; background: #e6f4ff; }
+  .card { background: #fff; border-radius: 8px; margin-bottom: 16px; }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; border-bottom: 1px solid #f0f0f0;
+  }
+  .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .card-body { padding: 16px 20px 20px; }
+  .btn {
+    border: 1px solid #d9d9d9; background: #fff; border-radius: 6px; height: 30px;
+    padding: 0 12px; cursor: pointer; color: var(--text);
+  }
+  table.desc { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.desc th, table.desc td { border: 1px solid #f0f0f0; padding: 9px 14px; text-align: left; vertical-align: top; }
+  table.desc th { background: var(--cell); color: var(--label); font-weight: 400; width: 16%; }
+  table.desc td { width: 34%; word-break: break-word; }
+  .tag {
+    display: inline-block; font-size: 12px; line-height: 20px; padding: 0 7px; border-radius: 4px;
+    border: 1px solid #d9d9d9; background: #fafafa; color: #374151;
+  }
+  .tag.blue { color: #0958d9; background: #e6f4ff; border-color: #91caff; }
+  .tag.green { color: #389e0d; background: #f6ffed; border-color: #b7eb8f; }
+  .tag.purple { color: #531dab; background: #f9f0ff; border-color: #d3adf7; }
+  .tag.gray { color: #6b7280; }
+  .muted { color: var(--muted); }
+  .code { font-family: Menlo, monospace; font-size: 12px; background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  .group { margin-top: 18px; }
+  .group:first-child { margin-top: 0; }
+  .group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .group-title { font-weight: 600; font-size: 14px; }
+  .group-hint { font-size: 12px; color: var(--muted); }
+  .src-line { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  table.list { width: 100%; border-collapse: collapse; }
+  table.list th, table.list td { border-bottom: 1px solid #f0f0f0; padding: 9px 12px; text-align: left; }
+  table.list th { background: var(--cell); color: var(--label); font-weight: 500; font-size: 13px; }
+  .empty {
+    border: 1px dashed #d9d9d9; border-radius: 6px; padding: 18px; text-align: center; color: var(--muted);
+  }
+  .note {
+    display: none; margin-top: 6px; font-size: 12px; line-height: 18px; color: #874d00;
+    background: var(--note); border: 1px solid var(--note-border); border-radius: 4px; padding: 4px 8px;
+  }
+  body.show-notes .note { display: block; }
+  .note-inline { display: none; margin-left: 6px; font-size: 12px; color: #874d00; background: var(--note);
+    border: 1px solid var(--note-border); border-radius: 4px; padding: 0 6px; }
+  body.show-notes .note-inline { display: inline-block; }
+  .placeholder-row td { color: #c0c4cc; }
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid #f0f0f0; padding: 0 20px; }
+  .tabs span { padding: 12px 0; color: var(--label); }
+  .tabs span.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+</style>
+</head>
+<body class="show-notes">
+<div class="page">
+  <div class="proto-bar">
+    <span>原型：用户中心 → 用户详情 · 新增「落地页收集信息」区块</span>
+    <div class="seg" id="scenario">
+      <button data-s="my" class="active">马来用户（二级问卷 + 皮肤字段）</button>
+      <button data-s="vn">越南用户（只有二级问卷）</button>
+      <button data-s="skin">皮肤登录页用户（只有自定义字段）</button>
+      <button data-s="none">无落地页数据</button>
+    </div>
+    <div class="seg">
+      <button id="toggleNotes" class="active">显示数据来源标注</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">用户详情</div>
+      <button class="btn">返回列表</button>
+    </div>
+    <div class="card-body">
+      <table class="desc">
+        <tr><th>用户ID</th><td id="uid"></td><th>学生姓名</th><td id="uname"></td></tr>
+        <tr><th>用户状态</th><td><span class="tag green">正常</span></td><th>用户类型</th><td><span class="tag blue">注册未付费</span></td></tr>
+        <tr><th>账号</th><td id="account"></td><th>国家/业务线</th><td id="country"></td></tr>
+        <tr><th>渠道来源（LP）</th><td id="lp"></td><th>渠道码</th><td id="code"></td></tr>
+        <tr><th>注册时间</th><td id="reg"></td><th>CC</th><td>—</td></tr>
+      </table>
+      <div class="note">学生姓名 = user_profile.nickname，马来线索页第一页填的孩子姓名也写在这里，下方不再重复展示。原「是否预约外呼 / 预约外呼时间 / 英语学习程度 / 学习目的」移到下方「落地页收集信息」。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">落地页收集信息 <span class="card-sub" id="lpSummary"></span></div>
+    </div>
+    <div class="card-body" id="lpBody"></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs"><span class="active">课程信息</span><span>上课记录</span><span>订单</span></div>
+    <div class="card-body muted">（原有内容不变）</div>
+  </div>
+</div>
+
+<script>
+const SCENARIOS = {
+  my: {
+    uid: '1849302775610023', uname: 'Aisyah', account: '+60 12-345 6789', country: '马来',
+    lp: '马来线索页 · KOL 钟嘉欣', code: 'MY_KOL_ZJX', reg: '2026-10-28 20:14（MYT）',
+    summary: '最近提交 2026-10-28 20:16（MYT）',
+    child: { name: 'Aisyah', time: '2026-10-28 20:14' },
+    survey: {
+      callback: true, callbackAt: '2026-10-30 19:30（MYT）',
+      level: '能进行简单对话', goal: '自信开口说英语', method: '线下补习班', showMethod: true,
+      time: '2026-10-28 20:16',
+    },
+    custom: [
+      { label: 'Nama sekolah', value: 'SK Taman Desa', skin: 'MY_SKIN_A', time: '2026-10-28 20:14' },
+      { label: 'Tahun / Darjah', value: 'Darjah 2', skin: 'MY_SKIN_A', time: '2026-10-28 20:14' },
+    ],
+  },
+  vn: {
+    uid: '1849302775610871', uname: 'Minh Anh', account: '+84 90 123 4567', country: '越南',
+    lp: '越南线索页 · FB 投放', code: 'VN_FB_0921', reg: '2026-10-27 09:02（ICT）',
+    summary: '最近提交 2026-10-27 09:05（ICT）',
+    child: null,
+    survey: {
+      callback: false, callbackAt: null,
+      level: '能读能说一点', goal: '不确定', showMethod: false, time: '2026-10-27 09:05',
+    },
+    custom: [],
+  },
+  skin: {
+    uid: '1849302775611204', uname: 'Ploy', account: '+66 81 234 5678', country: '泰国',
+    lp: '泰国皮肤登录页 · CC 支付', code: 'TH_CC_PAY', reg: '2026-10-26 14:40（ICT）',
+    summary: '最近提交 2026-10-26 14:40（ICT）',
+    child: null, survey: null,
+    custom: [
+      { label: 'ชื่อเล่นของลูก', value: 'น้องพลอย', skin: 'TH_SKIN_B', time: '2026-10-26 14:40' },
+      { label: 'อายุของลูก', value: '7', skin: 'TH_SKIN_B', time: '2026-10-26 14:40' },
+      { label: '推荐人', value: 'CC 小林', skin: 'TH_SKIN_B', time: '2026-10-26 14:40' },
+    ],
+  },
+  none: {
+    uid: '1849302775612090', uname: 'Dino_8821', account: 'parent@gmail.com', country: '马来',
+    lp: '—', code: '—', reg: '2026-10-20 11:11（MYT）', summary: '',
+    child: null, survey: null, custom: [],
+  },
+};
+
+const dash = '<span class="muted">—</span>';
+const src = (text) => `<div class="note">${text}</div>`;
+
+function surveyGroup(s) {
+  if (!s) {
+    return `<div class="group">
+      <div class="group-head"><span class="group-title">线索问卷</span></div>
+      <div class="empty">该用户未提交落地页二级问卷</div>
+    </div>`;
+  }
+  const callback = s.callback
+    ? '<span class="tag blue">是</span>'
+    : '<span class="muted">未预约</span>';
+  return `<div class="group">
+    <div class="group-head">
+      <span class="group-title">线索问卷</span>
+      <span class="group-hint">落地页二级页 · 提交于 ${s.time}</span>
+    </div>
+    <table class="desc">
+      <tr>
+        <th>是否预约外呼</th><td>${callback}${src('由预约时间推断：有时间 = 是；没有 = 未预约（分不清“选了否”和“没走到二级页”）')}</td>
+        <th>预约外呼时间</th><td>${s.callbackAt || dash}${src('web_lead.appointment_at，按用户国家时区展示')}</td>
+      </tr>
+      <tr>
+        <th>英语学习程度</th><td>${s.level}${src('web_survey_answer · english_level，选项编码转文案')}</td>
+        <th>学习目的</th><td>${s.goal}${src('web_survey_answer · learning_goal')}</td>
+      </tr>
+      ${s.showMethod ? `<tr>
+        <th>孩子当前学习方式</th><td>${s.method}${src('仅马来；web_survey_answer')}</td>
+        <th></th><td></td>
+      </tr>` : ''}
+    </table>
+  </div>`;
+}
+
+function customGroup(list) {
+  const body = list.length
+    ? `<table class="list">
+        <thead><tr><th style="width:28%">字段</th><th>填写内容</th><th style="width:16%">来源皮肤</th><th style="width:18%">提交时间</th></tr></thead>
+        <tbody>${list.map((f) => `<tr>
+          <td>${f.label}</td><td>${f.value}</td>
+          <td><span class="tag purple">${f.skin}</span></td>
+          <td class="muted">${f.time}</td>
+        </tr>`).join('')}</tbody>
+      </table>`
+    : '<div class="empty">该用户没有提交皮肤自定义字段</div>';
+  return `<div class="group">
+    <div class="group-head">
+      <span class="group-title">皮肤自定义字段</span>
+      <span class="group-hint">皮肤管理 → 登录页配置的字段，按提交原文展示，新增字段无需改 CRM</span>
+    </div>
+    ${body}
+    ${src('web_survey_answer 中不属于问卷题库的 key 都归到这里；字段名 = 运营配置的标签原文。来源皮肤需要后端多存一个皮肤编码，当前表里没有，这一列可二期再加')}
+  </div>`;
+}
+
+function render(key) {
+  const d = SCENARIOS[key];
+  for (const id of ['uid', 'uname', 'account', 'country', 'lp', 'reg']) {
+    document.getElementById(id).textContent = d[id];
+  }
+  document.getElementById('code').innerHTML = d.code === '—' ? dash : `<span class="code">${d.code}</span>`;
+  document.getElementById('lpSummary').textContent = d.summary;
+
+  const hasAny = d.survey || d.custom.length;
+  document.getElementById('lpBody').innerHTML = hasAny
+    ? (key === 'skin' ? '' : surveyGroup(d.survey)) + customGroup(d.custom)
+    : '<div class="empty">该用户不是从落地页注册的，暂无落地页收集信息</div>';
+}
+
+document.getElementById('scenario').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#scenario button').forEach((x) => x.classList.toggle('active', x === b));
+  render(b.dataset.s);
+});
+document.getElementById('toggleNotes').addEventListener('click', (e) => {
+  document.body.classList.toggle('show-notes');
+  e.currentTarget.classList.toggle('active');
+});
+render('my');
+</script>
+</body>
+</html>

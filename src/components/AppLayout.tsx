@@ -19,8 +19,6 @@ import {
   DashboardOutlined,
   ExperimentOutlined,
   SkinOutlined,
-  CreditCardOutlined,
-  QrcodeOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -61,10 +59,10 @@ const NAV_MODULE: Record<string, ModuleKey> = {
 }
 
 export default function AppLayout() {
+  const [collapsed, setCollapsed] = useState(false)
+  const [openKeys, setOpenKeys] = useState<string[]>([])
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
-  const [openKeys, setOpenKeys] = useState<string[]>(['marketing-v5'])
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
   const selectedPath = location.pathname.startsWith('/marketing-center') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
@@ -74,16 +72,6 @@ export default function AppLayout() {
   const { account, role } = useCurrentAccount()
   const accounts = useStore((s) => s.accounts)
   const roles = useStore((s) => s.roles)
-  // Create Payment Link demo only switches between the two CC roles.
-  const onPaymentLinks = location.pathname.startsWith('/marketing-center-v5/payment-links') || location.pathname.startsWith('/marketing-center-v5/open-links')
-  const ccRoles = [
-    { email: 'sales.lead@dinoai.ai', label: lang === 'en' ? 'CC manager' : 'CC 主管' },
-    { email: 'sales.kr@dinoai.ai', label: lang === 'en' ? 'CC' : '普通 CC' },
-  ].flatMap((item) => {
-    const found = accounts.find((a) => a.email === item.email)
-    return found ? [{ ...item, account: found }] : []
-  })
-  const ccCurrent = ccRoles.find((item) => item.account.id === account?.id) || (role?.id === 'role_support' ? ccRoles[1] : ccRoles[0])
 
   const phaseLabel = (text: string, phaseText: string, color: string) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -133,13 +121,7 @@ export default function AppLayout() {
     { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center-v5/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
     { key: '/marketing-center-v5/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
-    ...((can('salesV3') !== 'none' || can('marketingV2_landing') !== 'none')
-      ? [
-          { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: 'Create Payment Link' },
-          { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
-        ]
-      : []),
-  ].filter((n) => n.key === '/marketing-center-v5/payment-links' || n.key === '/marketing-center-v5/open-links' || visible(n.key))
+  ].filter((n) => visible(n.key))
 
   // 销售中心（二期）
   const salesNav = [
@@ -162,31 +144,28 @@ export default function AppLayout() {
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
   ].filter((n) => visible(n.key))
 
-  const placeholder = (label: string) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      {label}
-      <Tag color="default" style={{ margin: 0, lineHeight: '16px', fontSize: 11 }}>{lang === 'en' ? 'Placeholder' : '占位'}</Tag>
-    </span>
-  )
-
   const NAV = [
-    { key: '/users', icon: <TeamOutlined />, label: lang === 'en' ? 'User Center' : '用户中心' },
-    { key: '/sales-v3', icon: <SolutionOutlined />, label: lang === 'en' ? 'Sales Center' : '销售中心' },
-    { key: '/orders', icon: <ProfileOutlined />, label: lang === 'en' ? 'Order Center' : '订单中心' },
-    {
-      key: 'marketing-v5',
-      icon: <ShopOutlined />,
-      label: lang === 'en' ? 'Marketing Center' : '营销中心',
-      children: [
-        { key: '/marketing-center-v5/channels', icon: <ApartmentOutlined />, label: lang === 'en' ? 'Channel Management' : '渠道管理' },
-        { key: '/marketing-center-v5/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
-        { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
-        { key: 'landing-placeholder', icon: <LinkOutlined />, label: placeholder(lang === 'en' ? 'Landing Page Management' : '落地页管理'), disabled: true },
-        { key: 'skin-placeholder', icon: <SkinOutlined />, label: placeholder(lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理'), disabled: true },
-        { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: 'Create Payment Link' },
-        { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
-      ],
-    },
+    ...topNav,
+    ...salesNav,
+    ...systemNav,
+    ...usersV2Nav,
+    ...usersV6Nav,
+    ...ordersV3Nav,
+    ...salesV3Nav,
+    ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
+    ...(marketingV5Children.length ? [{ key: 'marketing-v5', icon: <ShopOutlined />, label: appABPhaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV5Children }] : []),
+    ...(marketingBackupChildren.length
+      ? [
+          {
+            key: 'marketing-backup',
+            icon: <HistoryOutlined />,
+            label: phase4Label(lang === 'en' ? 'Marketing Center Backup' : '营销中心备份'),
+            children: [{ key: '/marketing-backup', icon: <HistoryOutlined />, label: lang === 'en' ? 'Backup overview' : '备份说明' }, ...marketingBackupChildren],
+          },
+        ]
+      : []),
+    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
+    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
   ]
 
   const TITLES: Record<string, string> = {
@@ -206,8 +185,6 @@ export default function AppLayout() {
     '/marketing-center-v5/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center-v5/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center-v5/skins': lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理',
-    '/marketing-center-v5/payment-links': 'Create Payment Link',
-    '/marketing-center-v5/open-links': lang === 'en' ? 'Open Payment Link' : '通用支付链接',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/users-v6': t('app.nav.usersV6'),
@@ -272,7 +249,7 @@ export default function AppLayout() {
           }}
         />
       </Sider>
-      <Layout style={{ minWidth: 0 }}>
+      <Layout>
         <Header
           style={{
             background: '#fff',
@@ -287,30 +264,6 @@ export default function AppLayout() {
             {TITLES[selectedPath] ?? TITLES[basePath] ?? t('app.brand')}
           </Text>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {onPaymentLinks && ccCurrent ? (
-              <Dropdown
-                menu={{
-                  selectedKeys: [ccCurrent.account.id],
-                  items: ccRoles.map((item) => ({
-                    key: item.account.id,
-                    label: (
-                      <span>
-                        {item.label} · <Text type="secondary">{item.account.name}</Text>
-                      </span>
-                    ),
-                    onClick: () => setIdentity(item.account.id),
-                  })),
-                }}
-              >
-                <Button type="text" icon={<UserSwitchOutlined />}>
-                  {ccCurrent.account.name}
-                  <Tag color={ccCurrent === ccRoles[0] ? 'gold' : 'geekblue'} style={{ marginLeft: 6 }}>
-                    {ccCurrent.label}
-                  </Tag>
-                  <DownOutlined style={{ fontSize: 10 }} />
-                </Button>
-              </Dropdown>
-            ) : (
             <Dropdown
               menu={{
                 selectedKeys: [account?.id ?? '__default__'],
@@ -347,7 +300,6 @@ export default function AppLayout() {
                 <DownOutlined style={{ fontSize: 10 }} />
               </Button>
             </Dropdown>
-            )}
             <Dropdown
               menu={{
                 selectedKeys: [lang],
