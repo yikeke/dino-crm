@@ -534,11 +534,6 @@ export default function LandingSkinManagement() {
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
               </Text>
-              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                {en
-                  ? 'Where buttons go is fixed on the landing page (C-end), not configured here. CRM only sets button copy, style and position.'
-                  : '按钮点了去哪是 C 端落地页的固定逻辑，不在这里配。CRM 只配按钮文案、样式和位置。'}
-              </Text>
             </div>
           </div>
         </Card>
