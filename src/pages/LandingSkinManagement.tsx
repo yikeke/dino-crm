@@ -516,7 +516,7 @@ export default function LandingSkinManagement() {
               />
               {jpOneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
+                  {en ? 'No register (Japan): every button on the page jumps to OneLink.' : '无注册时，页面上的按钮直接跳 OneLink'}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -528,8 +528,8 @@ export default function LandingSkinManagement() {
                   ? (en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。')
                   : editing.line === '日本'
                     ? (en
-                      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
-                      : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
+                      ? 'Japan acquisition: Jump to OneLink (today’s default, usually No register). Web to App download popup is not in this PRD.'
+                      : '日本获客落地页本期只有「直接跳 OneLink」（现状默认，一般配「无注册」）。出下载弹窗的 Web to App 获客页不在本期。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
