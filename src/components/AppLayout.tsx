@@ -166,7 +166,7 @@ export default function AppLayout() {
     {
       key: 'marketing-v5',
       icon: <ShopOutlined />,
-      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.1 / 10.6', 'geekblue'),
+      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.1 / 10.4', 'geekblue'),
       children: marketingV5Children.map((n) =>
         HK_TABS.has(n.key)
           ? n
