@@ -159,7 +159,7 @@ export default function AppLayout() {
     {
       key: 'marketing-v5',
       icon: <ShopOutlined />,
-      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.3', 'geekblue'),
+      label: phaseLabel(lang === 'en' ? 'Marketing Center' : '营销中心', 'PRD 10.2', 'geekblue'),
       children: marketingV5Children.map((n) =>
         n.key === '/marketing-center-v5/skins'
           ? n
