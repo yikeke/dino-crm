@@ -563,7 +563,7 @@ export default function LandingSkinManagement() {
             <label><em>*</em>{en ? 'Register type' : '注册类型'}</label>
             <div>
               <Radio.Group
-                disabled={!editing.line}
+                disabled={!editing.line || (pageType === 'lead' && editing.line === '香港')}
                 value={regMode}
                 onChange={(e) => {
                   const mode = registerModeForPage(pageType, e.target.value, editing.line)
@@ -593,8 +593,8 @@ export default function LandingSkinManagement() {
               {editing.line === '香港' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {en
-                    ? 'Acquisition pages use No register: buttons open OneLink, no phone and no third-party. Payment pages use phone register (+852, OTP) and may add Google, Apple, Facebook. Hong Kong has no Social-login-only option.'
-                    : '获客页用「无注册」：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页用「手机号注册成账号」：区号 +852，必须有验证，可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
+                    ? 'Acquisition pages are locked to No register: buttons open OneLink, no phone and no third-party. Payment pages use phone register (+852, OTP) and may add Google, Apple, Facebook. Hong Kong has no Social-login-only option.'
+                    : '获客页固定「无注册」，不用选：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页用「手机号注册成账号」：区号 +852，必须有验证，可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
                 </Text>
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>

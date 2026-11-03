@@ -564,6 +564,7 @@ export function registerModeForPage(pageType: LandingPageKind, mode?: string, li
   const next = normalizeRegisterMode(mode)
   if (next === 'oauth') return line === '日本' ? 'oauth' : 'full'
   if (pageType === 'pay') return 'full'
+  if (line === '香港') return 'none'
   return next
 }
 
