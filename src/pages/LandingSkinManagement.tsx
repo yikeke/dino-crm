@@ -453,21 +453,22 @@ export default function LandingSkinManagement() {
               value={editing.line || undefined}
               style={{ width: 220 }}
               options={SKIN_BUSINESS_LINES.map((v) => ({ value: v, label: v }))}
-              onChange={(line) => setEditing({
-                ...editing,
-                line,
-                code: creating ? '' : editing.code,
-                language: defaultLanguageForLine(line),
-                registerMode: registerModeForPage(pageType, editing.registerMode, line),
-                verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, editing.registerMode, line), editing.verifyEnabled),
-                thirdPartyLogins: thirdPartyLoginsForLine(line, editing.thirdPartyLogins, registerModeForPage(pageType, editing.registerMode, line)),
-                afterRegisterAction: followUpActionForPageType(
-                  normalizePageType(editing.pageType, editing.afterRegisterAction),
-                  editing.afterRegisterAction,
+              onChange={(line) => {
+                const kind: LandingPageKind = line === '香港' ? 'lead' : pageType
+                const mode = registerModeForPage(kind, editing.registerMode, line)
+                setEditing({
+                  ...editing,
                   line,
-                  registerModeForPage(pageType, editing.registerMode, line),
-                ),
-              })}
+                  pageType: kind,
+                  code: creating ? '' : editing.code,
+                  language: defaultLanguageForLine(line),
+                  registerMode: mode,
+                  verifyEnabled: verifyEnabledForPage(kind, mode, editing.verifyEnabled),
+                  thirdPartyLogins: thirdPartyLoginsForLine(line, editing.thirdPartyLogins, mode),
+                  extraFields: extraFieldsForPage(kind, editing.extraFields),
+                  afterRegisterAction: followUpActionForPageType(kind, editing.afterRegisterAction, line, mode),
+                })
+              }}
             />
           </div>
           <div className="skin-form-row">
@@ -500,11 +501,22 @@ export default function LandingSkinManagement() {
                     extraFields: extraFieldsForPage(next, editing.extraFields),
                   })
                 }}
-                options={PAGE_TYPE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
+                options={PAGE_TYPE_OPTIONS.map((x) => ({
+                  value: x.value,
+                  label: en ? x.en : x.zh,
+                  disabled: editing.line === '香港' && x.value === 'pay',
+                }))}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
                 {en ? PAGE_TYPE_HINT[pageType].en : PAGE_TYPE_HINT[pageType].zh}
               </Text>
+              {editing.line === '香港' ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
+                  {en
+                    ? 'Hong Kong supports acquisition landings only for now; payment landings are not configurable yet.'
+                    : '香港暂只支持获客落地页，支付落地页暂不支持配置。'}
+                </Text>
+              ) : null}
             </div>
           </div>
           <div className="skin-form-row">
