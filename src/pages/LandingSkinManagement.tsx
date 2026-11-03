@@ -399,7 +399,10 @@ export default function LandingSkinManagement() {
     const basicsLocked = skinHasLiveVersion(editing)
     const regMode = registerModeForPage(pageType, editing.registerMode, editing.line)
     const noRegister = regMode === 'none'
-    const oneLinkLock = noRegister && (editing.line === '日本' || editing.line === '香港') && pageType === 'lead'
+    const oneLinkLock = pageType === 'lead' && (
+      editing.line === '香港'
+      || (noRegister && editing.line === '日本')
+    )
     const life = skinLifecycle(editing)
     const addAsset = (key: 'registerBefore' | 'registerAfter') =>
       setEditing({ ...editing, [key]: [...editing[key], emptySceneImage()] })
@@ -509,14 +512,16 @@ export default function LandingSkinManagement() {
             <div>
               <Radio.Group
                 className="skin-radio-stack"
-                disabled={basicsLocked || !editing.line || noRegister}
+                disabled={basicsLocked || !editing.line || noRegister || oneLinkLock}
                 value={followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, regMode)}
                 onChange={(e) => setEditing({ ...editing, afterRegisterAction: e.target.value })}
                 options={followUpOptions(pageType, editing.line).map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
               />
               {oneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
+                  {editing.line === '香港'
+                    ? (en ? 'Hong Kong acquisition pages always open OneLink. Every button on the page jumps there.' : '香港获客页固定直接跳转 OneLink，页面上的按钮都会打开 OneLink')
+                    : (en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink')}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -532,8 +537,8 @@ export default function LandingSkinManagement() {
                       : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
                   : editing.line === '香港'
                     ? (en
-                      ? 'Hong Kong has two acquisition pages: Open OneLink directly (No register + buttons) / Download-app popup (Web to App, phone register + Google / Apple / Facebook).'
-                      : '香港有两种获客页：直接跳转 OneLink（配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「手机号注册成账号」+ Google、Apple、Facebook）。')
+                      ? 'Hong Kong acquisition pages only open OneLink. Next interaction is locked.'
+                      : '香港获客页只有一种后续交互：直接跳转 OneLink，不用再选。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -588,8 +593,8 @@ export default function LandingSkinManagement() {
               {editing.line === '香港' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {en
-                    ? 'Two types only: 1) No register — buttons open OneLink; no phone and no third-party. 2) Phone register as account — +852 with OTP on payment pages; Google, Apple, Facebook optional. Hong Kong has no Social-login-only option.'
-                    : '两种注册类型：1）无注册：不能配手机号也不能配三方，按钮直接跳 OneLink。2）手机号注册成账号：区号 +852，支付页必须有验证；可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
+                    ? 'Acquisition pages use No register: buttons open OneLink, no phone and no third-party. Payment pages use phone register (+852, OTP) and may add Google, Apple, Facebook. Hong Kong has no Social-login-only option.'
+                    : '获客页用「无注册」：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页用「手机号注册成账号」：区号 +852，必须有验证，可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
                 </Text>
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>

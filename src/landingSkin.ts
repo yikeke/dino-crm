@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v12'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v13'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -339,7 +339,7 @@ export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
     if (x.value === 'onelink') return line === '日本' || line === '香港'
-    if (x.value === 'download_app') return line !== '越南' && line !== '马来'
+    if (x.value === 'download_app') return line !== '越南' && line !== '马来' && line !== '香港'
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
     return false
@@ -511,14 +511,15 @@ export function normalizePageType(type?: string, action?: string): LandingPageKi
 
 export function followUpActionForPageType(pageType: LandingPageKind, action?: string, line?: string, registerMode?: string): AfterRegisterAction {
   if (pageType === 'pay') return 'sku_promo_pay'
-  // 日本 / 香港获客 + 无注册：按钮直接跳 OneLink，后续交互锁定。
-  if ((line === '日本' || line === '香港') && normalizeRegisterMode(registerMode) === 'none') return 'onelink'
+  // 日本获客 + 无注册，或香港获客：后续交互锁定为直接跳 OneLink。
+  if (line === '香港') return 'onelink'
+  if (line === '日本' && normalizeRegisterMode(registerMode) === 'none') return 'onelink'
   const allowed = followUpOptions('lead', line).map((x) => x.value)
   const next = normalizeAfterRegisterAction(action)
   if (allowed.includes(next)) return next
   if (line === '越南') return 'lead_vn'
   if (line === '马来') return 'lead_my'
-  if (line === '日本' || line === '香港') return 'onelink'
+  if (line === '日本') return 'onelink'
   return 'download_app'
 }
 
@@ -1243,45 +1244,6 @@ export function seedLandingSkins(): LandingSkinStore {
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID HK_SKIN_B'),
       },
       {
-        id: 'SKIN_HK03',
-        code: 'HK_SKIN_C',
-        name: '香港获客落地页 · Web to App（出下载弹窗）',
-        line: '香港',
-        pageType: 'lead',
-        registerTitle: '登入後免費體驗 7 天',
-        registerSubtitle: '下載 App，立刻開始',
-        seoTitle: 'Dino AI｜兒童 AI 英語 App 7 天免費體驗',
-        seoDescription: '適合 3–12 歲。用手機號或 Google、Apple、Facebook 登入，下載 App 免費體驗 7 天。',
-        language: 'zh-Hant',
-        registerMode: 'full',
-        verifyEnabled: true,
-        extraFields: [],
-        thirdPartyLogins: ['google', 'apple', 'facebook'],
-        afterRegisterAction: 'download_app' as const,
-        ctaText: '登入並免費體驗',
-        ctaStyle: applyButtonPreset('midnight', false),
-        stickyCtaStyle: applyButtonPreset('midnight', true),
-        registerAreaBgKind: 'color',
-        registerAreaBgColor: '#e3f6ea',
-        hero: { ...asset('hero-hk-c', lpAsset('family.png'), 'family.png'), alt: '孩子跟恐龍角色一起練英語口語' },
-        registerBefore: [withBottomCta(jpPanel, 'App 裡免費體驗 7 天', applyButtonPreset('midnight', true))],
-        registerAfter: [asset('after-hk-c', AFTER, 'after-hk.png')],
-        stickyBar: asset('sticky-hk-c', STICKY, 'sticky-hk.png'),
-        stickyImageEnabled: false,
-        stickyBarCta: '登入並免費體驗',
-        stickyButtonEnabled: true,
-        stickyCtaMode: 'custom' as const,
-        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
-        effects: [],
-        status: 'published',
-        revision: 1,
-        lastPublishedRevision: 1,
-        createdAt: t,
-        updatedAt: t,
-        updatedBy: 'admin@dinoai.ai',
-        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID HK_SKIN_C'),
-      },
-      {
         id: 'SKIN_VN01',
         code: 'VN_SKIN_A',
         name: '越南线索页 · 无验证注册',
@@ -1348,6 +1310,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v12')
         ?? localStorage.getItem('dinoai_landing_skins_v11')
         ?? localStorage.getItem('dinoai_landing_skins_v10')
         ?? localStorage.getItem('dinoai_landing_skins_v9')
@@ -1367,7 +1330,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
       if (!localStorage.getItem(LANDING_SKIN_STORAGE_KEY)) {
         const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港')
         const seedCodes = new Set(seeds.map((x) => x.code))
-        raw.skins = [...seeds, ...raw.skins.filter((x) => !seedCodes.has(x.code) && x.id !== 'SKIN_JP01' && !String(x.id || '').startsWith('SKIN_HK'))]
+        raw.skins = [...seeds, ...raw.skins.filter((x) => !seedCodes.has(x.code) && x.id !== 'SKIN_JP01' && x.code !== 'HK_SKIN_C' && !String(x.id || '').startsWith('SKIN_HK'))]
       }
       for (const skin of raw.skins) {
         const line = skin.line === '其他' && (skin.language === 'ja' || (skin.code || '').startsWith('JP_'))
