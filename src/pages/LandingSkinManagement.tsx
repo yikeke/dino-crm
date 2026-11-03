@@ -47,6 +47,7 @@ import {
   normalizeRegisterAreaBgColor,
   normalizeRegisterAreaBgKind,
   normalizeRegisterMode,
+  registerModeChoiceDisabled,
   registerModeForPage,
   verifyEnabledForPage,
   extraFieldsForPage,
@@ -179,6 +180,18 @@ export default function LandingSkinManagement() {
     if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
       message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
       return false
+    }
+    if (editing.line === '日本') {
+      const jpType = normalizePageType(editing.pageType, editing.afterRegisterAction)
+      const jpMode = normalizeRegisterMode(editing.registerMode)
+      if (jpType === 'pay' && jpMode !== 'oauth') {
+        message.error(en ? 'Japan payment landings only allow Social login only.' : '日本支付落地页只允许「仅三方登录」')
+        return false
+      }
+      if (jpType === 'lead' && jpMode !== 'none') {
+        message.error(en ? 'Japan acquisition landings only allow No register.' : '日本获客落地页只允许「无注册」')
+        return false
+      }
     }
     if (normalizeRegisterMode(editing.registerMode) === 'oauth' && !thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, 'oauth').length) {
       message.error(en ? 'Social login only: pick at least one provider.' : '请至少选择一种三方登录')
@@ -488,19 +501,29 @@ export default function LandingSkinManagement() {
                 value={pageType}
                 onChange={(e) => {
                   const next = e.target.value as LandingPageKind
+                  const mode = registerModeForPage(next, editing.registerMode, editing.line)
                   setEditing({
                     ...editing,
                     pageType: next,
-                    afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line, registerModeForPage(next, editing.registerMode, editing.line)),
-                    registerMode: registerModeForPage(next, editing.registerMode, editing.line),
-                    verifyEnabled: verifyEnabledForPage(next, registerModeForPage(next, editing.registerMode, editing.line), editing.verifyEnabled),
+                    afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line, mode),
+                    registerMode: mode,
+                    verifyEnabled: verifyEnabledForPage(next, mode, editing.verifyEnabled),
                     extraFields: extraFieldsForPage(next, editing.extraFields),
+                    thirdPartyLogins: thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, mode),
                   })
                 }}
                 options={PAGE_TYPE_OPTIONS.map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
-                {en ? PAGE_TYPE_HINT[pageType].en : PAGE_TYPE_HINT[pageType].zh}
+                {editing.line === '日本'
+                  ? (pageType === 'pay'
+                    ? (en
+                      ? 'After social login, users go SKU list → promo code → PayPay → download App. Register type is locked to Social login only.'
+                      : '三方登录后进入 SKU 列表 → 输入优惠码 → PayPay 支付 → 下载 App。注册类型锁定「仅三方登录」。')
+                    : (en
+                      ? 'Today’s default Japan acquisition page. Next interaction is Jump to OneLink, so there is no register flow.'
+                      : '现状默认获客页。后续交互是「直接跳 OneLink」，没有注册流程。'))
+                  : (en ? PAGE_TYPE_HINT[pageType].en : PAGE_TYPE_HINT[pageType].zh)}
               </Text>
             </div>
           </div>
@@ -528,8 +551,8 @@ export default function LandingSkinManagement() {
                   ? (en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。')
                   : editing.line === '日本'
                     ? (en
-                      ? 'Japan acquisition: Jump to OneLink (today’s default, usually No register). Web to App download popup is not in this PRD.'
-                      : '日本获客落地页本期只有「直接跳 OneLink」（现状默认，一般配「无注册」）。出下载弹窗的 Web to App 获客页不在本期。')
+                      ? 'Japan acquisition is locked to Jump to OneLink. There is no register method on this page.'
+                      : '日本获客落地页后续交互锁定「直接跳 OneLink」，没有注册方式。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -571,16 +594,20 @@ export default function LandingSkinManagement() {
                 options={registerModeOptions(editing.line).map((x) => ({
                   value: x.value,
                   label: en ? x.en : x.zh,
-                  disabled: pageType === 'pay' && x.value === 'none',
+                  disabled: registerModeChoiceDisabled(editing.line, pageType, x.value),
                 }))}
               />
               {editing.line === '日本' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                  {en
-                    ? 'Three types: 1) No register — today’s default; no phone and no third-party; for pages whose buttons open OneLink. 2) Phone register as account — third-party optional. 3) Social login only — no register button below; icons sit where the form was.'
-                    : '三种注册类型：1）无注册：现状默认，不能配手机号也不能配三方，给页面上配按钮、点了跳 OneLink 的落地页用。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
+                  {pageType === 'pay'
+                    ? (en
+                      ? 'Japan payment landing: only Social login only is allowed. Phone register as account is greyed out and filtered.'
+                      : '日本支付落地页只允许「仅三方登录」。「手机号注册成账号」置灰，前端过滤掉。')
+                    : (en
+                      ? 'Japan acquisition jumps to OneLink, so there is no register method. Locked to No register; the other two options are greyed out.'
+                      : '获客落地页后续交互是「直接跳 OneLink」，没有注册方式。锁定「无注册」；「手机号注册成账号」和「仅三方登录」置灰。')}
                 </Text>
-              ) : null}
+              ) : (
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
                   ? (en ? 'Payment landings cannot use “No register”; phone register must use OTP.' : '支付落地页不能选择无注册；选手机号注册时必须有验证。')
@@ -588,6 +615,7 @@ export default function LandingSkinManagement() {
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
               </Text>
+              )}
             </div>
           </div>
           {regMode === 'full' ? (

@@ -326,6 +326,20 @@ export function registerModeOptions(line?: string) {
     .map((x) => (line === '日本' && x.value === 'oauth' ? { ...x, zh: '仅三方登录', en: 'Social login only' } : x))
 }
 
+/** 日本：支付只允许仅三方登录；获客只允许无注册。选项仍展示，置灰不可选。 */
+export function registerModeChoiceDisabled(
+  line: string | undefined,
+  pageType: LandingPageKind,
+  mode: RegisterMode,
+): boolean {
+  if (pageType === 'pay' && mode === 'none') return true
+  if (line === '日本') {
+    if (pageType === 'pay') return mode !== 'oauth'
+    return mode !== 'none'
+  }
+  return false
+}
+
 export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: string; en: string }[] = [
   { value: 'sku_promo_pay', zh: '跳转 SKU 列表 -> 输入 promo code -> 支付 -> 出下载 app 弹窗', en: 'SKU list → promo code → pay → download-app popup' },
   { value: 'onelink', zh: '直接跳 OneLink', en: 'Jump to OneLink' },
@@ -552,12 +566,14 @@ export function normalizeRegisterMode(mode?: string): RegisterMode {
 }
 
 /**
- * Payment landings never go register-free. 「仅三方登录」only exists for 日本;
- * other lines fall back to phone register.
+ * 日本按落地页类型锁定注册类型（需求 6）：
+ * 支付 → 仅三方登录；获客 → 无注册（后续交互直接跳 OneLink，没有注册流程）。
+ * 其他业务线：支付不能无注册；「仅三方登录」回落为手机号注册。
  */
 export function registerModeForPage(pageType: LandingPageKind, mode?: string, line?: string): RegisterMode {
+  if (line === '日本') return pageType === 'pay' ? 'oauth' : 'none'
   const next = normalizeRegisterMode(mode)
-  if (next === 'oauth') return line === '日本' ? 'oauth' : 'full'
+  if (next === 'oauth') return 'full'
   if (pageType === 'pay') return 'full'
   return next
 }
