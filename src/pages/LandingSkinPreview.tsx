@@ -286,9 +286,9 @@ const HK_SKUS = [
 ]
 
 const HK_PAY_METHODS = [
-  { id: 'apple_google', name: 'Apple Pay / Google Pay', note: '展會前必須 · 只在支援的裝置出現' },
-  { id: 'card', name: 'Visa / Mastercard', note: '展會前必須' },
   { id: 'alipayhk', name: 'AlipayHK', note: '展會前必須 · 電腦出動態收款碼' },
+  { id: 'apple_google', name: 'Google Pay / Apple Pay', note: '展會前必須 · 只在支援的裝置出現' },
+  { id: 'card', name: 'Visa / Mastercard', note: '展會前必須' },
   { id: 'alipay', name: 'Alipay', note: '可展會後' },
   { id: 'octopus', name: 'Octopus', note: '可展會後' },
 ]
