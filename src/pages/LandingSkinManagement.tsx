@@ -509,13 +509,6 @@ export default function LandingSkinManagement() {
               <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
                 {en ? PAGE_TYPE_HINT[pageType].en : PAGE_TYPE_HINT[pageType].zh}
               </Text>
-              {editing.line === '香港' ? (
-                <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
-                  {en
-                    ? 'Hong Kong: acquisition pages open OneLink directly (PRD 10.1); payment pages use phone login, HKD plans and local payments (PRD 10.4).'
-                    : '香港：获客落地页直接跳 OneLink（PRD 10.1）；支付落地页手机号登录、港币套餐、本地支付（PRD 10.4）。'}
-                </Text>
-              ) : null}
             </div>
           </div>
           <div className="skin-form-row">
@@ -530,9 +523,7 @@ export default function LandingSkinManagement() {
               />
               {oneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {editing.line === '香港'
-                    ? (en ? 'Hong Kong acquisition pages always open OneLink. Every button on the page jumps there.' : '香港获客页固定直接跳转 OneLink，页面上的按钮都会打开 OneLink')
-                    : (en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink')}
+                  {en ? 'No register: every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -546,10 +537,6 @@ export default function LandingSkinManagement() {
                     ? (en
                       ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
                       : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
-                  : editing.line === '香港'
-                    ? (en
-                      ? 'Hong Kong acquisition pages only open OneLink. Next interaction is locked.'
-                      : '香港获客页只有一种后续交互：直接跳转 OneLink，不用再选。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -601,16 +588,9 @@ export default function LandingSkinManagement() {
                     : '三种注册类型：1）无注册：现状默认，不能配手机号也不能配三方，给页面上配按钮、点了跳 OneLink 的落地页用。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
                 </Text>
               ) : null}
-              {editing.line === '香港' ? (
-                <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                  {en
-                    ? 'Acquisition pages are locked to No register: buttons open OneLink, no phone and no third-party. Payment pages are locked to phone register (+852, OTP). Google, Apple, Facebook come after phone and are not open this phase. Hong Kong has no Social-login-only option.'
-                    : '获客页固定「无注册」，不用选：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页固定「手机号注册成账号」：区号 +852，必须有验证；Google、Apple、Facebook 排在手机号之后，本期不开放。香港没有「仅三方登录」。'}
-                </Text>
-              ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en ? 'Payment landings cannot use “No register”; phone register must use OTP.' : '支付落地页不能选择无注册；选手机号注册时必须有验证。')
+                  ? (en ? 'Payment pages cannot use "No registration". Payment pages must enable verification.' : '支付落地页不能选择无注册，且必须有验证。')
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -723,9 +703,6 @@ export default function LandingSkinManagement() {
                 {regMode === 'oauth'
                   ? (en ? 'Social login only: icons replace the form. Pick at least one.' : '仅三方登录：图标放在原表单位置，至少勾一家。')
                   : (en ? 'Checked providers appear as icons under the register form.' : '勾选后展示在注册区域下方，作为快捷登录入口。')}
-                {editing.line === '香港'
-                  ? (en ? ' Hong Kong: phone first; Google, Apple, Facebook are not open this phase.' : ' 香港本期先上手机号；Google、Apple、Facebook 排在手机号之后，暂不开放勾选。')
-                  : null}
                 {editing.line === '日本'
                   ? (en ? ' Japan order is fixed: LINE, Apple, Google, Facebook. LINE is Japan-only.' : ' 日本固定按 LINE、Apple、Google、Facebook 排序；LINE 仅日本可选。')
                   : null}
