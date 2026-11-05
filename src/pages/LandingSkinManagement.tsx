@@ -590,7 +590,7 @@ export default function LandingSkinManagement() {
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en ? 'Payment pages cannot use "No registration". Payment pages must enable verification.' : '支付落地页不能选择无注册，且必须有验证。')
+                  ? (en ? 'Payment pages cannot use "No registration".' : '支付落地页不能选择无注册。')
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -616,8 +616,8 @@ export default function LandingSkinManagement() {
                 {pageType === 'pay' ? (
                   <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                     {en
-                      ? 'Payment landings must verify the phone with OTP before continuing. Matches current backend behavior.'
-                      : '支付落地页必须有验证，验证通过后才能进入后续流程（与现网后端一致）。'}
+                      ? 'Payment pages must enable verification.'
+                      : '支付落地页必须开启有验证。'}
                   </Text>
                 ) : null}
               </div>
