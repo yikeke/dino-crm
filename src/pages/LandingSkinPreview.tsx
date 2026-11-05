@@ -286,11 +286,12 @@ const HK_SKUS = [
 ]
 
 const HK_PAY_METHODS = [
-  { id: 'alipayhk', name: 'AlipayHK', note: '展會前必須 · 電腦出動態收款碼' },
-  { id: 'apple_google', name: 'Google Pay / Apple Pay', note: '展會前必須 · 只在支援的裝置出現' },
-  { id: 'card', name: 'Visa / Mastercard', note: '展會前必須' },
-  { id: 'alipay', name: 'Alipay', note: '可展會後' },
-  { id: 'octopus', name: 'Octopus', note: '可展會後' },
+  { id: 'alipayhk', name: 'AlipayHK', note: '電腦出動態收款碼，手機拉起 AlipayHK App' },
+  { id: 'googlepay', name: 'Google Pay', note: '瀏覽器支援才出現' },
+  { id: 'applepay', name: 'Apple Pay', note: '蘋果裝置才出現' },
+  { id: 'card', name: '信用卡（Visa / Mastercard）', note: '所有裝置都出現' },
+  { id: 'alipay', name: 'Alipay', note: '之後開通' },
+  { id: 'octopus', name: 'Octopus', note: '之後開通' },
 ]
 
 type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | 'onelink' | null
@@ -501,7 +502,7 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
                   <button type="button" className="lp-sku" key={method.id} onClick={() => onStep('download')}>
                     <span>
                       <b>{method.name}</b>
-                      <span style={{ display: 'block', fontSize: 12, color: '#64748b', fontWeight: 400 }}>{method.note}</span>
+                      <span className="lp-was">{method.note}</span>
                     </span>
                   </button>
                 ))}

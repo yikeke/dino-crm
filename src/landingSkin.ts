@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v14'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v13'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -371,7 +371,6 @@ export function thirdPartyOptionsForLine(line?: string) {
 
 export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[], registerMode?: string): ThirdPartyLogin[] {
   if (normalizeRegisterMode(registerMode) === 'none') return []
-  if (line === '香港') return []
   const picked = new Set(normalizeThirdPartyLogins(ids))
   return thirdPartyOptionsForLine(line).map((x) => x.value).filter((id) => picked.has(id))
 }
@@ -1174,18 +1173,18 @@ export function seedLandingSkins(): LandingSkinStore {
       {
         id: 'SKIN_HK01',
         code: 'HK_SKIN_A',
-        name: '香港支付落地页 · 手机号登录',
+        name: '香港支付落地页 · 手机号 + 三方',
         line: '香港',
         pageType: 'pay',
         registerTitle: '登入後選擇方案',
-        registerSubtitle: '用香港手機號碼登入（+852）',
+        registerSubtitle: '手機號、Google、Apple、Facebook 都可以登入',
         seoTitle: 'Dino AI｜兒童 AI 英語 App 付費方案',
-        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習。登入後用 AlipayHK、Apple Pay / Google Pay 或信用卡付款。',
+        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習。登入後用 Apple Pay、Visa 或 AlipayHK 付款。',
         language: 'zh-Hant',
         registerMode: 'full',
         verifyEnabled: true,
         extraFields: [],
-        thirdPartyLogins: [],
+        thirdPartyLogins: ['google', 'apple', 'facebook'],
         afterRegisterAction: 'sku_promo_pay' as const,
         ctaText: '登入並選擇方案',
         ctaStyle: applyButtonPreset('midnight', false),
@@ -1312,7 +1311,6 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
-        ?? localStorage.getItem('dinoai_landing_skins_v13')
         ?? localStorage.getItem('dinoai_landing_skins_v12')
         ?? localStorage.getItem('dinoai_landing_skins_v11')
         ?? localStorage.getItem('dinoai_landing_skins_v10')

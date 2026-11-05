@@ -454,7 +454,7 @@ export default function LandingSkinManagement() {
               style={{ width: 220 }}
               options={SKIN_BUSINESS_LINES.map((v) => ({ value: v, label: v }))}
               onChange={(line) => {
-                const kind: LandingPageKind = pageType
+                const kind: LandingPageKind = line === '香港' ? 'lead' : pageType
                 const mode = registerModeForPage(kind, editing.registerMode, line)
                 setEditing({
                   ...editing,
@@ -504,11 +504,19 @@ export default function LandingSkinManagement() {
                 options={PAGE_TYPE_OPTIONS.map((x) => ({
                   value: x.value,
                   label: en ? x.en : x.zh,
+                  disabled: editing.line === '香港' && x.value === 'pay',
                 }))}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
                 {en ? PAGE_TYPE_HINT[pageType].en : PAGE_TYPE_HINT[pageType].zh}
               </Text>
+              {editing.line === '香港' ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
+                  {en
+                    ? 'Hong Kong supports acquisition landings only for now; payment landings are not configurable yet.'
+                    : '香港暂只支持获客落地页，支付落地页暂不支持配置。'}
+                </Text>
+              ) : null}
             </div>
           </div>
           <div className="skin-form-row">
@@ -523,7 +531,9 @@ export default function LandingSkinManagement() {
               />
               {oneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No register: every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
+                  {editing.line === '香港'
+                    ? (en ? 'Hong Kong acquisition pages always open OneLink. Every button on the page jumps there.' : '香港获客页固定直接跳转 OneLink，页面上的按钮都会打开 OneLink')
+                    : (en ? 'No register (Japan): every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink')}
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
@@ -537,6 +547,10 @@ export default function LandingSkinManagement() {
                     ? (en
                       ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
                       : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
+                  : editing.line === '香港'
+                    ? (en
+                      ? 'Hong Kong acquisition pages only open OneLink. Next interaction is locked.'
+                      : '香港获客页只有一种后续交互：直接跳转 OneLink，不用再选。')
                   : (en
                     ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
                     : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
@@ -588,9 +602,16 @@ export default function LandingSkinManagement() {
                     : '三种注册类型：1）无注册：现状默认，不能配手机号也不能配三方，给页面上配按钮、点了跳 OneLink 的落地页用。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
                 </Text>
               ) : null}
+              {editing.line === '香港' ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                  {en
+                    ? 'Acquisition pages are locked to No register: buttons open OneLink, no phone and no third-party. Payment pages use phone register (+852, OTP) and may add Google, Apple, Facebook. Hong Kong has no Social-login-only option.'
+                    : '获客页固定「无注册」，不用选：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页用「手机号注册成账号」：区号 +852，必须有验证，可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
+                </Text>
+              ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
-                  ? (en ? 'Payment pages cannot use "No registration".' : '支付落地页不能选择无注册。')
+                  ? (en ? 'Payment landings cannot use “No register”; phone register must use OTP.' : '支付落地页不能选择无注册；选手机号注册时必须有验证。')
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
@@ -616,8 +637,8 @@ export default function LandingSkinManagement() {
                 {pageType === 'pay' ? (
                   <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                     {en
-                      ? 'Payment pages must enable verification.'
-                      : '支付落地页必须开启有验证。'}
+                      ? 'Payment landings must verify the phone with OTP before continuing. Matches current backend behavior.'
+                      : '支付落地页必须有验证，验证通过后才能进入后续流程（与现网后端一致）。'}
                   </Text>
                 ) : null}
               </div>
@@ -694,7 +715,7 @@ export default function LandingSkinManagement() {
             <label>{regMode === 'oauth' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
             <div>
               <Checkbox.Group
-                disabled={!editing.line || editing.line === '香港'}
+                disabled={!editing.line}
                 value={editing.thirdPartyLogins}
                 options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
                 onChange={(vals) => setEditing({ ...editing, thirdPartyLogins: thirdPartyLoginsForLine(editing.line, vals as ThirdPartyLogin[], regMode) })}
