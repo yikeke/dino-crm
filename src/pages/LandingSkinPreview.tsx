@@ -287,9 +287,9 @@ const HK_SKUS = [
 
 const HK_PAY_METHODS = [
   { id: 'alipayhk', name: 'AlipayHK', note: '電腦出動態收款碼，手機拉起 AlipayHK App' },
-  { id: 'googlepay', name: 'Google Pay', note: '瀏覽器支援才出現' },
-  { id: 'applepay', name: 'Apple Pay', note: '蘋果裝置才出現' },
-  { id: 'card', name: '信用卡（Visa / Mastercard）', note: '所有裝置都出現' },
+  { id: 'googlepay', name: 'Google Pay', note: '手機和電腦都常駐' },
+  { id: 'applepay', name: 'Apple Pay', note: '手機和電腦都常駐' },
+  { id: 'card', name: '信用卡（Visa / Mastercard）', note: '手機和電腦都常駐' },
   { id: 'alipay', name: 'Alipay', note: '之後開通' },
   { id: 'octopus', name: 'Octopus', note: '之後開通' },
 ]
