@@ -454,7 +454,7 @@ export default function LandingSkinManagement() {
               style={{ width: 220 }}
               options={SKIN_BUSINESS_LINES.map((v) => ({ value: v, label: v }))}
               onChange={(line) => {
-                const kind: LandingPageKind = line === '香港' ? 'lead' : pageType
+                const kind: LandingPageKind = pageType
                 const mode = registerModeForPage(kind, editing.registerMode, line)
                 setEditing({
                   ...editing,
@@ -504,7 +504,6 @@ export default function LandingSkinManagement() {
                 options={PAGE_TYPE_OPTIONS.map((x) => ({
                   value: x.value,
                   label: en ? x.en : x.zh,
-                  disabled: editing.line === '香港' && x.value === 'pay',
                 }))}
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
@@ -513,8 +512,8 @@ export default function LandingSkinManagement() {
               {editing.line === '香港' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6, maxWidth: 560 }}>
                   {en
-                    ? 'Hong Kong supports acquisition landings only for now; payment landings are not configurable yet.'
-                    : '香港暂只支持获客落地页，支付落地页暂不支持配置。'}
+                    ? 'Hong Kong: acquisition pages open OneLink directly (PRD 10.1); payment pages use phone login, HKD plans and local payments (PRD 10.4).'
+                    : '香港：获客落地页直接跳 OneLink（PRD 10.1）；支付落地页手机号登录、港币套餐、本地支付（PRD 10.4）。'}
                 </Text>
               ) : null}
             </div>
@@ -605,8 +604,8 @@ export default function LandingSkinManagement() {
               {editing.line === '香港' ? (
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {en
-                    ? 'Acquisition pages are locked to No register: buttons open OneLink, no phone and no third-party. Payment pages use phone register (+852, OTP) and may add Google, Apple, Facebook. Hong Kong has no Social-login-only option.'
-                    : '获客页固定「无注册」，不用选：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页用「手机号注册成账号」：区号 +852，必须有验证，可勾选 Google、Apple、Facebook。香港没有「仅三方登录」。'}
+                    ? 'Acquisition pages are locked to No register: buttons open OneLink, no phone and no third-party. Payment pages are locked to phone register (+852, OTP). Google, Apple, Facebook come after phone and are not open this phase. Hong Kong has no Social-login-only option.'
+                    : '获客页固定「无注册」，不用选：不能配手机号也不能配三方，按钮直接跳 OneLink。支付页固定「手机号注册成账号」：区号 +852，必须有验证；Google、Apple、Facebook 排在手机号之后，本期不开放。香港没有「仅三方登录」。'}
                 </Text>
               ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
@@ -715,7 +714,7 @@ export default function LandingSkinManagement() {
             <label>{regMode === 'oauth' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
             <div>
               <Checkbox.Group
-                disabled={!editing.line}
+                disabled={!editing.line || editing.line === '香港'}
                 value={editing.thirdPartyLogins}
                 options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
                 onChange={(vals) => setEditing({ ...editing, thirdPartyLogins: thirdPartyLoginsForLine(editing.line, vals as ThirdPartyLogin[], regMode) })}
@@ -724,6 +723,9 @@ export default function LandingSkinManagement() {
                 {regMode === 'oauth'
                   ? (en ? 'Social login only: icons replace the form. Pick at least one.' : '仅三方登录：图标放在原表单位置，至少勾一家。')
                   : (en ? 'Checked providers appear as icons under the register form.' : '勾选后展示在注册区域下方，作为快捷登录入口。')}
+                {editing.line === '香港'
+                  ? (en ? ' Hong Kong: phone first; Google, Apple, Facebook are not open this phase.' : ' 香港本期先上手机号；Google、Apple、Facebook 排在手机号之后，暂不开放勾选。')
+                  : null}
                 {editing.line === '日本'
                   ? (en ? ' Japan order is fixed: LINE, Apple, Google, Facebook. LINE is Japan-only.' : ' 日本固定按 LINE、Apple、Google、Facebook 排序；LINE 仅日本可选。')
                   : null}
