@@ -501,7 +501,7 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
                   <button type="button" className="lp-sku" key={method.id} onClick={() => onStep('download')}>
                     <span>
                       <b>{method.name}</b>
-                      <span className="lp-was">{method.note}</span>
+                      <span style={{ display: 'block', fontSize: 12, color: '#64748b', fontWeight: 400 }}>{method.note}</span>
                     </span>
                   </button>
                 ))}
