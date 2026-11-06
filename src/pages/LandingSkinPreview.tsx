@@ -287,11 +287,6 @@ const HK_SKUS = [
 
 const HK_PAY_METHODS = [
   { id: 'alipayhk', name: 'AlipayHK', note: '電腦出動態收款碼，手機拉起 AlipayHK App' },
-  { id: 'googlepay', name: 'Google Pay', note: '手機和電腦都常駐' },
-  { id: 'applepay', name: 'Apple Pay', note: '手機和電腦都常駐' },
-  { id: 'card', name: '信用卡（Visa / Mastercard）', note: '手機和電腦都常駐' },
-  { id: 'alipay', name: 'Alipay', note: '之後開通' },
-  { id: 'octopus', name: 'Octopus', note: '之後開通' },
 ]
 
 type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | 'onelink' | null
@@ -497,12 +492,12 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
             <h2>确认支付</h2>
             {hk ? (
               <>
-                <p className="lp-overlay-copy">香港收银台按优先级露出。点任一方式后，原型直接演示「确认到账 → 下载 App」。未开通的方式线上不露出。</p>
+                <p className="lp-overlay-copy">香港收银台本期只有 AlipayHK。点了之后，原型直接演示「确认到账 → 下载 App」。</p>
                 {HK_PAY_METHODS.map((method) => (
                   <button type="button" className="lp-sku" key={method.id} onClick={() => onStep('download')}>
                     <span>
                       <b>{method.name}</b>
-                      <span className="lp-was">{method.note}</span>
+                      <span style={{ display: 'block', fontSize: 12, color: '#64748b', fontWeight: 400 }}>{method.note}</span>
                     </span>
                   </button>
                 ))}

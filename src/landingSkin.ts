@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v13'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v15'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -1179,7 +1179,7 @@ export function seedLandingSkins(): LandingSkinStore {
         registerTitle: '登入後選擇方案',
         registerSubtitle: '手機號、Google、Apple、Facebook 都可以登入',
         seoTitle: 'Dino AI｜兒童 AI 英語 App 付費方案',
-        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習。登入後用 Apple Pay、Visa 或 AlipayHK 付款。',
+        seoDescription: '適合 3–12 歲。每天 15 分鐘、遊戲化學習。登入後用 AlipayHK 付款。',
         language: 'zh-Hant',
         registerMode: 'full',
         verifyEnabled: true,
@@ -1311,6 +1311,8 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v14')
+        ?? localStorage.getItem('dinoai_landing_skins_v13')
         ?? localStorage.getItem('dinoai_landing_skins_v12')
         ?? localStorage.getItem('dinoai_landing_skins_v11')
         ?? localStorage.getItem('dinoai_landing_skins_v10')
