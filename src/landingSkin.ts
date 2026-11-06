@@ -366,7 +366,7 @@ export function thirdPartyOptionsForLine(line?: string) {
   if (line === '日本') {
     return JP_THIRD_PARTY_ORDER.map((id) => THIRD_PARTY_OPTIONS.find((x) => x.value === id)!)
   }
-  return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line')
+  return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line' && (x.value !== 'kakao' || line === '韩国'))
 }
 
 export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[], registerMode?: string): ThirdPartyLogin[] {
