@@ -7,7 +7,6 @@ import { useI18n } from '../i18n'
 import SkinAssetField, { SceneImageField, StickyBarField } from '../components/SkinAssetField'
 import ButtonStyleField from '../components/ButtonStyleField'
 import {
-  followUpHint,
   followUpOptions,
   PAGE_TYPE_HINT,
   PAGE_TYPE_OPTIONS,
@@ -533,9 +532,6 @@ export default function LandingSkinManagement() {
                   {en ? 'No registration: the page does not go to a next interaction page.' : '无注册时不进入后续交互页面'}
                 </Text>
               ) : null}
-              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                {followUpHint(pageType, editing.line, en)}
-              </Text>
             </div>
           </div>
         </Card>

@@ -301,22 +301,6 @@ export const PAGE_TYPE_HINT: Record<LandingPageKind, { zh: string; en: string }>
   },
 }
 
-/** 后续交互的说明：选了当前业务线，只出这一条业务线的文案。 */
-export function followUpHint(pageType: LandingPageKind, line: string | undefined, en: boolean) {
-  if (pageType === 'pay') return en ? 'Fixed by the landing type.' : '由落地页类型决定，无需选择。'
-  if (!line) return en ? 'Select a business line to see its options.' : '先选业务线，再显示对应选项。'
-  if (line === '日本') {
-    return en
-      ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
-      : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。'
-  }
-  if (line === '越南') return en ? 'This line: two lead pages.' : '当前业务线：收集两个留资页面。'
-  if (line === '马来') return en ? 'This line: four lead pages.' : '当前业务线：收集四个留资页面。'
-  if (line === '沙特') return en ? 'This line: download-app popup, or four lead pages (Arabic).' : '当前业务线：下载 App 弹窗，或收集四个留资页面（阿语版）。'
-  if (line === '香港') return en ? 'This line: open OneLink directly.' : '当前业务线：直接跳转 OneLink。'
-  return en ? 'This line: download-app popup.' : '当前业务线：直接出下载 App 弹窗。'
-}
-
 export const LANGUAGE_OPTIONS = [
   { value: 'vi', label: '越南语' },
   { value: 'ko', label: '韩语' },
