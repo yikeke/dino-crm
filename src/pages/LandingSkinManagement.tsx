@@ -48,6 +48,7 @@ import {
   normalizeRegisterAreaBgKind,
   normalizeRegisterMode,
   registerModeForPage,
+  isLeadCollectAction,
   verifyEnabledForPage,
   extraFieldsForPage,
   pageTypeLabel,
@@ -282,9 +283,9 @@ export default function LandingSkinManagement() {
     let record: LandingSkin = flattenSkinScenes({
       ...editing,
       ...(lockedBasics || {}),
-      registerMode: registerModeForPage(nextPageType, editing.registerMode, editing.line),
-      verifyEnabled: verifyEnabledForPage(nextPageType, registerModeForPage(nextPageType, editing.registerMode, editing.line), editing.verifyEnabled),
-      extraFields: registerModeForPage(nextPageType, editing.registerMode, editing.line) === 'oauth'
+      registerMode: registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction),
+      verifyEnabled: verifyEnabledForPage(nextPageType, registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction), editing.verifyEnabled),
+      extraFields: registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction) === 'oauth'
         ? []
         : extraFieldsForPage(nextPageType, editing.extraFields),
       thirdPartyLogins: thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, editing.registerMode),
@@ -397,8 +398,9 @@ export default function LandingSkinManagement() {
   if (editing) {
     const pageType = normalizePageType(editing.pageType, editing.afterRegisterAction)
     const basicsLocked = skinHasLiveVersion(editing)
-    const regMode = registerModeForPage(pageType, editing.registerMode, editing.line)
+    const regMode = registerModeForPage(pageType, editing.registerMode, editing.line, editing.afterRegisterAction)
     const noRegister = regMode === 'none'
+    const leadCollect = pageType === 'lead' && isLeadCollectAction(followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, regMode))
     const oneLinkLock = pageType === 'lead' && (
       editing.line === '香港'
       || (noRegister && editing.line === '日本')
@@ -455,7 +457,7 @@ export default function LandingSkinManagement() {
               options={SKIN_BUSINESS_LINES.map((v) => ({ value: v, label: v }))}
               onChange={(line) => {
                 const kind: LandingPageKind = pageType
-                const mode = registerModeForPage(kind, editing.registerMode, line)
+                const mode = registerModeForPage(kind, editing.registerMode, line, editing.afterRegisterAction)
                 setEditing({
                   ...editing,
                   line,
@@ -495,9 +497,9 @@ export default function LandingSkinManagement() {
                   setEditing({
                     ...editing,
                     pageType: next,
-                    afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line, registerModeForPage(next, editing.registerMode, editing.line)),
-                    registerMode: registerModeForPage(next, editing.registerMode, editing.line),
-                    verifyEnabled: verifyEnabledForPage(next, registerModeForPage(next, editing.registerMode, editing.line), editing.verifyEnabled),
+                    afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line, registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction)),
+                    registerMode: registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction),
+                    verifyEnabled: verifyEnabledForPage(next, registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction), editing.verifyEnabled),
                     extraFields: extraFieldsForPage(next, editing.extraFields),
                   })
                 }}
@@ -564,7 +566,7 @@ export default function LandingSkinManagement() {
                 disabled={!editing.line || (pageType === 'lead' && editing.line === '香港')}
                 value={regMode}
                 onChange={(e) => {
-                  const mode = registerModeForPage(pageType, e.target.value, editing.line)
+                  const mode = registerModeForPage(pageType, e.target.value, editing.line, editing.afterRegisterAction)
                   setEditing({
                     ...editing,
                     registerMode: mode,
@@ -578,7 +580,7 @@ export default function LandingSkinManagement() {
                 options={registerModeOptions(editing.line).map((x) => ({
                   value: x.value,
                   label: en ? x.en : x.zh,
-                  disabled: pageType === 'pay' && x.value === 'none',
+                  disabled: (pageType === 'pay' || leadCollect) && x.value === 'none',
                 }))}
               />
               {editing.line === '日本' ? (
@@ -591,6 +593,8 @@ export default function LandingSkinManagement() {
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                 {pageType === 'pay'
                   ? (en ? 'Payment pages cannot use "No registration".' : '支付落地页不能选择无注册。')
+                  : leadCollect
+                  ? (en ? 'Lead collection pages cannot use "No registration".' : '收集留资页面不能选择无注册。')
                   : (en
                     ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
                     : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}

@@ -558,15 +558,21 @@ export function normalizeRegisterMode(mode?: string): RegisterMode {
   return 'full'
 }
 
+/** Follow-ups that collect leads: the lead must land on a phone number. */
+export function isLeadCollectAction(action?: string) {
+  return action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa'
+}
+
 /**
- * Payment landings never go register-free. 「仅三方登录」only exists for 日本;
- * other lines fall back to phone register.
+ * Payment landings and lead-collection follow-ups never go register-free.
+ * 「仅三方登录」only exists for 日本; other lines fall back to phone register.
  */
-export function registerModeForPage(pageType: LandingPageKind, mode?: string, line?: string): RegisterMode {
+export function registerModeForPage(pageType: LandingPageKind, mode?: string, line?: string, action?: string): RegisterMode {
   const next = normalizeRegisterMode(mode)
   if (next === 'oauth') return line === '日本' ? 'oauth' : 'full'
   if (pageType === 'pay') return 'full'
   if (line === '香港') return 'none'
+  if (next === 'none' && isLeadCollectAction(followUpActionForPageType(pageType, action, line, next))) return 'full'
   return next
 }
 
@@ -879,13 +885,13 @@ export function flattenSkinScenes(skin: LandingSkin & { contentButtons?: { text?
       thirdPartyLogins: thirdPartyLoginsForLine(
         skin.line,
         skin.thirdPartyLogins,
-        registerModeForPage(pageType, skin.registerMode, skin.line),
+        registerModeForPage(pageType, skin.registerMode, skin.line, skin.afterRegisterAction),
       ),
       pageType,
-      registerMode: registerModeForPage(pageType, skin.registerMode, skin.line),
-      verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, skin.registerMode, skin.line), skin.verifyEnabled),
-      extraFields: registerModeForPage(pageType, skin.registerMode, skin.line) === 'oauth' ? [] : extraFieldsForPage(pageType, skin.extraFields),
-      afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, registerModeForPage(pageType, skin.registerMode, skin.line)),
+      registerMode: registerModeForPage(pageType, skin.registerMode, skin.line, skin.afterRegisterAction),
+      verifyEnabled: verifyEnabledForPage(pageType, registerModeForPage(pageType, skin.registerMode, skin.line, skin.afterRegisterAction), skin.verifyEnabled),
+      extraFields: registerModeForPage(pageType, skin.registerMode, skin.line, skin.afterRegisterAction) === 'oauth' ? [] : extraFieldsForPage(pageType, skin.extraFields),
+      afterRegisterAction: followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, registerModeForPage(pageType, skin.registerMode, skin.line, skin.afterRegisterAction)),
       registerBgKind: normalizeRegisterBgKind(skin.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(skin.registerBgColor),
       registerAreaBgKind: normalizeRegisterAreaBgKind(skin.registerAreaBgKind),
@@ -1384,6 +1390,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
             normalizePageType(skin.pageType, (skin as LandingSkin).afterRegisterAction),
             skin.registerMode,
             line,
+            (skin as LandingSkin).afterRegisterAction,
           ),
           verifyEnabled: normalizeVerifyEnabled(skin),
           extraFields: Array.isArray(skin.extraFields) ? skin.extraFields.map(normalizeRegisterField) : [],
