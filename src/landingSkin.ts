@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v15'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v16'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -11,7 +11,7 @@ export const DEFAULT_STICKY_CTA_RECT = { left: 8, top: 30, width: 84, height: 48
 export type RegisterMode = 'none' | 'full' | 'oauth'
 export type RegisterBgKind = 'color' | 'image'
 export type RegisterAreaBgKind = 'none' | 'color' | 'image'
-export type AfterRegisterAction = 'sku_promo_pay' | 'onelink' | 'download_app' | 'lead_my' | 'lead_vn'
+export type AfterRegisterAction = 'sku_promo_pay' | 'onelink' | 'download_app' | 'lead_my' | 'lead_vn' | 'lead_sa'
 export type ThirdPartyLogin = 'line' | 'google' | 'apple' | 'facebook' | 'kakao'
 /** Two kinds, aligned with 落地页管理: payment vs acquisition (CC lead + KOL web-to-app). */
 export type LandingPageKind = 'pay' | 'lead'
@@ -296,8 +296,8 @@ export const PAGE_TYPE_HINT: Record<LandingPageKind, { zh: string; en: string }>
     en: 'After register, users go SKU list → promo code → pay → download App. Use for paid conversion.',
   },
   lead: {
-    zh: '用于留资获客或引导下载。越南固定为收集两个留资页面，马来固定为收集四个留资页面；其他业务线直接出下载 App 弹窗。',
-    en: 'For lead collection or download. Vietnam is fixed to the two lead pages, Malaysia to the four lead pages; other lines go straight to the download-app popup.',
+    zh: '用于留资获客或引导下载。越南固定为收集两个留资页面，马来固定为收集四个留资页面；沙特可选下载 App 弹窗或收集四个留资页面（阿语版）；其他业务线直接出下载 App 弹窗。',
+    en: 'For lead collection or download. Vietnam is fixed to the two lead pages, Malaysia to the four lead pages; Saudi can pick the download-app popup or the four lead pages (Arabic); other lines go straight to the download-app popup.',
   },
 }
 
@@ -332,9 +332,10 @@ export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: st
   { value: 'download_app', zh: '直接出下载 App 弹窗（Web to App）', en: 'Download-app popup (Web to App)' },
   { value: 'lead_my', zh: '出收集四个留资页面（马来版）-> 出下载 App 弹窗', en: 'Four lead pages (Malaysia) → download-app popup' },
   { value: 'lead_vn', zh: '出收集两个留资页面（越南版）-> 出下载 App 弹窗', en: 'Two lead pages (Vietnam) → download-app popup' },
+  { value: 'lead_sa', zh: '出收集四个留资页面（沙特阿语版）-> 出下载 App 弹窗', en: 'Four lead pages (Saudi, Arabic) → download-app popup' },
 ]
 
-/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，其余业务线只有下载弹窗。 */
+/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，沙特是下载弹窗或四项留资（阿语），其余业务线只有下载弹窗。 */
 export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
@@ -342,6 +343,7 @@ export function followUpOptions(pageType: LandingPageKind, line?: string) {
     if (x.value === 'download_app') return line !== '越南' && line !== '马来' && line !== '香港'
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
+    if (x.value === 'lead_sa') return line === '沙特'
     return false
   })
 }
@@ -729,7 +731,7 @@ export function collectSkinAssets(skin: LandingSkin): SkinSlot[] {
 }
 
 export function normalizeAfterRegisterAction(action?: string): AfterRegisterAction {
-  if (action === 'onelink' || action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'sku_promo_pay') return action
+  if (action === 'onelink' || action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa' || action === 'sku_promo_pay') return action
   return 'sku_promo_pay'
 }
 
@@ -1303,6 +1305,37 @@ export function seedLandingSkins(): LandingSkinStore {
         updatedBy: 'admin@dinoai.ai',
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID MY_SKIN_A'),
       },
+      {
+        id: 'SKIN_SA01',
+        code: 'SA_SKIN_A',
+        name: '沙特线索页 · 阿语四项留资',
+        line: '沙特',
+        pageType: 'lead',
+        language: 'ar',
+        registerTitle: 'احصل على حصة إنجليزي مجانية بالذكاء الاصطناعي في 30 ثانية',
+        registerSubtitle: 'لا يلزم الدفع',
+        registerMode: 'full',
+        verifyEnabled: false,
+        extraFields: [{ id: 'name-sa', key: 'name', label: 'اسم الطفل', required: true }],
+        thirdPartyLogins: [],
+        afterRegisterAction: 'lead_sa' as const,
+        ctaText: 'ابدأ التقييم المجاني',
+        ctaStyle: applyButtonPreset('chunky', true),
+        stickyCtaStyle: applyButtonPreset('sunset', false),
+        stickyBarCta: 'احصل على حصة مجانية',
+        stickyButtonEnabled: true,
+        hero: asset('hero-sa', lpAsset('family.png'), 'family.png'),
+        registerBefore: [],
+        registerAfter: [asset('after-sa', AFTER, 'after-sa.png')],
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID SA_SKIN_A'),
+      },
     ].map((skin) => flattenSkinScenes(skin as unknown as LandingSkin)),
   }
 }
@@ -1311,6 +1344,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v15')
         ?? localStorage.getItem('dinoai_landing_skins_v14')
         ?? localStorage.getItem('dinoai_landing_skins_v13')
         ?? localStorage.getItem('dinoai_landing_skins_v12')
@@ -1331,7 +1365,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
       const skins: LandingSkin[] = []
       // 升级时补入日本 / 香港示例皮肤。
       if (!localStorage.getItem(LANDING_SKIN_STORAGE_KEY)) {
-        const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港')
+        const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港' || x.line === '沙特')
         const seedCodes = new Set(seeds.map((x) => x.code))
         raw.skins = [...seeds, ...raw.skins.filter((x) => !seedCodes.has(x.code) && x.id !== 'SKIN_JP01' && x.code !== 'HK_SKIN_C' && !String(x.id || '').startsWith('SKIN_HK'))]
       }

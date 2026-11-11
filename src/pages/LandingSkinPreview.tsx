@@ -237,7 +237,7 @@ function LeadForm({ skin, onSubmit, onOauth }: { skin: LandingSkin; onSubmit: ()
                 />
               </div>
             ))}
-            <div className="lp-field">
+            <div className="lp-field lp-field-phone">
               <span className="lp-flag">{phone.flag}</span>
               <span className="lp-dial">{phone.dial}</span>
               <img className="lp-chevron" src={lpAsset('chevron.svg')} alt="" />
@@ -289,7 +289,7 @@ const HK_PAY_METHODS = [
   { id: 'alipayhk', name: 'AlipayHK', note: '電腦出動態收款碼，手機拉起 AlipayHK App' },
 ]
 
-type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_done' | 'onelink' | null
+type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_sa' | 'lead_done' | 'onelink' | null
 
 const ONELINK_SAMPLE = 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_JP-KOL-SDKD4K&c=JP-KOL-SDKD4K&lp_id=LP-E57YSUCTP7'
 
@@ -440,6 +440,81 @@ function VietnamLeadExtra({ onContinue }: { onContinue: () => void }) {
   )
 }
 
+const AR_LEVEL: Record<string, string> = {
+  new_to_english: 'جديد على الإنجليزية',
+  knows_a_little: 'يعرف القليل',
+  can_speak_up: 'يستطيع التحدث',
+  just_starting: 'في البداية',
+  knows_the_basics: 'يعرف الأساسيات',
+  simple_conversations: 'محادثات بسيطة',
+  basic_level: 'مستوى أساسي',
+  can_read_talk: 'يقرأ ويتحدث',
+  can_read_write: 'يقرأ ويكتب',
+  can_communicate: 'يستطيع التواصل',
+  advanced: 'متقدم',
+  not_sure: 'لست متأكدًا',
+}
+const AR_GOAL: Record<string, string> = {
+  speak_with_confidence: 'التحدث بالإنجليزية بثقة',
+  improve_for_school: 'تحسين الإنجليزية للمدرسة',
+  strong_foundation: 'بناء أساس قوي في الإنجليزية',
+  everyday_situations: 'استخدام الإنجليزية في المواقف اليومية',
+  consistent_habit: 'بناء عادة تعلّم منتظمة',
+}
+const AR_LEARNING: Record<string, string> = {
+  school_only: 'المدرسة فقط',
+  tuition: 'دروس تقوية',
+  private_tutor: 'مدرس خصوصي',
+  youtube: 'يوتيوب',
+  learning_from_parents: 'يتعلم من الوالدين',
+  not_actively_learning: 'لا يتعلم حاليًا',
+  other_learning_apps: 'تطبيقات تعليمية أخرى',
+}
+const toArabic = (items: { id: string; label: string }[], map: Record<string, string>) =>
+  items.map((x) => ({ id: x.id, label: map[x.id] ?? x.label }))
+
+/** Same four questions and option ids as Malaysia; Arabic copy, RTL from the skin container. */
+function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
+  const [age, setAge] = useState('')
+  const [level, setLevel] = useState('')
+  const [goal, setGoal] = useState('')
+  const [learning, setLearning] = useState('')
+  const [callPref, setCallPref] = useState('')
+  const levels = toArabic(englishLevelOptions(age), AR_LEVEL)
+  return (
+    <div className="lp-pay">
+      <h2>شكرًا لك!</h2>
+      <p className="lp-overlay-copy">لقد استلمنا بياناتك. سيتواصل معك مستشارنا التعليمي قريبًا.</p>
+      <p className="lp-lead-optional">أخبرنا عن طفلك (اختياري)</p>
+      <LeadSelect
+        label="عمر طفلك"
+        value={age}
+        placeholder="اختر العمر"
+        options={CHILD_AGES.map((id) => ({ id, label: id }))}
+        onChange={(next) => {
+          setAge(next)
+          setLevel('')
+        }}
+      />
+      {age ? <LeadSelect label="مستوى الإنجليزية" value={level} placeholder="اختر المستوى" options={levels} onChange={setLevel} /> : null}
+      <LeadSelect label="هدف التعلّم" value={goal} placeholder="اختر هدفًا" options={toArabic(LEARNING_GOALS, AR_GOAL)} onChange={setGoal} />
+      <LeadSelect label="كيف يتعلم طفلك الإنجليزية حاليًا؟" value={learning} placeholder="اختر واحدًا" options={toArabic(CURRENTLY_LEARNING, AR_LEARNING)} onChange={setLearning} />
+      <p className="lp-lead-optional">اختر وقتًا لنتصل بك (اختياري)</p>
+      <LeadSelect
+        label="هل تريد أن يتصل بك مستشارنا التعليمي في وقت محدد؟"
+        value={callPref}
+        placeholder="لا يهم"
+        options={[
+          { id: 'yes', label: 'نعم، اختر وقتًا' },
+          { id: 'no', label: 'لا يهم' },
+        ]}
+        onChange={setCallPref}
+      />
+      <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onContinue}>متابعة</button>
+    </div>
+  )
+}
+
 const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   sku: '后续交互 1 / 4 · SKU 列表',
   promo: '后续交互 2 / 4 · 输入 promo code',
@@ -447,6 +522,7 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   download: '后续交互 · 下载 App 弹窗',
   lead_my: '后续交互 Page 2 · 马来补充资料（四项选填 + 预约）',
   lead_vn: '后续交互 Page 2 · 越南补充资料（两项选填 + 预约）',
+  lead_sa: '后续交互 Page 2 · 沙特补充资料（阿语，四项选填 + 预约）',
   lead_done: '后续交互 Page 3 · 完成 → 下一步出下载 App',
   onelink: '打开 OneLink（原型模拟）',
 }
@@ -455,6 +531,7 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
   if (!step) return null
   const jp = line === '日本'
   const hk = line === '香港'
+  const sa = line === '沙特'
   const skus = jp ? JP_SKUS : hk ? HK_SKUS : SKUS
   const onelinkUrl = hk
     ? 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_HK-KOL-DEMO&c=HK-KOL-DEMO&lp_id=LP-HKDEMO01'
@@ -528,7 +605,14 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
         ) : null}
         {step === 'lead_my' ? <MalaysiaLeadExtra onContinue={() => onStep('lead_done')} /> : null}
         {step === 'lead_vn' ? <VietnamLeadExtra onContinue={() => onStep('lead_done')} /> : null}
-        {step === 'lead_done' ? (
+        {step === 'lead_sa' ? <SaudiLeadExtra onContinue={() => onStep('lead_done')} /> : null}
+        {step === 'lead_done' && sa ? (
+          <div className="lp-pay">
+            <h2>تم بنجاح!</h2>
+            <p className="lp-overlay-copy">تم حفظ معلوماتك. سيتواصل معك مستشارنا التعليمي قريبًا.</p>
+            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>حمّل التطبيق الآن</button>
+          </div>
+        ) : step === 'lead_done' ? (
           <div className="lp-pay">
             <h2>All done!</h2>
             <p className="lp-overlay-copy">资料已保存，顾问会尽快联系。下一步出下载 App 弹窗。</p>
@@ -545,6 +629,7 @@ function startStep(action: AfterRegisterAction): FlowStep {
   if (action === 'download_app') return 'download'
   if (action === 'lead_my') return 'lead_my'
   if (action === 'lead_vn') return 'lead_vn'
+  if (action === 'lead_sa') return 'lead_sa'
   return 'sku'
 }
 

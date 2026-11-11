@@ -538,8 +538,8 @@ export default function LandingSkinManagement() {
                       ? 'Japan has two acquisition pages: Open OneLink directly (today’s default page, No register + buttons) / Download-app popup (Web to App, Social login only).'
                       : '日本有两种获客页：直接跳转 OneLink（现状默认，配「无注册」，按钮跳 OneLink）/ 直接出下载 App 弹窗（Web to App，配「仅三方登录」）。')
                   : (en
-                    ? 'Fixed by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Other lines: download-app popup.'
-                    : '由业务线决定，无需选择。越南是收集两个留资页面，马来是收集四个留资页面，其他业务线是直接出下载 App 弹窗。')}
+                    ? 'Set by the business line. Vietnam: two lead pages. Malaysia: four lead pages. Saudi: download-app popup or four lead pages (Arabic). Other lines: download-app popup.'
+                    : '由业务线决定。越南是收集两个留资页面，马来是收集四个留资页面，沙特可选下载 App 弹窗或收集四个留资页面（阿语版），其他业务线是直接出下载 App 弹窗。')}
               </Text>
             </div>
           </div>
