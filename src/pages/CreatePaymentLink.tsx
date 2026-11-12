@@ -8,7 +8,6 @@ import {
   Input,
   InputNumber,
   Checkbox,
-  DatePicker,
   Drawer,
   Empty,
   Modal,
@@ -36,7 +35,6 @@ import { setState, useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
 import {
-  DEFAULT_BALANCE_DUE_DAYS,
   PREVIEW_LINK_ID,
   PREVIEW_LINK_KEY,
   balanceDeadline,
@@ -56,7 +54,6 @@ import {
   readLinkTxns,
   parseTime,
   readPaymentLinks,
-  setBalanceDeadline,
   singlePayment,
   stageAmount,
   stageMethods,
@@ -144,9 +141,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [memberLink, setMemberLink] = useState('')
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
   const [memberDays, setMemberDays] = useState<number | null>(7)
-  const [dueDays, setDueDays] = useState<number | null>(DEFAULT_BALANCE_DUE_DAYS)
-  const [dueTarget, setDueTarget] = useState<PaymentLink | null>(null)
-  const [dueDraft, setDueDraft] = useState<dayjs.Dayjs | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string } | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
@@ -270,10 +264,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience !== 'open' || ccManager)
   const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
+  const defaultValidity = (kind: 'full' | 'deposit') => (kind === 'deposit' ? dayjs().add(1, 'month').format('YYYY-MM-DD') : '')
+
   const resetCustomer = () => {
     setUserQuery('')
     setFirstAmount(null)
-    setDueDays(DEFAULT_BALANCE_DUE_DAYS)
     setAudience(openPage ? 'open' : 'user')
     setEventName('')
     setValidUntil('')
@@ -345,8 +340,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       amount,
       methods,
       balanceMethods: kind === 'deposit' ? methods : undefined,
-      balanceDueDays: kind === 'deposit' ? (dueDays || DEFAULT_BALANCE_DUE_DAYS) : undefined,
-      balanceDueAt: kind === 'deposit' && previous?.balanceDueDays === (dueDays || DEFAULT_BALANCE_DUE_DAYS) ? previous?.balanceDueAt : undefined,
       eventName: open ? eventName.trim() : undefined,
       validUntil: validUntil || undefined,
       status: 'ACTIVE',
@@ -368,12 +361,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           previous.methods.join() !== row.methods.join() && `支付方式 ${previous.methods.map((code) => methodName(previous, code)).join('、')} → ${methodText}`,
           (previous.promoCode || '') !== (row.promoCode || '') && `优惠 ${previous.promoCode || '全部原价'} → ${row.promoCode || '全部原价'}`,
           row.kind === 'deposit' && previous.amount !== row.amount && `首款 ${formatMoney(previous.amount, row.currency)} → ${formatMoney(row.amount, row.currency)}`,
-          row.kind === 'deposit' && previous.balanceDueDays !== row.balanceDueDays && `尾款期限 ${previous.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天 → ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天`,
         ].filter(Boolean).join('；') || '未改动'
       : ''
     const validText = row.validUntil ? `，有效期至 ${row.validUntil}` : ''
     const detail = changes ? changes : row.kind === 'deposit'
-      ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}，尾款期限 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天${validText} · ${methodText}`
+      ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}${validText} · ${methodText}`
       : row.audience === 'open'
         ? `${row.eventName || ''}${validText} · ${row.offers.length} 个 SKU · ${methodText}`
         : `${row.offers.length} 个 SKU${validText} · ${methodText}`
@@ -421,6 +413,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         : (en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于这个套餐的应付金额'))
       return
     }
+    if (!validUntil) {
+      message.warning(en ? 'Deposit links need a valid-until date' : '定金链接必须设置有效期')
+      return
+    }
     save(baseFields('deposit', amount, editingId || newId('PL')))
     message.success(editingId
       ? (en ? 'Deposit link updated' : '定金链接已更新')
@@ -441,7 +437,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setDepositSkuId(row.offers?.[0]?.skuId || row.skuId.split(',')[0] || '')
     setPayMethods(row.methods || [])
     setFirstAmount(row.kind === 'deposit' ? row.amount : null)
-    setDueDays(row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS)
     setAudience(row.audience === 'open' ? 'open' : 'user')
     setEventName(row.eventName || '')
     setValidUntil(row.validUntil || '')
@@ -546,12 +541,14 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const setCollecting = (stop: boolean) => {
     if (!editingRow) return
-    const next = stop ? dayjs().subtract(1, 'day').format('YYYY-MM-DD') : undefined
+    const next = stop ? dayjs().subtract(1, 'day').format('YYYY-MM-DD') : defaultValidity(editingRow.kind) || undefined
     Modal.confirm({
       title: stop ? (en ? 'Stop taking payments?' : '停止收款？') : (en ? 'Resume taking payments?' : '恢复收款？'),
       content: stop
         ? (en ? 'Valid-until becomes yesterday and takes effect now. The customer page shows the link as expired. Paid orders stay as they are.' : '有效期改成昨天，马上生效：用户打开链接提示已过期，不能再付款。已支付的订单不变。')
-        : (en ? 'Valid-until is cleared (no end date) and takes effect now.' : '清空有效期（不限期），马上生效，用户可以继续付款。'),
+        : editingRow.kind === 'deposit'
+          ? (en ? `Valid-until becomes ${next} (one month from today) and takes effect now.` : `有效期改成 ${next}（今天起一个月），马上生效，用户可以继续付款。`)
+          : (en ? 'Valid-until is cleared (no end date) and takes effect now.' : '清空有效期（不限期），马上生效，用户可以继续付款。'),
       okText: stop ? (en ? 'Stop' : '停止收款') : (en ? 'Resume' : '恢复收款'),
       okButtonProps: stop ? { danger: true } : undefined,
       cancelText: en ? 'Cancel' : '取消',
@@ -566,10 +563,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const validityCard = (no: number, deposit: boolean) => (
-    <Card size="small" title={step(no, en ? 'Link validity' : '链接有效期', en ? 'Leave empty for no end date' : '不填就不限期')}>
+    <Card size="small" title={step(no, en ? 'Link validity' : '链接有效期', deposit
+      ? (en ? 'Required for deposits, one month by default' : '定金必填，默认一个月')
+      : (en ? 'Leave empty for no end date' : '不填就不限期'))}>
       <div className="pl-validity">
         <div>
-          <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
+          <div className="pl-label">{deposit && <span className="pl-required">*</span>}{en ? 'Valid until' : '有效期至'}</div>
           <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} style={{ width: 220 }} />
         </div>
         {editingRow && (stopped ? (
@@ -583,9 +582,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       </div>
       <Typography.Text type="secondary" className="pl-field-hint">
         {editingRow
-          ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。')
-          : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
-        {deposit && (en ? ' The balance also has its own deadline; whichever comes first applies.' : '定金的尾款另有尾款支付期限，两个时间以先到的为准。')}
+          ? (deposit
+            ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume sets it to one month from today; you can also pick another date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」改成今天起一个月。也可以直接选日期，保存后生效。')
+            : (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。'))
+          : deposit
+            ? (en ? 'First payment and balance must both be paid by this date. After the first payment, the customer page shows the days left.' : '首款和尾款都要在有效期内付完。首款到账后，用户支付页提示还剩几天；过期后不能再付。')
+            : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
       </Typography.Text>
     </Card>
   )
@@ -742,7 +744,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     type="button"
                     className={`pl-audience__item${mode === item.value ? ' is-on' : ''}`}
                     disabled={!!editingId && mode !== item.value}
-                    onClick={() => { setTab(item.value); setFirstAmount(null) }}
+                    onClick={() => { setTab(item.value); setFirstAmount(null); if (!editingId) setValidUntil(defaultValidity(item.value)) }}
                   >
                     <span className="pl-audience__radio" />
                     <span>
@@ -793,44 +795,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   <span className="pl-split__total">{en ? 'Package' : '套餐应付'} {formatMoney(depositPayable, chosenDeposit.currency)}</span>
                 </div>
               </div>
-            </Card>
-          )}
-
-          {mode === 'deposit' && chosenDeposit && (
-            <Card
-              size="small"
-              title={step(++stepNo, en ? 'Balance deadline' : '尾款支付期限', ccManager
-                ? (en ? 'CC managers can change it here and on the list later' : 'CC 主管可在这里设置，之后也可以在列表里调整')
-                : (en ? 'Set by your CC manager' : '由 CC 主管设置'))}
-            >
-              <div className="pl-due">
-                <span>{en ? 'Balance must be paid within' : '首款到账后'}</span>
-                {ccManager ? (
-                  <InputNumber min={1} max={30} value={dueDays} onChange={(value) => setDueDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: 140 }} />
-                ) : (
-                  <b className="pl-due__fixed">{dueDays || DEFAULT_BALANCE_DUE_DAYS} {en ? 'days' : '天'}</b>
-                )}
-                <span>{en ? 'of the first payment' : '内必须付清尾款'}</span>
-              </div>
-              <Alert
-                type="warning"
-                showIcon
-                icon={<ClockCircleOutlined />}
-                className="pl-due__alert"
-                message={en
-                  ? `If the balance is not paid within ${dueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment, the first payment is cancelled.`
-                  : `首款到账后 ${dueDays || DEFAULT_BALANCE_DUE_DAYS} 天内未付清尾款，首款将被取消。`}
-                description={en
-                  ? 'The customer page shows one small line under "Due now" with the days left to pay the balance. Follow up before the deadline.'
-                  : '用户支付页只在「本次应付」下方用一行小字提示还剩几天付清尾款。请在截止前跟进用户付尾款。'}
-              />
-              {(!ccManager || firstLocked) && (
-                <Typography.Text type="secondary" className="pl-field-hint">
-                  {!ccManager
-                    ? (en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。')
-                    : (en ? 'The first payment is paid. Saving a new number of days moves the deadline to first payment time + days, replacing any earlier adjustment.' : '首款已到账：保存后截止时间按「首款到账时间 + 新天数」重算，之前「调整截止」改过的时间被覆盖。')}
-                </Typography.Text>
-              )}
             </Card>
           )}
 
@@ -897,8 +861,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     <div className="pl-summary__sku"><span>① {en ? 'First' : '首款'}</span><b>{firstValid ? formatMoney(firstValue, chosenDeposit.currency) : '—'}</b></div>
                     <div className="pl-summary__sku"><span>② {en ? 'Balance' : '尾款'}</span><b>{firstValid ? formatMoney(balanceValue, chosenDeposit.currency) : '—'}</b></div>
                   </dd>
-                  <dt>{en ? 'Balance due' : '尾款期限'}</dt>
-                  <dd className="pl-summary__due">{en ? `Within ${dueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment` : `首款到账后 ${dueDays || DEFAULT_BALANCE_DUE_DAYS} 天内，逾期首款取消`}</dd>
                 </>
               )}
               <dt>{en ? 'Methods' : '支付方式'}</dt>
@@ -986,42 +948,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const orders = txnsOf(row.id)
     if (paidOf(orders, 'DEPOSIT_BALANCE') || isExpired(row)) return null
     const due = balanceDeadline(row, orders)
-    if (!due) {
-      return <Typography.Text type="secondary" className="pl-due-line">{en ? `Balance within ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of first payment` : `首款后 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款`}</Typography.Text>
-    }
+    if (!due) return null
     const left = parseTime(due) - Date.now()
     const tone = left <= 0 ? 'is-late' : left < 86_400_000 * 2 ? 'is-soon' : ''
     return (
       <span className={`pl-due-line ${tone}`}>
-        <ClockCircleOutlined /> {en ? 'Due' : '尾款截止'} {due.slice(5, 16)}
+        <ClockCircleOutlined /> {en ? 'Balance by valid-until' : '尾款需在有效期内付清'}
         <b>{leftText(due)}</b>
-        {ccManager && (
-          <Button size="small" type="link" className="pl-due-line__btn" onClick={() => openDue(row)}>
-            {en ? 'Adjust' : '调整截止'}
-          </Button>
-        )}
       </span>
     )
-  }
-
-  const openDue = (row: PaymentLink) => {
-    const due = balanceDeadline(row, txnsOf(row.id))
-    setDueTarget(row)
-    setDueDraft(due ? dayjs(due) : dayjs().add(1, 'day'))
-  }
-
-  const saveDue = () => {
-    if (!dueTarget || !dueDraft) return
-    if (!dueDraft.isAfter(dayjs())) {
-      message.warning(en ? 'Pick a time in the future' : '请选择一个晚于现在的时间')
-      return
-    }
-    const before = balanceDeadline(dueTarget, txnsOf(dueTarget.id))
-    setBalanceDeadline(dueTarget.id, dueDraft.format('YYYY-MM-DD HH:mm:00'))
-    logAction(dueTarget.id, '调整尾款截止', `${before ? before.slice(0, 16) : '—'} → ${dueDraft.format('YYYY-MM-DD HH:mm')}`)
-    reload()
-    setDueTarget(null)
-    message.success(en ? 'Balance deadline updated. The customer page shows the new days left.' : '尾款截止时间已更新，用户支付页的剩余天数同步更新')
   }
 
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
@@ -1035,8 +970,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       return { label: en ? 'Awaiting payment' : '待支付', color: 'processing' }
     }
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return { label: en ? 'Fully paid' : '已付清', color: 'success' }
+    if (balanceOverdue(row, orders)) return { label: en ? 'Expired · first payment paid' : '已过期 · 已付首款', color: 'error' }
     if (isExpired(row)) return expired
-    if (balanceOverdue(row, orders)) return { label: en ? 'Balance overdue' : '尾款已逾期', color: 'error' }
     if (paidOf(orders, 'DEPOSIT_FIRST')) {
       return declaredOf(orders, 'DEPOSIT_BALANCE')
         ? { label: en ? 'Balance transfer to confirm' : '尾款待确认', color: 'warning' }
@@ -1403,7 +1338,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {detailField(en ? 'Promo' : '优惠', promo)}
             {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
             {detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))}
-            {row.kind === 'deposit' && row.status === 'ACTIVE' && detailField(en ? 'Balance deadline' : '尾款截止', dueLine(row) || '—')}
             {detailField(en ? 'Collected' : '已收', paid.length
               ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${single ? (en ? `${paid.length} paid orders` : `${paid.length} 张已支付订单`) : (en ? `${paid.length} successful` : `${paid.length} 笔成功交易`)}`
               : (en ? 'Nothing yet' : '暂无'))}
@@ -1513,6 +1447,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setEditingId(null)
     resetCustomer()
     setAudience(kind === 'full' ? who : 'user')
+    setValidUntil(defaultValidity(kind))
     setTab(kind)
     setScreen('form')
   }
@@ -1582,8 +1517,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy links and QR codes; ask your CC manager to create or edit.'}`
             : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制链接和二维码；新建、编辑需要 CC 主管。'}`)
           : en
-          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
-          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. Valid-until controls when a link stops taking payments; deposits must be fully paid by then. ${ccManager ? 'As a CC manager you can confirm bank transfers.' : 'Ask your CC manager to confirm bank transfers.'}`
+          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。有效期决定链接什么时候停止收款，定金的首款和尾款都要在有效期内付完。${ccManager ? '当前是 CC 主管：可以确认银行转账。' : '确认银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"
@@ -1635,8 +1570,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           showIcon
           style={{ marginBottom: 16 }}
           message={en
-            ? 'Creating, editing, changing methods, moving the balance deadline, confirming transfers and adding membership are logged with the operator.'
-            : '新建、编辑、改支付方式、调整尾款截止、确认转账、添加会员都会记录操作人和变更内容。'}
+            ? 'Creating, editing, changing methods, stopping or resuming payments, confirming transfers and adding membership are logged with the operator.'
+            : '新建、编辑、改支付方式、停止 / 恢复收款、确认转账、添加会员都会记录操作人和变更内容。'}
         />
         <Table
           rowKey="id"
@@ -1672,42 +1607,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           onChange={(skuId) => setConfirmTarget((current) => (current ? { ...current, skuId } : current))}
           options={(confirmTarget?.link.offers || []).map((item) => ({ value: item.skuId, label: `${item.skuName} · ${formatMoney(item.payable, item.currency)}` }))}
         />
-      </Modal>
-      <Modal
-        title={`${en ? 'Balance deadline' : '调整尾款截止时间'} · ${dueTarget?.id || ''}`}
-        open={!!dueTarget}
-        onCancel={() => setDueTarget(null)}
-        onOk={saveDue}
-        okButtonProps={{ disabled: !dueDraft }}
-        okText={en ? 'Save' : '保存'}
-        cancelText={en ? 'Cancel' : '取消'}
-        destroyOnClose
-      >
-        {dueTarget && (() => {
-          const current = balanceDeadline(dueTarget, txnsOf(dueTarget.id))
-          return (
-            <>
-              <Typography.Paragraph type="secondary">
-                {en
-                  ? `Default rule: balance within ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of the first payment. If it is not paid by the deadline, the first payment is cancelled. The customer page updates the days left right away.`
-                  : `默认规则：首款到账后 ${dueTarget.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款，逾期首款将被取消。改完后用户支付页的剩余天数立即更新。`}
-              </Typography.Paragraph>
-              <div className="pl-label">{en ? 'Current deadline' : '当前截止'}</div>
-              <Typography.Paragraph strong>{current ? `${current.slice(0, 16)} · ${leftText(current)}` : '—'}</Typography.Paragraph>
-              <div className="pl-label">{en ? 'New deadline' : '新的截止时间'}</div>
-              <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" value={dueDraft} onChange={setDueDraft} style={{ width: '100%' }}
-                disabledDate={(day) => day.isBefore(dayjs(), 'day')}
-              />
-              <Space size={6} style={{ marginTop: 8 }}>
-                {[1, 3, 7].map((days) => (
-                  <Button key={days} size="small" onClick={() => setDueDraft((current && dayjs(current).isAfter(dayjs()) ? dayjs(current) : dayjs()).add(days, 'day'))}>
-                    {en ? `+${days} day${days > 1 ? 's' : ''}` : `延长 ${days} 天`}
-                  </Button>
-                ))}
-              </Space>
-            </>
-          )
-        })()}
       </Modal>
       <Modal
         title={`${en ? 'Add membership' : '添加会员'} · ${memberTarget || ''}`}

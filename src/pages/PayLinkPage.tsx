@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
 import {
-  DEFAULT_BALANCE_DUE_DAYS,
   PREVIEW_LINK_ID,
   balanceDeadline,
   balanceOverdue,
@@ -374,13 +373,10 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const stateLabel = (state: string) => (state === 'paid' ? copy.paidTag : state === 'now' ? copy.dueNow : copy.laterTag)
   const dueAt = deposit ? balanceDeadline(link, txns) : null
   const overdue = deposit && balanceOverdue(link, txns)
-  const dueDays = link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS
   const daysText = (template: string, days: number) => template.replace('{days}', String(days)).replace(' 1 days', ' 1 day')
   const dueNote = overdue
     ? copy.overdue
-    : stage === 'DEPOSIT_FIRST' && !doneTxn
-      ? daysText(copy.dueRule, dueDays)
-      : stage === 'DEPOSIT_BALANCE' && dueAt
+    : stage === 'DEPOSIT_BALANCE' && dueAt
         ? daysText(copy.dueLeft, Math.max(1, Math.ceil((parseTime(dueAt) - Date.now()) / 86_400_000)))
         : ''
   const settledTxn = !stage && !open && !blockedLink && !overdue
@@ -436,7 +432,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </section>
         )}
 
-        {blockedLink && <section className="pay-card pay-expired">{copy.expired}</section>}
+        {blockedLink && !overdue && <section className="pay-card pay-expired">{copy.expired}</section>}
 
         {offers.length > 1 && shownStage === 'FULL' && (
           <section className="pay-card">

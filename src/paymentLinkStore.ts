@@ -2,7 +2,7 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v9'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v10'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
@@ -10,9 +10,9 @@ export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
+  'dino-cc-payment-links-v9',
   'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
-export const DEFAULT_BALANCE_DUE_DAYS = 7
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
 export type TxnStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
@@ -43,9 +43,6 @@ export type PaymentLink = {
   /** Deposit balance methods. CC can change them until the balance is paid. */
   balanceMethods?: string[]
   /** Deposit: the balance is due this many days after the first payment lands, or the first payment is cancelled. */
-  balanceDueDays?: number
-  /** Deposit: a CC manager moved the balance deadline. Overrides first payment time + balanceDueDays. */
-  balanceDueAt?: string
   eventName?: string
   validUntil?: string
   status: 'ACTIVE' | 'VOID'
@@ -268,24 +265,16 @@ export function syncUpfrontOrder(link: PaymentLink) {
   }
 }
 
-/** When the balance must be paid by. Null until the first payment has landed, and once the balance is paid. */
+/** Deposit: the balance must be paid before the link expires. Null until the first payment lands, and once the balance is paid. */
 export function balanceDeadline(link: PaymentLink, txns: LinkTxn[]): string | null {
-  if (link.kind !== 'deposit') return null
-  const first = paidTxn(txns, 'DEPOSIT_FIRST')
-  if (!first?.paidAt || paidTxn(txns, 'DEPOSIT_BALANCE')) return null
-  if (link.balanceDueAt) return link.balanceDueAt
-  const due = new Date(parseTime(first.paidAt))
-  due.setDate(due.getDate() + (link.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS))
-  return stamp(due)
+  if (link.kind !== 'deposit' || !link.validUntil) return null
+  if (!paidTxn(txns, 'DEPOSIT_FIRST') || paidTxn(txns, 'DEPOSIT_BALANCE')) return null
+  return `${link.validUntil} 23:59:59`
 }
 
+/** Deposit with the first payment in, balance unpaid, and the link expired. */
 export function balanceOverdue(link: PaymentLink, txns: LinkTxn[]) {
-  const due = balanceDeadline(link, txns)
-  return !!due && link.status === 'ACTIVE' && parseTime(due) < Date.now()
-}
-
-export function setBalanceDeadline(id: string, dueAt: string) {
-  writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, balanceDueAt: dueAt, updatedAt: now().slice(0, 16) } : link)))
+  return !!balanceDeadline(link, txns) && isExpired(link)
 }
 
 /** Which payment the link is collecting now; null when nothing more can be paid. */
@@ -294,7 +283,7 @@ export function currentStage(link: PaymentLink, txns: LinkTxn[]): PayStage | nul
   if (link.audience === 'open') return 'FULL'
   if (link.kind === 'full') return paidTxn(txns, 'FULL') ? null : 'FULL'
   if (!paidTxn(txns, 'DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'
-  if (paidTxn(txns, 'DEPOSIT_BALANCE') || balanceOverdue(link, txns)) return null
+  if (paidTxn(txns, 'DEPOSIT_BALANCE')) return null
   return 'DEPOSIT_BALANCE'
 }
 
@@ -498,6 +487,7 @@ function seedLink(row: Omit<PaymentLink, 'url' | 'status' | 'skuId' | 'skuName' 
 
 function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const shift = (hours: number) => stamp(new Date(Date.now() + hours * 3_600_000))
+  const day = (days: number) => shift(days * 24).slice(0, 10)
   const kr = [
     offer('KR-Q-2026', 'Pro Quarterly', 'Pro', 99000, 89100, 'KRW', '10% off'),
     offer('KR-H-2026', 'Max 6 Months', 'Max', 178000, 178000, 'KRW', 'List price'),
@@ -510,11 +500,11 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const linh = { line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005', planId: 'CSP-LINH', promoCode: 'CSP-LINH-PROMO' }
   const bkk = { line: 'Thailand', channelId: 'th_ground', channelName: 'Bangkok Ground Team', channelCode: 'CH-TH-0001', planId: 'CSP-TH', promoCode: '' }
   const links: PaymentLink[] = [
-    seedLink({ id: 'PL-DEP-TH', kind: 'deposit', audience: 'user', userId: '2060199610824355848', ...bkk, offers: th, payable: 9900, amount: 990, methods: ['KPLUS'], balanceDueDays: 7, balanceDueAt: `${shift(30).slice(0, 13)}:00:00`, createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 15:40' }),
-    seedLink({ id: 'PL-DEP-VN', kind: 'deposit', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
-    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
-    seedLink({ id: 'PL-DEP-LATE', kind: 'deposit', audience: 'user', userId: '2060199610824356004', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], balanceDueDays: 7, createdAt: shift(-218).slice(0, 16), updatedAt: shift(-216).slice(0, 16) }),
-    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], balanceDueDays: 3, createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
+    seedLink({ id: 'PL-DEP-TH', kind: 'deposit', validUntil: '2026-11-27', audience: 'user', userId: '2060199610824355848', ...bkk, offers: th, payable: 9900, amount: 990, methods: ['KPLUS'], createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 15:40' }),
+    seedLink({ id: 'PL-DEP-VN', kind: 'deposit', validUntil: '2026-11-27', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
+    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', validUntil: day(6), audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
+    seedLink({ id: 'PL-DEP-LATE', kind: 'deposit', validUntil: day(-2), audience: 'user', userId: '2060199610824356004', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: shift(-218).slice(0, 16), updatedAt: shift(-216).slice(0, 16) }),
+    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', validUntil: day(30), audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
     seedLink({ id: 'PL-FULL-BANK', kind: 'full', audience: 'user', userId: '2090031938694049794', ...linh, offers: vn, payable: 891000, amount: 0, methods: ['bank_transfer'], createdAt: '2026-10-28 13:05', updatedAt: '2026-10-28 13:22' }),
     seedLink({ id: 'PL-FULL-PAID', kind: 'full', audience: 'user', userId: '2060199610824355846', ...amy, offers: [kr[0]], payable: 89100, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20' }),
     seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
@@ -524,11 +514,11 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const cc = 'sales.kr@dinoai.ai'
   const ops = 'ops.vn@dinoai.ai'
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
-    'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，尾款期限 7 天'], [lead, '调整尾款截止', `首款后 7 天 → ${links[0].balanceDueAt?.slice(0, 16)}`, '2026-10-28 15:40']] },
-    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [ops, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
-    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
-    'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 7 天']] },
-    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，尾款期限 3 天']] },
+    'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，有效期至 2026-11-27 · KPLUS']] },
+    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [ops, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
+    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
+    'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
+    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至一个月后']] },
     'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Bank transfer']] },
     'PL-FULL-PAID': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Card、Kakao Pay']] },
     'PL-OPEN-KR': { by: lead, log: [[lead, '新建通用链接', 'Seoul Edu Expo 2026 · Booth B12，有效期至 2026-11-30'], [lead, '修改支付方式', '全款：Card、Kakao Pay', '2026-10-27 11:40']] },
