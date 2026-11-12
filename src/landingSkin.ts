@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v12'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v13'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -326,17 +326,14 @@ export function registerModeOptions(line?: string) {
     .map((x) => (line === '日本' && x.value === 'oauth' ? { ...x, zh: '仅三方登录', en: 'Social login only' } : x))
 }
 
-/** 日本：支付只允许仅三方登录；获客只允许无注册。选项仍展示，置灰不可选。 */
+/** 日本：支付可选仅三方登录或手机号注册（10.10）；获客只允许无注册。不可选项置灰。 */
 export function registerModeChoiceDisabled(
   line: string | undefined,
   pageType: LandingPageKind,
   mode: RegisterMode,
 ): boolean {
   if (pageType === 'pay' && mode === 'none') return true
-  if (line === '日本') {
-    if (pageType === 'pay') return mode !== 'oauth'
-    return mode !== 'none'
-  }
+  if (line === '日本' && pageType !== 'pay') return mode !== 'none'
   return false
 }
 
@@ -566,13 +563,16 @@ export function normalizeRegisterMode(mode?: string): RegisterMode {
 }
 
 /**
- * 日本按落地页类型锁定注册类型（需求 6）：
- * 支付 → 仅三方登录；获客 → 无注册（后续交互直接跳 OneLink，没有注册流程）。
+ * 日本获客锁定无注册。日本支付可选仅三方登录或手机号注册（10.10）；
+ * 从无注册切过来时默认仅三方登录。
  * 其他业务线：支付不能无注册；「仅三方登录」回落为手机号注册。
  */
 export function registerModeForPage(pageType: LandingPageKind, mode?: string, line?: string): RegisterMode {
-  if (line === '日本') return pageType === 'pay' ? 'oauth' : 'none'
   const next = normalizeRegisterMode(mode)
+  if (line === '日本') {
+    if (pageType !== 'pay') return 'none'
+    return next === 'full' ? 'full' : 'oauth'
+  }
   if (next === 'oauth') return 'full'
   if (pageType === 'pay') return 'full'
   return next
@@ -1143,6 +1143,45 @@ export function seedLandingSkins(): LandingSkinStore {
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_B'),
       },
       {
+        id: 'SKIN_JP04',
+        code: 'JP_SKIN_D',
+        name: '日本支付落地页 · 手机号登录',
+        line: '日本',
+        pageType: 'pay',
+        registerTitle: 'ログインしてプランを選ぶ',
+        registerSubtitle: '電話番号、または LINE・Apple・Google・Facebook',
+        seoTitle: 'Dino AI｜子ども向けAI英会話アプリ 有料プラン',
+        seoDescription: '3〜12歳の子ども向けAI英会話アプリ。電話番号またはLINEでログインして、PayPayでお支払い。',
+        language: 'ja',
+        registerMode: 'full',
+        verifyEnabled: true,
+        extraFields: [],
+        thirdPartyLogins: ['line', 'apple', 'google', 'facebook'],
+        afterRegisterAction: 'sku_promo_pay' as const,
+        ctaText: 'ログインしてプランを選ぶ',
+        ctaStyle: applyButtonPreset('midnight', false),
+        stickyCtaStyle: { ...DEFAULT_CTA_STYLE },
+        registerAreaBgKind: 'color',
+        registerAreaBgColor: '#ffe3a3',
+        hero: { ...asset('hero-jp-phone', lpAsset('family.png'), 'family.png'), alt: '恐竜のキャラクターと一緒に英語を学ぶ子ども' },
+        registerBefore: [withBottomCta(jpPanel, 'プランを見る', applyButtonPreset('midnight', true))],
+        registerAfter: [asset('after-jp-phone', AFTER, 'after-jp.png')],
+        stickyBar: asset('sticky-jp-phone', STICKY, 'sticky-jp.png'),
+        stickyImageEnabled: false,
+        stickyBarCta: 'ログインしてプランを選ぶ',
+        stickyButtonEnabled: true,
+        stickyCtaMode: 'custom' as const,
+        stickyCtaRect: { ...DEFAULT_STICKY_CTA_RECT },
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID JP_SKIN_D'),
+      },
+      {
         id: 'SKIN_VN01',
         code: 'VN_SKIN_A',
         name: '越南线索页 · 无验证注册',
@@ -1209,6 +1248,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v12')
         ?? localStorage.getItem('dinoai_landing_skins_v11')
         ?? localStorage.getItem('dinoai_landing_skins_v10')
         ?? localStorage.getItem('dinoai_landing_skins_v9')

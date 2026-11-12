@@ -184,10 +184,6 @@ export default function LandingSkinManagement() {
     if (editing.line === '日本') {
       const jpType = normalizePageType(editing.pageType, editing.afterRegisterAction)
       const jpMode = normalizeRegisterMode(editing.registerMode)
-      if (jpType === 'pay' && jpMode !== 'oauth') {
-        message.error(en ? 'Japan payment landings only allow Social login only.' : '日本支付落地页只允许「仅三方登录」')
-        return false
-      }
       if (jpType === 'lead' && jpMode !== 'none') {
         message.error(en ? 'Japan acquisition landings only allow No register.' : '日本获客落地页只允许「无注册」')
         return false
@@ -518,8 +514,8 @@ export default function LandingSkinManagement() {
                 {editing.line === '日本'
                   ? (pageType === 'pay'
                     ? (en
-                      ? 'After social login, users go SKU list → promo code → PayPay → download App. Register type is locked to Social login only.'
-                      : '三方登录后进入 SKU 列表 → 输入优惠码 → PayPay 支付 → 下载 App。注册类型锁定「仅三方登录」。')
+                      ? 'After login, users go SKU list → promo code → PayPay → download App. Phone register or social login only.'
+                      : '登录后进入 SKU 列表 → 输入优惠码 → PayPay 支付 → 下载 App。可以选「手机号注册成账号」或「仅三方登录」。')
                     : (en
                       ? 'Today’s default Japan acquisition page. Next interaction is Jump to OneLink, so there is no register flow.'
                       : '现状默认获客页。后续交互是「直接跳 OneLink」，没有注册流程。'))
@@ -601,8 +597,8 @@ export default function LandingSkinManagement() {
                 <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
                   {pageType === 'pay'
                     ? (en
-                      ? 'Japan payment landing: only Social login only is allowed. Phone register as account is greyed out and filtered.'
-                      : '日本支付落地页只允许「仅三方登录」。「手机号注册成账号」置灰，前端过滤掉。')
+                      ? 'Japan payment landing: Phone register as account (OTP required, +81) or Social login only. No register stays greyed out.'
+                      : '日本支付落地页可以选「手机号注册成账号」（必须有验证，区号 +81）或「仅三方登录」。「无注册」仍然置灰。')
                     : (en
                       ? 'Japan acquisition jumps to OneLink, so there is no register method. Locked to No register; the other two options are greyed out.'
                       : '获客落地页后续交互是「直接跳 OneLink」，没有注册方式。锁定「无注册」；「手机号注册成账号」和「仅三方登录」置灰。')}
