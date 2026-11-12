@@ -441,13 +441,13 @@ function VietnamLeadExtra({ onContinue }: { onContinue: () => void }) {
 }
 
 const AR_LEVEL: Record<string, string> = {
-  new_to_english: 'جديد على الإنجليزية',
-  knows_a_little: 'يعرف القليل',
+  new_to_english: 'مبتدئ في اللغة الإنجليزية',
+  knows_a_little: 'لديه معرفة بسيطة باللغة الإنجليزية',
   can_speak_up: 'يستطيع التحدث',
-  just_starting: 'في البداية',
+  just_starting: 'بدأ تعلّم اللغة الإنجليزية للتو',
   knows_the_basics: 'يعرف الأساسيات',
   simple_conversations: 'محادثات بسيطة',
-  basic_level: 'مستوى أساسي',
+  basic_level: 'مستوى مبتدئ',
   can_read_talk: 'يقرأ ويتحدث',
   can_read_write: 'يقرأ ويكتب',
   can_communicate: 'يستطيع التواصل',
@@ -483,7 +483,7 @@ function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="lp-pay">
       <h2>شكرًا لك!</h2>
-      <p className="lp-overlay-copy">لقد استلمنا بياناتك. سيتواصل معك مستشارنا التعليمي قريبًا.</p>
+      <p className="lp-overlay-copy">تم استلام بياناتك بنجاح، وسيتواصل معك أحد مستشارينا التعليميين قريبًا.</p>
       <p className="lp-lead-optional">أخبرنا عن طفلك (اختياري)</p>
       <LeadSelect
         label="عمر طفلك"
@@ -496,7 +496,7 @@ function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
         }}
       />
       {age ? <LeadSelect label="مستوى الإنجليزية" value={level} placeholder="اختر المستوى" options={levels} onChange={setLevel} /> : null}
-      <LeadSelect label="هدف التعلّم" value={goal} placeholder="اختر هدفًا" options={toArabic(LEARNING_GOALS, AR_GOAL)} onChange={setGoal} />
+      <LeadSelect label="أهداف التعلّم" value={goal} placeholder="حدّد هدفك" options={toArabic(LEARNING_GOALS, AR_GOAL)} onChange={setGoal} />
       <LeadSelect label="كيف يتعلم طفلك الإنجليزية حاليًا؟" value={learning} placeholder="اختر واحدًا" options={toArabic(CURRENTLY_LEARNING, AR_LEARNING)} onChange={setLearning} />
       <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onContinue}>متابعة</button>
     </div>

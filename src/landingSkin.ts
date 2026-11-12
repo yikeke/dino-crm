@@ -1319,7 +1319,7 @@ export function seedLandingSkins(): LandingSkinStore {
         pageType: 'lead',
         language: 'ar',
         registerTitle: 'احصل على حصة إنجليزي مجانية بالذكاء الاصطناعي في 30 ثانية',
-        registerSubtitle: 'لا يلزم الدفع',
+        registerSubtitle: 'لا يتطلب أي دفع.',
         registerMode: 'full',
         verifyEnabled: false,
         extraFields: [{ id: 'name-sa', key: 'name', label: 'اسم الطفل', required: true }],
