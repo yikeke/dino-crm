@@ -349,7 +349,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           <h1>{formatMoney(amount, currency)}</h1>
           <p className="psp-sku">{skuName}</p>
           {host.orderNo && <p className="psp-sku">Order {host.orderNo}</p>}
-          {host.txn && <p className="psp-sku">Transaction {host.txn.txnId}</p>}
+          {host.txn && link.kind === 'deposit' && <p className="psp-sku">Transaction {host.txn.txnId}</p>}
           {open && account && <p className="psp-sku">ID {account.userId}</p>}
           <button className="psp-pay" type="button" onClick={pay}>{copy.pay}</button>
           <button className="psp-cancel" type="button" onClick={() => leaveHost('用户返回，未完成支付')}>{copy.choose}</button>
