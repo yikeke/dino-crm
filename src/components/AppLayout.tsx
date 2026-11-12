@@ -134,12 +134,8 @@ export default function AppLayout() {
     { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center-v5/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
     { key: '/marketing-center-v5/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
-    ...((can('salesV3') !== 'none' || can('marketingV2_landing') !== 'none')
-      ? [
-          { key: '/marketing-center-v5/personal-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' },
-          { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
-        ]
-      : []),
+    ...(can('marketingV2_paylinks') !== 'none' ? [{ key: '/marketing-center-v5/personal-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' }] : []),
+    ...(can('marketingV2_openlinks') !== 'none' ? [{ key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' }] : []),
   ].filter((n) => n.key === '/marketing-center-v5/personal-links' || n.key === '/marketing-center-v5/open-links' || visible(n.key))
 
   // 销售中心（二期）
@@ -184,8 +180,8 @@ export default function AppLayout() {
         { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
         { key: 'landing-placeholder', icon: <LinkOutlined />, label: placeholder(lang === 'en' ? 'Landing Page Management' : '落地页管理'), disabled: true },
         { key: '/marketing-center-v6/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
-        { key: '/marketing-center-v5/personal-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' },
-        { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
+        ...(can('marketingV2_paylinks') !== 'none' ? [{ key: '/marketing-center-v5/personal-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' }] : []),
+        ...(can('marketingV2_openlinks') !== 'none' ? [{ key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' }] : []),
       ],
     },
   ]

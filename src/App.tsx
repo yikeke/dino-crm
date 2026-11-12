@@ -67,9 +67,9 @@ function Guard({ module, children }: { module: ModuleKey; children: JSX.Element 
   return children
 }
 
-function PaymentLinkGuard({ children }: { children: JSX.Element }) {
+function PaymentLinkGuard({ children, module }: { children: JSX.Element; module: 'marketingV2_paylinks' | 'marketingV2_openlinks' }) {
   const { can } = usePerm()
-  if (can('salesV3') === 'none' && can('marketingV2_landing') === 'none') {
+  if (can(module) === 'none') {
     return <Navigate to={firstAllowedPath(can)} replace />
   }
   return children
@@ -137,9 +137,9 @@ export default function App() {
           <Route path="marketing-center-v5/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
           <Route path="marketing-center-v5/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
           <Route path="marketing-center-v5/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
-          <Route path="marketing-center-v5/personal-links" element={<PaymentLinkGuard><CreatePaymentLink /></PaymentLinkGuard>} />
+          <Route path="marketing-center-v5/personal-links" element={<PaymentLinkGuard module="marketingV2_paylinks"><CreatePaymentLink /></PaymentLinkGuard>} />
           <Route path="marketing-center-v5/payment-links" element={<LegacyPersonalLinks />} />
-          <Route path="marketing-center-v5/open-links" element={<PaymentLinkGuard><CreatePaymentLink key="open" scope="open" /></PaymentLinkGuard>} />
+          <Route path="marketing-center-v5/open-links" element={<PaymentLinkGuard module="marketingV2_openlinks"><CreatePaymentLink key="open" scope="open" /></PaymentLinkGuard>} />
           <Route path="marketing-center-v6/skins" element={<SkinGuard><LandingSkinManagement /></SkinGuard>} />
           <Route path="marketing-center/skins" element={<Navigate to="/marketing-center-v6/skins" replace />} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />

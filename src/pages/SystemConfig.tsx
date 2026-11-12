@@ -66,6 +66,8 @@ const MODULE_HIERARCHY: ModuleNode[] = [
       { key: 'marketingV2_skus' },
       { key: 'marketingV2_offers', children: [{ key: 'marketingV2_offers_edit' }] },
       { key: 'marketingV2_landing', children: [{ key: 'marketingV2_landing_create' }, { key: 'marketingV2_landing_edit' }, { key: 'marketingV2_landing_preview' }, { key: 'marketingV2_landing_copy' }] },
+      { key: 'marketingV2_paylinks', children: [{ key: 'marketingV2_paylinks_edit' }, { key: 'marketingV2_paylinks_confirm' }] },
+      { key: 'marketingV2_openlinks', children: [{ key: 'marketingV2_openlinks_edit' }] },
     ],
   },
 ]
@@ -109,10 +111,14 @@ export default function SystemConfig() {
       marketingV2: 'Marketing Center', marketingV2_channels: 'Channel management', marketingV2_channels_edit: 'Create and edit channels', marketingV2_channels_status: 'Enable / disable channels', marketingV2_skus: 'SKU catalog (view only)',
       marketingV2_offers: 'Offer plans', marketingV2_offers_edit: 'Create and edit offer plans', marketingV2_offers_status: 'Enable / end offer plans',
       marketingV2_landing: 'Landing page management', marketingV2_landing_create: 'Create landing pages', marketingV2_landing_edit: 'Edit landing pages', marketingV2_landing_preview: 'Generate preview links', marketingV2_landing_copy: 'Copy landing page links', marketingV2_landing_status: 'Publish / unpublish landing pages',
+      marketingV2_paylinks: 'Personal payment links', marketingV2_paylinks_edit: 'Create and edit personal payment links', marketingV2_paylinks_confirm: 'Confirm manual bank transfers',
+      marketingV2_openlinks: 'Open payment links', marketingV2_openlinks_edit: 'Create and edit open payment links',
     } : {
       marketingV2: '营销中心', marketingV2_channels: '渠道管理', marketingV2_channels_edit: '新建及编辑渠道', marketingV2_channels_status: '启用/停用渠道', marketingV2_skus: 'SKU 管理（仅查看）',
       marketingV2_offers: '优惠方案', marketingV2_offers_edit: '新建及编辑优惠方案', marketingV2_offers_status: '启用/结束优惠方案',
       marketingV2_landing: '落地页管理', marketingV2_landing_create: '新建落地页', marketingV2_landing_edit: '编辑落地页', marketingV2_landing_preview: '生成预览链接', marketingV2_landing_copy: '复制落地页链接', marketingV2_landing_status: '落地页上下架',
+      marketingV2_paylinks: '专属支付链接', marketingV2_paylinks_edit: '新建及编辑专属支付链接', marketingV2_paylinks_confirm: '确认手动银行转账',
+      marketingV2_openlinks: '通用支付链接', marketingV2_openlinks_edit: '新建及编辑通用支付链接',
     }
     if (marketingV2Labels[m]) return marketingV2Labels[m]!
     if (m === 'usersV2') return t('app.nav.users')

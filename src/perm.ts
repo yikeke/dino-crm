@@ -61,6 +61,16 @@ export function usePerm() {
     if (saved) return saved
     if (m === 'appABTest') return role.perms.marketing ?? 'none'
     if (m === 'marketingV2_channel_types') return role.id === 'role_admin' ? 'operate' : 'none'
+    // Payment link permissions added after roles were saved in localStorage.
+    const payLinkDefaults: Record<string, Partial<Record<ModuleKey, PermLevel>>> = {
+      role_growth: { marketingV2_paylinks: 'none', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
+      role_ops: { marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
+      role_support: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
+      role_admin: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate' },
+      role_sales_leader: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate' },
+    }
+    const payLinkDefault = payLinkDefaults[role.id]?.[m]
+    if (payLinkDefault) return payLinkDefault
     // 兼容四期上线前保存在 localStorage 的旧角色数据。
     if (m === 'lifecycle') {
       if (role.id === 'role_admin' || role.id === 'role_ops') return 'operate'

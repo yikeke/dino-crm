@@ -31,7 +31,7 @@ import {
 } from '../paymentLinkCatalog'
 import dayjs from 'dayjs'
 import { useStore } from '../store'
-import { useCurrentAccount } from '../perm'
+import { useCurrentAccount, usePerm } from '../perm'
 import { useSession } from '../auth'
 import {
   PREVIEW_LINK_ID,
@@ -139,11 +139,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const { account, role } = useCurrentAccount()
   const session = useSession()
   const myEmail = account?.email || session?.email || ''
-  const canConfirmBank = role?.id === 'role_sales_leader'
-  const ccManager = !role || role.id === 'role_sales_leader' || role.id === 'role_admin'
-  const ccOnly = !canConfirmBank && !!(account?.isCc ?? role?.id === 'role_support')
+  const { can } = usePerm()
+  const canConfirmBank = can('marketingV2_paylinks_confirm') === 'operate'
+  const ccManager = can('marketingV2_openlinks_edit') === 'operate'
+  const canEditPersonal = can('marketingV2_paylinks_edit') === 'operate'
+  const teamView = !role || role.dataScope === 'all' || can('sales_reassign') === 'operate' || can('sales_config') === 'operate'
   const inMyLines = (row: PaymentLink) => !role || role.dataScope === 'all' || (account?.businessLines || []).includes(LINE_ZH[row.line] || row.line)
-  const visible = (row: PaymentLink) => (row.audience !== 'open' && ccOnly ? row.createdBy === myEmail : inMyLines(row))
+  const visible = (row: PaymentLink) => (row.audience === 'open' || teamView ? inMyLines(row) : row.createdBy === myEmail)
   const students = useStore((s) => s.students)
   const accounts = useStore((s) => s.accounts)
   const actorName = (email?: string) => accounts.find((item) => item.email === email)?.name || email || '—'
@@ -244,7 +246,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : row.createdBy === myEmail)
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : canEditPersonal && (row.createdBy === myEmail || teamView))
   const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
   const DEPOSIT_VALID_DAYS = 7
@@ -367,7 +369,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const blockedEdit = () => {
     const row = editingId ? links.find((item) => item.id === editingId) : undefined
     if (row && !editable(row)) {
-      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator can edit this link' : '只有创建人能编辑这条链接'))
+      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator or a CC manager can edit this link' : '只有创建人和 CC 主管能编辑这条链接'))
       return true
     }
     return false
@@ -409,7 +411,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const startEdit = (row: PaymentLink) => {
     if (!editable(row)) {
-      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator can edit this link' : '只有创建人能编辑这条链接'))
+      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator or a CC manager can edit this link' : '只有创建人和 CC 主管能编辑这条链接'))
       return
     }
     if (row.line !== activeLine) holdLineReset.current = true
@@ -1453,7 +1455,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         />
         {openPage
           ? ccManager && <Button type="primary" icon={<QrcodeOutlined />} onClick={() => openCreate('full', 'open')}>{en ? 'New open payment link' : '新建通用支付链接'}</Button>
-          : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
+          : canEditPersonal && <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
       </div>
       <Space wrap>
         <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link ID' : '活动名 / 链接号') : (en ? 'Link ID / User ID' : '链接号 / User ID')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
@@ -1470,8 +1472,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'You can create and edit.' : 'Only CC managers and above can create or edit; you can view, copy and open links.'}`
             : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '你可以新建和编辑。' : '只有 CC 主管及以上能新建和编辑；你可以查看、复制和打开链接。'}`)
           : en
-          ? 'One link per customer: pay in full at once, or as a deposit in two parts (first payment, then balance), before the valid-until date. CCs see only links they created; CC managers see every link in their business lines. Only the creator can edit a link. Manual bank transfers are confirmed by a CC manager on the details page.'
-          : '一条链接对应一个用户：全款一次付清，定金分首款、尾款两次付，都要在有效期内付完。CC 只看到自己创建的链接，CC 主管看到所负责业务线的全部链接；链接只有创建人能编辑，手动银行转账到账后由 CC 主管在详情页确认。'}
+          ? 'One link per customer: pay in full at once, or as a deposit in two parts (first payment, then balance), before the valid-until date. CCs see and edit only links they created; CC managers see and edit every link in their business lines and confirm manual bank transfers on the details page.'
+          : '一条链接对应一个用户：全款一次付清，定金分首款、尾款两次付，都要在有效期内付完。CC 只能看到、编辑自己创建的链接；CC 主管能看到、编辑所负责业务线的全部链接，并在详情页确认手动银行转账。'}
       />
       <Table
         className="pl-table"

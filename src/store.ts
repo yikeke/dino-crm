@@ -851,6 +851,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        marketingV2_paylinks: 'none', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
         marketing: 'operate',
@@ -918,6 +919,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
         marketing: 'operate',
@@ -985,6 +987,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'none',
         marketing: 'none',
@@ -1052,6 +1055,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'all',
       perms: {
+        marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate',
         marketingV2_channel_types: 'operate',
         appABTest: 'operate',
         marketing: 'operate',
@@ -1119,6 +1123,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate',
         marketingV2_channel_types: 'none',
         appABTest: 'none',
         marketing: 'none',
