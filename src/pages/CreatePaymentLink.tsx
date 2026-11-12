@@ -1408,7 +1408,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const stage = currentStage(row, orders)
     if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((txn) => txn.status === 'PENDING' && !!txn.declaredAt)
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
-    if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE' || balanceOverdue(row, orders))
+    if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE')
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
     const settled = !!paidOf(orders, row.kind === 'full' ? 'FULL' : 'DEPOSIT_BALANCE')
     if (value === 'done') return row.audience !== 'open' && settled
