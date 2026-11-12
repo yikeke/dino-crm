@@ -423,13 +423,6 @@ export function confirmBankPayment(linkId: string, skuId?: string) {
   return started ? completeTxn(started.txn.txnId) : undefined
 }
 
-export function voidPaymentLink(id: string) {
-  writePaymentLinks(readPaymentLinks().map((link) => (link.id === id ? { ...link, status: 'VOID', updatedAt: now().slice(0, 16) } : link)))
-  const txns = readLinkTxns().map((txn) => (txn.paymentLinkId === id && txn.status === 'PENDING' ? { ...txn, status: 'FAILED' as const, failReason: '链接已作废' } : txn))
-  const orders = readLinkOrders().map((order) => (order.paymentLinkId === id && orderState(order, txns).paid === 0 ? { ...order, cancelled: true } : order))
-  writeAll(orders, txns)
-}
-
 const TXN_STATUS: Record<TxnStatus, OrderTransaction['status']> = { PENDING: '待支付', SUCCESS: '已支付', FAILED: '支付失败' }
 const ORDER_STATUS: Record<OrderState, OrderStatus> = { PENDING: '待支付', PARTIALLY_PAID: '部分付款', COMPLETED: '已支付', CANCELLED: '已取消' }
 const STAGE_EVENT: Record<PayStage, string> = { FULL: '全款', DEPOSIT_FIRST: '定金首款', DEPOSIT_BALANCE: '定金尾款' }

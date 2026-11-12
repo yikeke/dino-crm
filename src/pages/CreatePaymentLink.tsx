@@ -20,7 +20,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -61,7 +61,6 @@ import {
   stageAmount,
   stageMethods,
   syncUpfrontOrder,
-  voidPaymentLink,
   writePaymentLinks,
   type LinkHistoryEntry,
   type LinkTxn,
@@ -73,7 +72,7 @@ import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
-type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired' | 'void'
+type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
 
 const OPEN_LINK_LINES = ['Korea']
 
@@ -268,7 +267,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : !txnsOf(row.id).some((txn) => txn.status !== 'FAILED'))
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience !== 'open' || ccManager)
+  const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
   const resetCustomer = () => {
     setUserQuery('')
@@ -292,7 +292,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const openMode = tab === 'full' && audience === 'open'
-  const scopeLocked = !!editingId && openMode
+  const scopeLocked = !!editingId
   const methodsFor = (mode: 'full' | 'deposit') => methodsForLine(activeLine)
     .filter((method) => !(mode === 'full' && openMode && method.kind === 'manual'))
 
@@ -347,7 +347,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       balanceDueDays: kind === 'deposit' ? (dueDays || DEFAULT_BALANCE_DUE_DAYS) : undefined,
       balanceDueAt: kind === 'deposit' ? previous?.balanceDueAt : undefined,
       eventName: open ? eventName.trim() : undefined,
-      validUntil: open ? (validUntil || undefined) : undefined,
+      validUntil: validUntil || undefined,
       status: 'ACTIVE',
       url: payLinkUrl(id),
       createdAt: previous?.createdAt || nowText(),
@@ -360,19 +360,22 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const previous = editingId ? links.find((item) => item.id === editingId) : undefined
     const action = previous ? '编辑链接' : row.audience === 'open' ? '新建通用链接' : row.kind === 'deposit' ? '新建定金链接' : '新建全款链接'
     const methodText = row.methods.map((code) => methodName(row, code)).join('、')
-    const openChanges = previous && row.audience === 'open'
+    const changes = previous
       ? [
-          previous.eventName !== row.eventName && `活动名 ${previous.eventName || '—'} → ${row.eventName || '—'}`,
+          row.audience === 'open' && previous.eventName !== row.eventName && `活动名 ${previous.eventName || '—'} → ${row.eventName || '—'}`,
           (previous.validUntil || '') !== (row.validUntil || '') && `有效期 ${previous.validUntil || '不限'} → ${row.validUntil || '不限'}`,
           previous.methods.join() !== row.methods.join() && `支付方式 ${previous.methods.map((code) => methodName(previous, code)).join('、')} → ${methodText}`,
           (previous.promoCode || '') !== (row.promoCode || '') && `优惠 ${previous.promoCode || '全部原价'} → ${row.promoCode || '全部原价'}`,
+          row.kind === 'deposit' && previous.amount !== row.amount && `首款 ${formatMoney(previous.amount, row.currency)} → ${formatMoney(row.amount, row.currency)}`,
+          row.kind === 'deposit' && previous.balanceDueDays !== row.balanceDueDays && `尾款期限 ${previous.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天 → ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天`,
         ].filter(Boolean).join('；') || '未改动'
       : ''
-    const detail = openChanges ? openChanges : row.kind === 'deposit'
-      ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}，尾款期限 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天 · ${methodText}`
+    const validText = row.validUntil ? `，有效期至 ${row.validUntil}` : ''
+    const detail = changes ? changes : row.kind === 'deposit'
+      ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}，尾款期限 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天${validText} · ${methodText}`
       : row.audience === 'open'
-        ? `${row.eventName || ''}${row.validUntil ? `，有效期至 ${row.validUntil}` : ''} · ${row.offers.length} 个 SKU · ${methodText}`
-        : `${row.offers.length} 个 SKU · ${methodText}`
+        ? `${row.eventName || ''}${validText} · ${row.offers.length} 个 SKU · ${methodText}`
+        : `${row.offers.length} 个 SKU${validText} · ${methodText}`
     row = { ...row, history: [...(previous?.history || []), historyEntry(myEmail || 'admin@dinoai.ai', action, detail)] }
     persist(editingId ? links.map((item) => (item.id === editingId ? row : item)) : [row, ...links])
     syncUpfrontOrder(row)
@@ -387,7 +390,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const blockedEdit = () => {
     const row = editingId ? links.find((item) => item.id === editingId) : undefined
     if (row && !editable(row)) {
-      message.warning(en ? 'Someone has started paying this link, so it cannot be changed' : '这条链接已经有人在付款，不能再改')
+      message.warning(en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑')
       return true
     }
     return false
@@ -425,7 +428,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const startEdit = (row: PaymentLink) => {
     if (!editable(row)) {
-      message.warning(en ? 'Links with payments in progress cannot be edited' : '已经有人在付款的链接不能再编辑')
+      message.warning(en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑')
       return
     }
     if (row.line !== activeLine) holdLineReset.current = true
@@ -464,23 +467,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       return
     }
     confirmTransfer(row)
-  }
-
-  const voidLink = (row: PaymentLink) => {
-    Modal.confirm({
-      title: en ? `Void ${row.id}?` : `作废 ${row.id}？`,
-      content: en
-        ? 'The link stops accepting payments. Open payment attempts fail and orders with nothing paid are cancelled. Paid orders stay as they are.'
-        : '作废后链接不能再付款：进行中的交易记为失败，一笔都没付的订单一起取消；已支付的订单不受影响。',
-      okText: en ? 'Void' : '作废',
-      okButtonProps: { danger: true },
-      cancelText: en ? 'Cancel' : '取消',
-      onOk: () => {
-        voidPaymentLink(row.id)
-        logAction(row.id, '作废链接', '进行中的交易记为失败，未付款订单取消')
-        reload()
-      },
-    })
   }
 
   const linkedStudent = students.find((student) => student.studentId === linkedUserId)
@@ -553,6 +539,16 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     </span>
   )
 
+  const validField = (
+    <div>
+      <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
+      <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
+      <Typography.Text type="secondary" className="pl-field-hint">{editingId
+        ? (en ? 'To stop taking payments now, set it to yesterday or earlier. Move it forward again to reopen.' : '要马上停止收款，改到昨天或更早；改回以后的日期就恢复收款。')
+        : (en ? 'Optional. After this date the link shows as expired and cannot be paid.' : '可不填。过期后打开链接会提示已失效，不能再付款。')}</Typography.Text>
+    </div>
+  )
+
   const formCard = (mode: 'full' | 'deposit') => {
     const methodList = methodsFor(mode)
     const open = mode === 'full' && audience === 'open'
@@ -580,13 +576,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   />
                   <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Shown at the top of the customer page; also used to attribute orders.' : '显示在用户页面顶部，同时用于统计订单来源。'}</Typography.Text>
                 </div>
-                <div>
-                  <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
-                  <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
-                  <Typography.Text type="secondary" className="pl-field-hint">{editingId
-                    ? (en ? 'To stop taking payments now, set it to yesterday or earlier. Move it forward again to reopen.' : '要马上停止收款，改到昨天或更早；改回以后的日期就恢复收款。')
-                    : (en ? 'Optional. After this date the QR code shows the link as expired.' : '可不填。过期后扫码会提示链接已失效。')}</Typography.Text>
-                </div>
+                {validField}
               </div>
             ) : (
               <>
@@ -604,6 +594,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               onChange={setUserQuery}
               onSelect={setUserQuery}
               placeholder={en ? 'Type at least 2 characters' : '至少输入 2 个字符'}
+              disabled={!!editingId}
               style={{ width: '100%' }}
               status={userQuery.trim().length >= 2 && !linkedUserId ? 'warning' : undefined}
             />
@@ -616,13 +607,17 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 </span>
                 <Tag color="success" bordered={false}>{en ? 'Matched' : '已匹配'}</Tag>
               </div>
-            ) : (
+            ) : null}
+            {editingId ? (
+              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'The payer cannot change after the link is created. For another user, create a new link.' : '链接生成后不能换付款人，换人请新建链接。'}</Typography.Text>
+            ) : !linkedStudent ? (
               <Typography.Text type="secondary" className="pl-field-hint">
                 {userQuery.trim().length >= 2
                   ? (en ? 'Pick a user from the matches. The link saves the User ID.' : '请从下拉结果里选中一个用户，链接保存的是 User ID。')
                   : (en ? 'The link is tied to one user. Only that user can pay with it.' : '链接绑定一个用户，只给这个用户付款。')}
               </Typography.Text>
-            )}
+            ) : null}
+            <div className="pl-grid-2 pl-grid-2--wide" style={{ marginTop: 12 }}>{validField}</div>
               </>
             )}
           </Card>
@@ -639,7 +634,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   onChange={onLine}
                   disabled={scopeLocked}
                 />
-                {openPage && (
+                {(openPage || scopeLocked) && (
                   <Typography.Text type="secondary" className="pl-field-hint">
                     {scopeLocked
                       ? (en ? 'Business line and channel cannot be changed after the link is created.' : '链接生成后，业务线和渠道不能改。')
@@ -670,6 +665,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     <Segmented
                       size="small"
                       value={usePromo ? 'yes' : 'no'}
+                      disabled={firstLocked}
                       onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
                       options={[
                         { value: 'yes', label: `${en ? 'Use' : '使用'} ${activeChannel.plan.promoCode}` },
@@ -706,6 +702,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     key={item.value}
                     type="button"
                     className={`pl-audience__item${mode === item.value ? ' is-on' : ''}`}
+                    disabled={!!editingId && mode !== item.value}
                     onClick={() => { setTab(item.value); setFirstAmount(null) }}
                   >
                     <span className="pl-audience__radio" />
@@ -716,6 +713,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   </button>
                 ))}
               </div>
+              {editingId && (
+                <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Full payment or deposit cannot change after the link is created.' : '链接生成后不能在全款、定金之间切换，要换请新建链接。'}</Typography.Text>
+              )}
             </Card>
           )}
 
@@ -732,14 +732,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   parser={(value) => Number((value || '').replace(/[^\d.]/g, ''))}
                   addonAfter={chosenDeposit.currency}
                   status={firstAmount !== null && !firstValid ? 'error' : undefined}
+                  disabled={firstLocked}
                   style={{ width: 260 }}
                 />
-                <Space size={6}>
+                {!firstLocked && <Space size={6}>
                   {quickFirst.map((item) => (
                     <Button key={item.label} size="small" onClick={() => setFirstAmount(item.value)}>{item.label}</Button>
                   ))}
-                </Space>
+                </Space>}
               </div>
+              {firstLocked && (
+                <Typography.Text type="secondary" className="pl-field-hint">{en ? 'The first payment is paid, so the amount, SKU and promo are fixed.' : '首款已付，首款金额、SKU、优惠都不能再改。'}</Typography.Text>
+              )}
               <div className="pl-split">
                 <div className="pl-split__bar">
                   <span className="pl-split__first" style={{ width: `${firstShare}%` }} />
@@ -762,7 +766,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             >
               <div className="pl-due">
                 <span>{en ? 'Balance must be paid within' : '首款到账后'}</span>
-                {ccManager ? (
+                {ccManager && !firstLocked ? (
                   <InputNumber min={1} max={30} value={dueDays} onChange={(value) => setDueDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: 140 }} />
                 ) : (
                   <b className="pl-due__fixed">{dueDays || DEFAULT_BALANCE_DUE_DAYS} {en ? 'days' : '天'}</b>
@@ -781,9 +785,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   ? 'The customer page shows one small line under "Due now" with the days left to pay the balance. Follow up before the deadline.'
                   : '用户支付页只在「本次应付」下方用一行小字提示还剩几天付清尾款。请在截止前跟进用户付尾款。'}
               />
-              {!ccManager && (
+              {(!ccManager || firstLocked) && (
                 <Typography.Text type="secondary" className="pl-field-hint">
-                  {en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。'}
+                  {firstLocked
+                    ? (en ? 'The first payment is paid. Move the balance deadline from the link list or detail page instead.' : '首款已付，期限天数不能再改；要延长请在列表或详情页「调整截止」。')
+                    : en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。'}
                 </Typography.Text>
               )}
             </Card>
@@ -832,7 +838,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             </div>
             <dl className="pl-summary__list">
               <dt>{en ? 'Customer' : '客户'}</dt>
-              <dd>{open ? <>{en ? 'Bound at login' : '登录后绑定'}{eventName.trim() && <><br /><Typography.Text type="secondary">{eventName.trim()}</Typography.Text></>}{validUntil && <><br /><Typography.Text type="secondary">{en ? 'Until' : '有效期至'} {validUntil}</Typography.Text></>}</> : linkedStudent ? <>{linkedStudent.name}<br /><Typography.Text type="secondary">{linkedStudent.studentId}</Typography.Text></> : <Typography.Text type="secondary">{en ? 'Not selected' : '未选择'}</Typography.Text>}</dd>
+              <dd>{open ? <>{en ? 'Bound at login' : '登录后绑定'}{eventName.trim() && <><br /><Typography.Text type="secondary">{eventName.trim()}</Typography.Text></>}{validUntil && <><br /><Typography.Text type="secondary">{en ? 'Until' : '有效期至'} {validUntil}</Typography.Text></>}</> : linkedStudent ? <>{linkedStudent.name}<br /><Typography.Text type="secondary">{linkedStudent.studentId}</Typography.Text>{validUntil && <><br /><Typography.Text type="secondary">{en ? 'Until' : '有效期至'} {validUntil}</Typography.Text></>}</> : <Typography.Text type="secondary">{en ? 'Not selected' : '未选择'}</Typography.Text>}</dd>
               <dt>{en ? 'Channel' : '渠道'}</dt>
               <dd>{activeChannel ? `${activeChannel.channel.name} · ${activeLine}` : '—'}</dd>
               <dt>{en ? 'Promo' : '优惠'}</dt>
@@ -866,7 +872,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 ? (en ? 'Print the QR code on expo materials. Each customer logs in, pays, and gets their own order bound to the account they logged in with.' : '二维码可印在展会物料上。每个用户扫码登录后付款，各自生成一张订单，绑定到登录的账号。')
                 : mode === 'full'
                 ? (en ? 'The order is created when the customer picks a method and starts paying. Membership opens when it is paid.' : '用户选好支付方式开始付款时才生成订单；付款成功后开通会员。')
-                : (en ? 'One link for both payments. Each payment becomes its own order when the customer pays; the balance order points to the first one. Membership opens after the balance.' : '首款、尾款用同一条链接。用户每次付款各生成一张订单，尾款订单关联首款订单；尾款到账后开通会员。')}
+                : (en ? 'One link and one order for both payments, with two transactions under the order. Membership opens after the balance.' : '首款、尾款用同一条链接、同一张订单，订单下两笔交易；尾款到账后开通会员。')}
             </Typography.Paragraph>
             <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDeposit}>
               {editingId
@@ -979,16 +985,16 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
     const orders = txnsOf(row.id)
-    if (row.status === 'VOID') return { label: en ? 'Void' : '已作废', color: 'default' }
-    if (row.audience === 'open') {
-      return isExpired(row) ? { label: en ? 'Expired' : '已过期', color: 'default' } : { label: en ? 'Collecting' : '收款中', color: 'cyan' }
-    }
+    const expired = { label: en ? 'Expired' : '已过期', color: 'default' }
+    if (row.audience === 'open') return isExpired(row) ? expired : { label: en ? 'Collecting' : '收款中', color: 'cyan' }
     if (row.kind === 'full') {
       if (paidOf(orders, 'FULL')) return { label: en ? 'Paid' : '已支付', color: 'success' }
+      if (isExpired(row)) return expired
       if (declaredOf(orders, 'FULL')) return { label: en ? 'Transfer to confirm' : '转账待确认', color: 'warning' }
       return { label: en ? 'Awaiting payment' : '待支付', color: 'processing' }
     }
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return { label: en ? 'Fully paid' : '已付清', color: 'success' }
+    if (isExpired(row)) return expired
     if (balanceOverdue(row, orders)) return { label: en ? 'Balance overdue' : '尾款已逾期', color: 'error' }
     if (paidOf(orders, 'DEPOSIT_FIRST')) {
       return declaredOf(orders, 'DEPOSIT_BALANCE')
@@ -1106,7 +1112,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         return (
           <div className="pl-two-line">
             <span><Tag color={status.color} bordered={false}>{status.label}</Tag></span>
-            {row.audience === 'open' && row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
+            {row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
             {row.kind === 'deposit' && row.status === 'ACTIVE' && dueLine(row)}
             {row.audience === 'open' && <Typography.Text type="secondary">{en ? `${paid} paid order${paid === 1 ? '' : 's'}` : `${paid} 张已支付订单`}</Typography.Text>}
             {row.kind === 'deposit' && <Typography.Text type="secondary">{en ? `${paid} successful transaction${paid === 1 ? '' : 's'}` : `${paid} 笔成功交易`}</Typography.Text>}
@@ -1142,11 +1148,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           <Button size="small" type="link" icon={<RightOutlined />} className="pl-history-btn" onClick={() => openDetail(row.id)}>{en ? 'Details' : '查看详情'}</Button>
           {linkActions(row)}
           <Space size={4} wrap>
-            {row.status === 'ACTIVE' && editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
+            {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
             <Button size="small" type="link" icon={<HistoryOutlined />} className="pl-history-btn" onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
-            {row.status === 'ACTIVE' && row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
-              <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
-            )}
           </Space>
         </Space>
       ),
@@ -1251,11 +1254,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       <>
         <div className="pl-detail-orders__bar">
           {methodsCell(row, row.methods)}
-          {row.status === 'ACTIVE' && collecting && (
-            <Button size="small" type="link" icon={<EditOutlined />} onClick={() => { setMethodTarget({ link: row, stage: 'FULL' }); setMethodDraft(row.methods) }}>
-              {en ? 'Methods' : '改支付方式'}
-            </Button>
-          )}
           {canConfirm && confirmButton(row, 'FULL')}
         </div>
         {openOrders(row)}
@@ -1345,15 +1343,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           </div>
           <Space wrap className="pl-detail__actions">
             {linkActions(row)}
+            {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
             <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
             {!open && row.userId && (
               <Button size="small" type="link" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberLink(row.id); setMemberDays(7) }}>
                 {en ? 'Add membership' : '添加会员'}
               </Button>
-            )}
-            {row.status === 'ACTIVE' && editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-            {row.status === 'ACTIVE' && row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
-              <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
             )}
           </Space>
         </div>
@@ -1367,9 +1362,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {detailField('SKU', (row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName)}
             {detailField(en ? 'Promo' : '优惠', promo)}
             {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
-            {open
-              ? detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))
-              : row.kind === 'deposit' && row.status === 'ACTIVE' ? detailField(en ? 'Balance deadline' : '尾款截止', dueLine(row) || '—') : null}
+            {detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))}
+            {row.kind === 'deposit' && row.status === 'ACTIVE' && detailField(en ? 'Balance deadline' : '尾款截止', dueLine(row) || '—')}
             {detailField(en ? 'Collected' : '已收', paid.length
               ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${single ? (en ? `${paid.length} paid orders` : `${paid.length} 张已支付订单`) : (en ? `${paid.length} successful` : `${paid.length} 笔成功交易`)}`
               : (en ? 'Nothing yet' : '暂无'))}
@@ -1443,10 +1437,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
     if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE' || balanceOverdue(row, orders))
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
-    if (value === 'done') return row.audience !== 'open' && row.status === 'ACTIVE' && !stage && !balanceOverdue(row, orders)
-    if (value === 'collecting') return row.status === 'ACTIVE' && !isExpired(row)
-    if (value === 'expired') return row.status === 'ACTIVE' && isExpired(row)
-    if (value === 'void') return row.status === 'VOID'
+    const settled = !!paidOf(orders, row.kind === 'full' ? 'FULL' : 'DEPOSIT_BALANCE')
+    if (value === 'done') return row.audience !== 'open' && settled
+    if (value === 'collecting') return !isExpired(row)
+    if (value === 'expired') return isExpired(row) && (row.audience === 'open' || !settled)
     return true
   }
   const baseRows = links.filter((row) => {
@@ -1471,6 +1465,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
     { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
     { value: 'done', label: en ? 'Completed' : '已完成' },
+    { value: 'expired', label: en ? 'Expired' : '已过期' },
   ]
   const scopedLinks = links.filter((row) => (row.audience === 'open') === openPage)
   const lineOptions = Array.from(new Set(scopedLinks.map((row) => row.line).filter(Boolean)))
@@ -1570,7 +1565,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         dataSource={rows}
         pagination={false}
         scroll={{ x: openPage ? 1130 : 1202 }}
-        rowClassName={(row: PaymentLink) => (row.status === 'VOID' ? 'pl-row--void' : '')}
+        rowClassName={(row: PaymentLink) => (linkStatus(row).label === (en ? 'Expired' : '已过期') ? 'pl-row--void' : '')}
         locale={{ emptyText: openPage ? (en ? 'No open payment links yet' : '还没有通用支付链接') : (en ? 'No personal payment links yet' : '还没有专属支付链接') }}
       />
       </>
@@ -1612,8 +1607,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           showIcon
           style={{ marginBottom: 16 }}
           message={en
-            ? 'Creating, editing, changing methods, moving the balance deadline, confirming transfers, adding membership and voiding are logged with the operator.'
-            : '新建、编辑、改支付方式、调整尾款截止、确认转账、添加会员、作废都会记录操作人和变更内容。'}
+            ? 'Creating, editing, changing methods, moving the balance deadline, confirming transfers and adding membership are logged with the operator.'
+            : '新建、编辑、改支付方式、调整尾款截止、确认转账、添加会员都会记录操作人和变更内容。'}
         />
         <Table
           rowKey="id"
