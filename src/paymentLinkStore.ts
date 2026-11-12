@@ -2,15 +2,15 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v8'
-export const LINK_ORDER_KEY = 'dino-cc-link-orders-v3'
-export const LINK_TXN_KEY = 'dino-cc-link-txns-v2'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v9'
+export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
+export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
-  'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-link-orders-v1',
-  'dino-cc-link-orders-v2', 'dino-cc-link-txns-v1',
+  'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
+  'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
 export const DEFAULT_BALANCE_DUE_DAYS = 7
 
@@ -66,8 +66,8 @@ export type LinkHistoryEntry = {
 }
 
 /**
- * Layer 2. One purchase of one package. A User ID link has at most one order (full or deposit);
- * an open link gets one order per payer per payment.
+ * Layer 2. One purchase of one package. A deposit link has one order holding both payments. Full links
+ * (personal or open) work like the landing page: one order per payment attempt.
  */
 export type WebOrder = {
   orderNo: string
@@ -84,7 +84,10 @@ export type WebOrder = {
   createdAt: string
 }
 
-/** Layer 3. One payment attempt: created when the customer presses pay (or picks bank transfer), one method each. */
+/**
+ * Layer 3. One payment attempt: created when the customer presses pay (or picks bank transfer), one method each.
+ * Only deposit orders expose these as transactions; on full links each order has exactly one, shown as the order's payment.
+ */
 export type LinkTxn = {
   txnId: string
   orderNo: string
@@ -223,6 +226,11 @@ export function orderState(order: WebOrder, txns: LinkTxn[]): { state: OrderStat
   return { state: order.cancelled ? 'CANCELLED' : 'PENDING', paid }
 }
 
+/** Full links have one payment per order and no transaction layer; only deposits put two payments on one order. */
+export function singlePayment(link: Pick<PaymentLink, 'audience' | 'kind'>) {
+  return link.audience === 'open' || link.kind === 'full'
+}
+
 /** User ID links that offer bank transfer get their web order when the link is created, so a manager can confirm a transfer. */
 export function needsUpfrontOrder(link: PaymentLink) {
   return link.audience === 'user' && [...link.methods, ...(link.balanceMethods || [])].includes('bank_transfer')
@@ -248,7 +256,7 @@ export function syncUpfrontOrder(link: PaymentLink) {
   if (link.audience !== 'user' || link.id === PREVIEW_LINK_ID) return
   const orders = readLinkOrders()
   const txns = readLinkTxns()
-  const mine = orders.find((order) => order.paymentLinkId === link.id && !order.cancelled)
+  const mine = orders.find((order) => order.paymentLinkId === link.id && !order.cancelled && (link.kind === 'deposit' || order.origin === 'link'))
   const untouched = mine && !txns.some((txn) => txn.orderNo === mine.orderNo)
   if (!mine && needsUpfrontOrder(link)) {
     writeAll([orderFor(link, 'link', link.userId), ...orders], txns)
@@ -301,9 +309,10 @@ export function stageMethods(link: PaymentLink, stage: PayStage) {
 }
 
 /**
- * The customer pressed pay (or picked bank transfer). Personal links find or create their one order, then a
- * transaction; an open attempt with the same method is reused. Open links work like the landing page: every
- * press is a new order with exactly one payment. Amount comes from the link, not the page.
+ * The customer pressed pay (or picked bank transfer). Deposit links find or create their one order, then a
+ * transaction; an open attempt with the same method is reused. Full links work like the landing page: every
+ * third-party press is a new order with exactly one payment; bank transfer uses the order created with the link.
+ * Amount comes from the link, not the page.
  */
 export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?: string; method: string; userId?: string }) {
   const link = findPaymentLink(linkId)
@@ -315,9 +324,13 @@ export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?:
   const userId = link.audience === 'open' ? detail.userId : link.userId
   if (!userId) return undefined
   const offer = link.offers.find((item) => item.skuId === detail.skuId) || link.offers[0]
-  let order = link.audience === 'open' ? undefined : ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.userId === userId)
+  const single = singlePayment(link)
+  const bank = detail.method === 'bank_transfer'
+  let order = !single
+    ? ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.userId === userId)
+    : bank ? ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.origin === 'link') : undefined
   if (!order) {
-    order = orderFor(link, link.audience === 'user' && needsUpfrontOrder(link) ? 'link' : 'checkout', userId, offer?.skuId)
+    order = orderFor(link, needsUpfrontOrder(link) && (!single || bank) ? 'link' : 'checkout', userId, offer?.skuId)
     orders = [order, ...orders]
   } else if (!order.skuId && offer) {
     const picked = orderFor(link, order.origin, userId, offer.skuId)
@@ -353,20 +366,30 @@ export function declareTransfer(txnId: string) {
   writeAll(readLinkOrders(), readLinkTxns().map((txn) => (txn.txnId === txnId && txn.status === 'PENDING' ? { ...txn, declaredAt: txn.declaredAt || now() } : txn)))
 }
 
-/** Third-party callback succeeded, or a manager confirmed the transfer. Other open attempts on the same payment fail. */
+/**
+ * Third-party callback succeeded, or a manager confirmed the transfer. Other open attempts on the same payment fail;
+ * on a personal full link that also cancels the link's other unpaid orders (the upfront bank order included).
+ */
 export function completeTxn(txnId: string) {
   const txns = readLinkTxns()
   const target = txns.find((txn) => txn.txnId === txnId)
   if (!target || target.status !== 'PENDING') return target
+  const link = findPaymentLink(target.paymentLinkId)
+  const wholeLink = link?.audience === 'user' && link.kind === 'full'
   const paidAt = now()
   const next = txns.map((txn) => {
     if (txn.txnId === txnId) {
       return { ...txn, status: 'SUCCESS' as const, paidAt, providerRef: txn.method === 'bank_transfer' ? undefined : providerRef(txn.method) }
     }
-    const superseded = txn.orderNo === target.orderNo && txn.payStage === target.payStage && txn.status === 'PENDING'
+    const sameScope = wholeLink ? txn.paymentLinkId === target.paymentLinkId : txn.orderNo === target.orderNo
+    const superseded = sameScope && txn.payStage === target.payStage && txn.status === 'PENDING'
     return superseded ? { ...txn, status: 'FAILED' as const, failReason: '已用其他方式付款' } : txn
   })
-  writeAll(readLinkOrders(), next)
+  const orders = readLinkOrders().map((order) => {
+    const leftover = wholeLink && order.paymentLinkId === target.paymentLinkId && order.orderNo !== target.orderNo
+    return leftover && !order.cancelled && orderState(order, next).paid === 0 ? { ...order, cancelled: true } : order
+  })
+  writeAll(orders, next)
   return next.find((txn) => txn.txnId === txnId)
 }
 
@@ -375,7 +398,8 @@ export function failTxn(txnId: string, reason = '支付失败') {
   const txns = readLinkTxns()
   const target = txns.find((txn) => txn.txnId === txnId && txn.status === 'PENDING')
   if (!target) return
-  const cancelOrder = findPaymentLink(target.paymentLinkId)?.audience === 'open'
+  const link = findPaymentLink(target.paymentLinkId)
+  const cancelOrder = !!link && singlePayment(link) && target.method !== 'bank_transfer'
   writeAll(
     readLinkOrders().map((order) => (cancelOrder && order.orderNo === target.orderNo ? { ...order, cancelled: true } : order)),
     txns.map((txn) => (txn === target ? { ...txn, status: 'FAILED', failReason: reason } : txn)),
@@ -417,7 +441,7 @@ export function orderSourceOf(order: Pick<Order, 'orderSource' | 'payMethod'>): 
   return order.payMethod === 'Payment Link' ? 'PAYMENT_LINK' : 'LANDING_PAGE'
 }
 
-/** Order center: one row per web order, its transactions underneath. */
+/** Order center: one row per web order. Deposit orders list their transactions; full-link orders carry their one payment. */
 function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
   return orders.map((order) => {
     const mine = txns.filter((txn) => txn.orderNo === order.orderNo)
@@ -434,7 +458,9 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
       note: txn.status === 'PENDING' && txn.declaredAt ? `用户已声明转账 ${txn.declaredAt}` : txn.failReason,
     }))
     const sortKey = [order.createdAt, ...mine.map((txn) => txn.paidAt || txn.createdAt)].sort().pop() || ''
-    const open = findPaymentLink(order.paymentLinkId)?.audience === 'open'
+    const link = findPaymentLink(order.paymentLinkId)
+    const open = link?.audience === 'open'
+    const single = !!link && singlePayment(link)
     return {
       sortKey,
       order: {
@@ -451,9 +477,10 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
         paymentLinkId: order.paymentLinkId,
         orderSource: 'PAYMENT_LINK',
         paymentLinkType: open ? 'OPEN' : 'PERSONAL',
-        channelMethod: open ? mine[0]?.method : undefined,
-        channelRef: open ? mine[0]?.providerRef : undefined,
-        transactions: open ? [] : transactions,
+        singlePayment: single,
+        channelMethod: single ? mine[0]?.method : undefined,
+        channelRef: single ? mine[0]?.providerRef || mine[0]?.transferReference : undefined,
+        transactions: single ? [] : transactions,
       } as Order,
     }
   })
@@ -540,7 +567,8 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     { orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', userId: '2060199610824356004', ...vnSku, origin: 'link', createdAt: `${shift(-218).slice(0, 16)}:00` },
     { orderNo: 'WEB-261028-NW01', paymentLinkId: 'PL-DEP-NEW', userId: '2060199610824355844', ...vnSku, origin: 'link', createdAt: '2026-10-28 16:20:00' },
     { orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', userId: '2090031938694049794', ...vnSku, origin: 'link', createdAt: '2026-10-28 13:05:00' },
-    { orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:15:00' },
+    { orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:18:00' },
+    { orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:15:00', cancelled: true },
     { orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824356011', ...krH, origin: 'checkout', createdAt: '2026-10-28 10:05:00' },
     { orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824355846', ...krH, origin: 'checkout', createdAt: '2026-10-27 11:38:00' },
     { orderNo: 'WEB-261027-EX04', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824355846', ...krH, origin: 'checkout', createdAt: '2026-10-27 11:31:00', cancelled: true },
@@ -559,7 +587,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     t({ txnId: 'TXN-261028-RF01', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
     t({ txnId: 'TXN-261020-LF01', orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
     t({ txnId: 'TXN-261028-BK01', orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', amount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', declaredAt: '2026-10-28 13:22:00', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
-    t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),
+    t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),
     t({ txnId: 'TXN-261027-KP01', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
     t({ txnId: 'TXN-261028-EX03', orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),
     t({ txnId: 'TXN-261027-EX02', orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', providerRef: 'CARD-27114033KR', createdAt: '2026-10-27 11:38:00', paidAt: '2026-10-27 11:40:00' }),

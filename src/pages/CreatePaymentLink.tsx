@@ -57,6 +57,7 @@ import {
   parseTime,
   readPaymentLinks,
   setBalanceDeadline,
+  singlePayment,
   stageAmount,
   stageMethods,
   syncUpfrontOrder,
@@ -1112,11 +1113,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             <span><Tag color={status.color} bordered={false}>{status.label}</Tag></span>
             {row.audience === 'open' && row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
             {row.kind === 'deposit' && row.status === 'ACTIVE' && dueLine(row)}
-            <Typography.Text type="secondary">
-              {row.audience === 'open'
-                ? (en ? `${paid} paid order${paid === 1 ? '' : 's'}` : `${paid} 张已支付订单`)
-                : (en ? `${paid} successful transaction${paid === 1 ? '' : 's'}` : `${paid} 笔成功交易`)}
-            </Typography.Text>
+            {row.audience === 'open' && <Typography.Text type="secondary">{en ? `${paid} paid order${paid === 1 ? '' : 's'}` : `${paid} 张已支付订单`}</Typography.Text>}
+            {row.kind === 'deposit' && <Typography.Text type="secondary">{en ? `${paid} successful transaction${paid === 1 ? '' : 's'}` : `${paid} 笔成功交易`}</Typography.Text>}
           </div>
         )
       },
@@ -1250,20 +1248,36 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           )
         })}
         <div className="pl-legs__note">
-          {row.kind === 'deposit'
-            ? (en
-              ? 'Payment link → one web order → two successful transactions (first payment, balance). Membership opens when the order is fully paid.'
-              : '支付链接 → 一张 Web Order → 两笔成功交易（首款、尾款）。订单付清后开通会员。')
-            : (en
-              ? 'Payment link → one web order → one successful transaction. Failed attempts stay on the order as FAILED.'
-              : '支付链接 → 一张 Web Order → 一笔成功交易。失败的尝试也留在订单下，状态 FAILED。')}
+          {en
+            ? 'Payment link → one web order → two successful transactions (first payment, balance). Membership opens when the order is fully paid.'
+            : '支付链接 → 一张 Web Order → 两笔成功交易（首款、尾款）。订单付清后开通会员。'}
         </div>
       </div>
     )
   }
 
+  const fullOrders = (row: PaymentLink) => {
+    const collecting = currentStage(row, txnsOf(row.id)) === 'FULL'
+    const canConfirm = canConfirmBank && row.status === 'ACTIVE' && collecting && row.methods.includes('bank_transfer')
+    return (
+      <>
+        <div className="pl-detail-orders__bar">
+          {methodsCell(row, row.methods)}
+          {row.status === 'ACTIVE' && collecting && (
+            <Button size="small" type="link" icon={<EditOutlined />} onClick={() => { setMethodTarget({ link: row, stage: 'FULL' }); setMethodDraft(row.methods) }}>
+              {en ? 'Methods' : '改支付方式'}
+            </Button>
+          )}
+          {canConfirm && confirmButton(row, 'FULL')}
+        </div>
+        {openOrders(row)}
+      </>
+    )
+  }
+
   const openOrders = (row: PaymentLink) => {
     const txns = txnsOf(row.id)
+    const open = row.audience === 'open'
     const orders = [...ordersOf(row.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     const paidCount = orders.filter((order) => orderState(order, linkTxns).state === 'COMPLETED').length
     return (
@@ -1284,8 +1298,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           </div>
         )}
         columns={[
-          { title: en ? 'Order no.' : '订单号', dataIndex: 'orderNo', width: 200, render: (value: string) => <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(value)}>{value}</Button> },
-          { title: 'User ID', dataIndex: 'userId', width: 200, render: (value?: string) => <Typography.Text copyable={!!value}>{value || '—'}</Typography.Text> },
+          {
+            title: en ? 'Order no.' : '订单号',
+            dataIndex: 'orderNo',
+            width: 200,
+            render: (value: string, order: WebOrder) => (
+              <div className="pl-two-line">
+                <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(value)}>{value}</Button>
+                {order.origin === 'link' && <Typography.Text type="secondary">{en ? 'Created with the link (bank transfer)' : '创建链接时生成（银行转账）'}</Typography.Text>}
+              </div>
+            ),
+          },
+          ...(open ? [{ title: 'User ID', dataIndex: 'userId', width: 200, render: (value?: string) => <Typography.Text copyable={!!value}>{value || '—'}</Typography.Text> }] : []),
           { title: 'SKU', dataIndex: 'skuName', width: 170, render: (value?: string) => value || '—' },
           { title: en ? 'Payable' : '应付', dataIndex: 'payable', width: 140, render: (value: number, order: WebOrder) => formatMoney(value, order.currency) },
           { title: en ? 'Order status' : '订单状态', key: 'state', width: 110, render: (_: unknown, order: WebOrder) => orderStateTag(order) },
@@ -1294,14 +1318,17 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             key: 'pay',
             render: (_: unknown, order: WebOrder) => {
               const pay = txns.find((txn) => txn.orderNo === order.orderNo)
-              if (!pay) return <Typography.Text type="secondary">—</Typography.Text>
+              if (!pay) return <Typography.Text type="secondary">{en ? 'Customer has not paid yet' : '用户还没付款'}</Typography.Text>
+              const ref = pay.providerRef || (pay.transferReference && `${en ? 'Transfer note' : '转账附言'} ${pay.transferReference}`)
               return (
                 <div className="pl-two-line">
-                  <span>{methodName(row, pay.method)}{pay.providerRef && <Typography.Text type="secondary"> · {pay.providerRef}</Typography.Text>}</span>
+                  <span>{methodName(row, pay.method)}{ref && <Typography.Text type="secondary"> · {ref}</Typography.Text>}</span>
                   <Typography.Text type="secondary">
                     {pay.status === 'SUCCESS'
                       ? `${en ? 'Paid' : '支付'} ${(pay.paidAt || '').slice(0, 16)}`
-                      : `${en ? 'Started' : '发起'} ${pay.createdAt.slice(0, 16)}${pay.failReason ? ` · ${pay.failReason}` : ''}`}
+                      : pay.status === 'PENDING' && pay.declaredAt
+                        ? `${en ? 'Transfer declared' : '用户声明已转账'} ${pay.declaredAt.slice(0, 16)}`
+                        : `${en ? 'Started' : '发起'} ${pay.createdAt.slice(0, 16)}${pay.failReason ? ` · ${pay.failReason}` : ''}`}
                   </Typography.Text>
                 </div>
               )
@@ -1323,6 +1350,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const status = linkStatus(row)
     const paid = collected(row)
     const open = row.audience === 'open'
+    const single = singlePayment(row)
     const promo = row.promoCode ? `${en ? 'Use' : '使用'} ${row.promoCode}` : (en ? 'List price' : '全部原价')
     return (
       <div className="pl-detail">
@@ -1365,15 +1393,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               ? detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))
               : row.kind === 'deposit' && row.status === 'ACTIVE' ? detailField(en ? 'Balance deadline' : '尾款截止', dueLine(row) || '—') : null}
             {detailField(en ? 'Collected' : '已收', paid.length
-              ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${open ? (en ? `${paid.length} paid orders` : `${paid.length} 张已支付订单`) : (en ? `${paid.length} successful` : `${paid.length} 笔成功交易`)}`
+              ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${single ? (en ? `${paid.length} paid orders` : `${paid.length} 张已支付订单`) : (en ? `${paid.length} successful` : `${paid.length} 笔成功交易`)}`
               : (en ? 'Nothing yet' : '暂无'))}
             {detailField(en ? 'Creator' : '创建人', `${actorName(row.createdBy)}${row.createdBy ? ` · ${row.createdBy}` : ''}`)}
             {detailField(en ? 'Created / Updated' : '创建 / 更新', `${row.createdAt} / ${row.updatedAt}`)}
             {detailField(en ? 'Link URL' : '链接地址', <Typography.Text copyable className="pl-detail-url">{row.url}</Typography.Text>)}
           </div>
         </Card>
-        <Card size="small" title={open ? (en ? 'Orders' : '订单') : (en ? 'Order and transactions' : '订单与交易')} className="pl-detail-orders">
-          {open ? openOrders(row) : stageRows(row)}
+        <Card size="small" title={single ? (en ? 'Orders' : '订单') : (en ? 'Order and transactions' : '订单与交易')} className="pl-detail-orders">
+          {open ? openOrders(row) : single ? fullOrders(row) : stageRows(row)}
         </Card>
       </div>
     )
@@ -1564,8 +1592,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each press of pay is one order, like the landing page. Click a link to see all its orders.'
             : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样每点一次支付生成一张订单；点击链接进入详情查看全部订单。')
           : en
-          ? `Each row is one personal payment link with one web order; click it to see the order and its transactions. Links that offer bank transfer get the order when the link is created; otherwise when the customer presses pay. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
-          : `每一行是一条专属支付链接，对应一张 Web Order；点击链接进入详情查看订单和它下面的交易。挂了银行转账的链接在创建时就生成订单，只挂三方支付的在用户点支付时生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
+          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"

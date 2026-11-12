@@ -108,7 +108,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
           <Descriptions.Item label={t('order.col.paid')}>{money(order.paidAmount, order.currency)}</Descriptions.Item>
           <Descriptions.Item label={lang === 'en' ? 'Order source' : '订单来源'}><OrderSourceTag order={order} /></Descriptions.Item>
           <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
-          {order.paymentLinkType === 'OPEN' && (
+          {order.singlePayment && (
             <>
               <Descriptions.Item label={lang === 'en' ? 'Paid with' : '实际支付方式'}>{order.channelMethod || '—'}</Descriptions.Item>
               <Descriptions.Item label={d('channelRef')}>{order.channelRef ? <Text code>{order.channelRef}</Text> : '—'}</Descriptions.Item>
@@ -124,7 +124,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
         </Descriptions>
       </Card>
 
-      {order.paymentLinkType !== 'OPEN' && (
+      {!order.singlePayment && (
         <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderTransactions')}</span>}>
           <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} rowClassName={(row) => (row.id === focusSub ? 'order-sub--focus' : '')} />
         </Card>
