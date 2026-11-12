@@ -582,7 +582,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 <div>
                   <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
                   <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
-                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Optional. After this date the QR code shows the link as expired.' : '可不填。过期后扫码会提示链接已失效。'}</Typography.Text>
+                  <Typography.Text type="secondary" className="pl-field-hint">{editingId
+                    ? (en ? 'To stop taking payments now, set it to yesterday or earlier. Move it forward again to reopen.' : '要马上停止收款，改到昨天或更早；改回以后的日期就恢复收款。')
+                    : (en ? 'Optional. After this date the QR code shows the link as expired.' : '可不填。过期后扫码会提示链接已失效。')}</Typography.Text>
                 </div>
               </div>
             ) : (
@@ -1151,7 +1153,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {row.status === 'ACTIVE' && (
             <Space size={4}>
               {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-              {(currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
+              {row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
                 <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
               )}
             </Space>
@@ -1332,7 +1334,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </Button>
             )}
             {row.status === 'ACTIVE' && editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-            {row.status === 'ACTIVE' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
+            {row.status === 'ACTIVE' && row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
               <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
             )}
           </Space>
@@ -1411,6 +1413,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
+    if (row.audience === 'open') return [row.id, row.eventName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
     return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...ordersOf(row.id).flatMap((order) => [order.orderNo, order.userId]), ...txnsOf(row.id).map((txn) => txn.txnId)]
       .join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
@@ -1442,7 +1445,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     { value: 'all', label: en ? 'All' : '全部' },
     { value: 'collecting', label: en ? 'Collecting' : '收款中' },
     { value: 'expired', label: en ? 'Expired' : '已过期' },
-    { value: 'void', label: en ? 'Void' : '已作废' },
   ] : [
     { value: 'all', label: en ? 'All' : '全部' },
     { value: 'confirm', label: en ? 'Transfer to confirm' : '待确认转账' },
@@ -1525,7 +1527,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
       </div>
       <Space wrap>
-        <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link / user / order no.' : '活动 / 链接 / User ID / 订单号') : (en ? 'Link / user / order no.' : '链接 / User ID / 订单号')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
+        <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link ID' : '活动名 / 链接号') : (en ? 'Link / user / order no.' : '链接 / User ID / 订单号')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
         {!openPage && (
           <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 150 }}
             options={[
@@ -1538,7 +1540,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           onChange={(value) => { setLineFilter(value); setChannelFilter(undefined) }}
         />
         <Select allowClear showSearch optionFilterProp="label" placeholder={en ? 'Channel' : '渠道'} value={channelFilter} onChange={setChannelFilter} style={{ width: 200 }} options={channelOptions} />
-        <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>
+        {!openPage && <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>}
         {filtersOn && <Button type="link" onClick={clearFilters}>{en ? 'Clear filters' : '清空筛选'}</Button>}
       </Space>
       <Alert
