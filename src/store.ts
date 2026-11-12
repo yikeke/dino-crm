@@ -204,6 +204,19 @@ export function disableAccountAndReallocate(st: AppState, accountId: string): Ap
   }
 }
 
+/** Payment link demo: CC flags and the CC manager's lines, applied to saved sessions too. */
+function withPaymentLinkDemo(state: AppState): AppState {
+  const ccEmails = ['sales.kr@dinoai.ai', 'sales.my@dinoai.ai']
+  return {
+    ...state,
+    accounts: state.accounts.map((account) => {
+      if (ccEmails.includes(account.email) && account.isCc === undefined) return { ...account, isCc: true }
+      if (account.email === 'sales.lead@dinoai.ai') return { ...account, businessLines: Array.from(new Set([...account.businessLines, '越南', '泰国'])) }
+      return account
+    }),
+  }
+}
+
 function load(): AppState {
   const seeded = seed()
   try {
@@ -227,14 +240,14 @@ function load(): AppState {
       const withPkgs = missingPkgs.length
         ? { ...withBankDemo, packages: [...withBankDemo.packages, ...missingPkgs] }
         : withBankDemo
-      const migrated = autoAllocate(withManagementDemo(withPkgs))
+      const migrated = withPaymentLinkDemo(autoAllocate(withManagementDemo(withPkgs)))
       localStorage.setItem(KEY, JSON.stringify(migrated))
       return migrated
     }
   } catch {
     /* ignore */
   }
-  const finalSeeded = autoAllocate(withManagementDemo(normalizePaymentMethods(seeded)))
+  const finalSeeded = withPaymentLinkDemo(autoAllocate(withManagementDemo(normalizePaymentMethods(seeded))))
   localStorage.setItem(KEY, JSON.stringify(finalSeeded))
   return finalSeeded
 }
@@ -1218,13 +1231,14 @@ function seed(): AppState {
       email: 'sales.lead@dinoai.ai',
       name: '销售组长 · Kim',
       roleId: 'role_sales_leader',
-      businessLines: ['韩国', '马来'],
+      businessLines: ['韩国', '马来', '越南', '泰国'],
       status: '启用',
       lastLogin: now.subtract(30, 'minute').format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       id: uid('acc_'),
       email: 'sales.kr@dinoai.ai',
+      isCc: true,
       name: '销售专员 · 韩国',
       roleId: 'role_support',
       businessLines: ['韩国'],
@@ -1234,6 +1248,7 @@ function seed(): AppState {
     {
       id: uid('acc_'),
       email: 'sales.my@dinoai.ai',
+      isCc: true,
       name: '销售专员 · 马来',
       roleId: 'role_support',
       businessLines: ['马来'],

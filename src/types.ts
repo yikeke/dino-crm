@@ -445,6 +445,7 @@ export type Account = {
   lastLogin?: string
   salesLead?: boolean // 销售组长：可查看并重新分配组内（业务线范围）全部销售的跟进线索
   outboundSeatBound?: boolean // 是否已绑定外呼坐席
+  isCc?: boolean // 一线销售（CC）标记
 }
 
 // 操作日志（审计）

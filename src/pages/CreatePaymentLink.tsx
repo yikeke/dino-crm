@@ -70,6 +70,7 @@ import './CreatePaymentLink.css'
 type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
 
 const OPEN_LINK_LINES = ['Korea']
+const LINE_ZH: Record<string, string> = { Korea: '韩国', Vietnam: '越南', Thailand: '泰国', Malaysia: '马来' }
 const PERSONAL_LINK_LINES = ['Malaysia', 'Thailand', 'Vietnam', 'Korea']
 
 function depositFloor(line: string, payable: number) {
@@ -139,7 +140,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const session = useSession()
   const myEmail = account?.email || session?.email || ''
   const canConfirmBank = role?.id === 'role_sales_leader'
-  const ccManager = role?.id !== 'role_support'
+  const ccManager = !role || role.id === 'role_sales_leader' || role.id === 'role_admin'
+  const ccOnly = !canConfirmBank && !!(account?.isCc ?? role?.id === 'role_support')
+  const inMyLines = (row: PaymentLink) => !role || role.dataScope === 'all' || (account?.businessLines || []).includes(LINE_ZH[row.line] || row.line)
+  const visible = (row: PaymentLink) => (row.audience !== 'open' && ccOnly ? row.createdBy === myEmail : inMyLines(row))
   const students = useStore((s) => s.students)
   const accounts = useStore((s) => s.accounts)
   const actorName = (email?: string) => accounts.find((item) => item.email === email)?.name || email || '—'
@@ -1367,6 +1371,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
   const baseRows = links.filter((row) => {
     if ((row.audience === 'open') !== openPage) return false
+    if (!visible(row)) return false
     if (!textMatch(row)) return false
     if (lineFilter && row.line !== lineFilter) return false
     if (channelFilter && row.channelId !== channelFilter) return false
@@ -1385,7 +1390,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     { value: 'done', label: en ? 'Completed' : '已完成' },
     { value: 'expired', label: en ? 'Expired' : '已过期' },
   ]
-  const scopedLinks = links.filter((row) => (row.audience === 'open') === openPage)
+  const scopedLinks = links.filter((row) => (row.audience === 'open') === openPage && visible(row))
   const lineOptions = Array.from(new Set(scopedLinks.map((row) => row.line).filter(Boolean)))
     .map((value) => ({ value, label: enValue(value) }))
   const channelOptions = Array.from(
@@ -1423,7 +1428,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     )
   }
 
-  const detailRow = focusLinkId ? links.find((row) => row.id === focusLinkId && (row.audience === 'open') === openPage) : undefined
+  const detailRow = focusLinkId ? links.find((row) => row.id === focusLinkId && (row.audience === 'open') === openPage && visible(row)) : undefined
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
@@ -1462,11 +1467,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy and open links; ask your CC manager to create or edit.'}`
-            : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制和打开链接；新建、编辑需要 CC 主管。'}`)
+            ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'You can create and edit.' : 'Only CC managers and above can create or edit; you can view, copy and open links.'}`
+            : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '你可以新建和编辑。' : '只有 CC 主管及以上能新建和编辑；你可以查看、复制和打开链接。'}`)
           : en
-          ? 'One link per customer: pay in full at once, or as a deposit in two parts (first payment, then balance), before the valid-until date. Only the creator can edit a link. Manual bank transfers are confirmed by a CC manager on the details page.'
-          : '一条链接对应一个用户：全款一次付清，定金分首款、尾款两次付，都要在有效期内付完。链接只有创建人能编辑；手动银行转账到账后，由 CC 主管在详情页确认。'}
+          ? 'One link per customer: pay in full at once, or as a deposit in two parts (first payment, then balance), before the valid-until date. CCs see only links they created; CC managers see every link in their business lines. Only the creator can edit a link. Manual bank transfers are confirmed by a CC manager on the details page.'
+          : '一条链接对应一个用户：全款一次付清，定金分首款、尾款两次付，都要在有效期内付完。CC 只看到自己创建的链接，CC 主管看到所负责业务线的全部链接；链接只有创建人能编辑，手动银行转账到账后由 CC 主管在详情页确认。'}
       />
       <Table
         className="pl-table"
