@@ -1176,14 +1176,14 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               <Typography.Text type="secondary" className="pl-leg__relation">
                 {order.origin === 'link'
                   ? (en ? 'Created with the link (bank transfer offered)' : '链接含银行转账，创建链接时已生成')
-                  : (en ? 'Created when the customer pressed pay' : '用户点支付时生成')}
+                  : (en ? 'Created when the customer reached the payment page' : '用户进入三方支付页时生成')}
               </Typography.Text>
             </>
           ) : (
             <>
               <span className="pl-order-head__label">Web Order</span>
               <Tag bordered={false}>{en ? 'Not created yet' : '未创建'}</Tag>
-              <Typography.Text type="secondary">{en ? 'Third-party methods only: the order is created when the customer presses pay.' : '只挂三方支付：用户点支付时才创建订单。'}</Typography.Text>
+              <Typography.Text type="secondary">{en ? 'Third-party methods only: the order is created when the customer reaches the payment page.' : '只挂三方支付：用户进入三方支付页时才创建订单。'}</Typography.Text>
             </>
           )}
         </div>
@@ -1211,7 +1211,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   <div className="pl-order-line is-none">
                     <Tag bordered={false}>{waiting ? (en ? 'After first payment' : '首款付清后可付') : (en ? 'No transaction yet' : '暂无交易')}</Tag>
                     <Typography.Text type="secondary">
-                      {en ? 'A transaction is created each time the customer presses pay' : '用户每点一次支付生成一笔交易'}
+                      {en ? 'A transaction is created each time the customer reaches the payment step' : '用户每次进入支付页（三方页或转账面板）生成一笔交易'}
                     </Typography.Text>
                   </div>
                 )}
@@ -1274,7 +1274,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         size="middle"
         pagination={{ pageSize: 20, hideOnSinglePage: true }}
         dataSource={orders}
-        locale={{ emptyText: <Empty description={en ? 'No orders yet. Each time a customer presses pay, one order is created.' : '还没有订单。用户每点一次支付生成一张订单。'} /> }}
+        locale={{ emptyText: <Empty description={en ? 'No orders yet. An order is created each time a customer reaches the payment page.' : '还没有订单。用户每次进入三方支付页生成一张订单。'} /> }}
         title={() => (
           <div className="pl-detail-orders__head">
             <span>{en ? `${orders.length} orders · ${paidCount} paid` : `共 ${orders.length} 张订单 · 已支付 ${paidCount} 张`}</span>
@@ -1556,8 +1556,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each press of pay is one order, like the landing page. Click a link to see all its orders.'
-            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样每点一次支付生成一张订单；点击链接进入详情查看全部订单。')
+            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders.'
+            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。')
           : en
           ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
           : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
