@@ -268,7 +268,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' || !txnsOf(row.id).some((txn) => txn.status !== 'FAILED'))
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : !txnsOf(row.id).some((txn) => txn.status !== 'FAILED'))
 
   const resetCustomer = () => {
     setUserQuery('')
@@ -1533,7 +1533,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           })}
         />
         {openPage
-          ? <Button type="primary" icon={<QrcodeOutlined />} onClick={() => openCreate('full', 'open')}>{en ? 'New open payment link' : '新建通用支付链接'}</Button>
+          ? ccManager && <Button type="primary" icon={<QrcodeOutlined />} onClick={() => openCreate('full', 'open')}>{en ? 'New open payment link' : '新建通用支付链接'}</Button>
           : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
       </div>
       <Space wrap>
@@ -1556,8 +1556,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders.'
-            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。')
+            ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy links and QR codes; ask your CC manager to create or edit.'}`
+            : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制链接和二维码；新建、编辑需要 CC 主管。'}`)
           : en
           ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
           : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
