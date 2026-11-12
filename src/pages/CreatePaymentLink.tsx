@@ -346,7 +346,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       methods,
       balanceMethods: kind === 'deposit' ? methods : undefined,
       balanceDueDays: kind === 'deposit' ? (dueDays || DEFAULT_BALANCE_DUE_DAYS) : undefined,
-      balanceDueAt: kind === 'deposit' ? previous?.balanceDueAt : undefined,
+      balanceDueAt: kind === 'deposit' && previous?.balanceDueDays === (dueDays || DEFAULT_BALANCE_DUE_DAYS) ? previous?.balanceDueAt : undefined,
       eventName: open ? eventName.trim() : undefined,
       validUntil: validUntil || undefined,
       status: 'ACTIVE',
@@ -767,7 +767,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             >
               <div className="pl-due">
                 <span>{en ? 'Balance must be paid within' : '首款到账后'}</span>
-                {ccManager && !firstLocked ? (
+                {ccManager ? (
                   <InputNumber min={1} max={30} value={dueDays} onChange={(value) => setDueDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: 140 }} />
                 ) : (
                   <b className="pl-due__fixed">{dueDays || DEFAULT_BALANCE_DUE_DAYS} {en ? 'days' : '天'}</b>
@@ -788,9 +788,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               />
               {(!ccManager || firstLocked) && (
                 <Typography.Text type="secondary" className="pl-field-hint">
-                  {firstLocked
-                    ? (en ? 'The first payment is paid. Move the balance deadline from the link list or detail page instead.' : '首款已付，期限天数不能再改；要延长请在列表或详情页「调整截止」。')
-                    : en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。'}
+                  {!ccManager
+                    ? (en ? 'Need more time for a customer? Ask your CC manager to move the deadline on the list.' : '需要给用户更长时间，请找 CC 主管在列表里调整截止时间。')
+                    : (en ? 'The first payment is paid. Saving a new number of days moves the deadline to first payment time + days, replacing any earlier adjustment.' : '首款已到账：保存后截止时间按「首款到账时间 + 新天数」重算，之前「调整截止」改过的时间被覆盖。')}
                 </Typography.Text>
               )}
             </Card>
@@ -1116,7 +1116,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
             {row.kind === 'deposit' && row.status === 'ACTIVE' && dueLine(row)}
             {row.audience === 'open' && <Typography.Text type="secondary">{en ? `${paid} paid order${paid === 1 ? '' : 's'}` : `${paid} 张已支付订单`}</Typography.Text>}
-            {row.kind === 'deposit' && <Typography.Text type="secondary">{en ? `${paid} successful transaction${paid === 1 ? '' : 's'}` : `${paid} 笔成功交易`}</Typography.Text>}
           </div>
         )
       },
