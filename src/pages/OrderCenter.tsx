@@ -18,8 +18,6 @@ import { dashboardPopulation } from '../dashboardData'
 import { useDashboardText } from '../dashboardText'
 import { usePerm } from '../perm'
 import { downloadCsv } from '../export'
-import OrderSourceTag from '../components/OrderSourceTag'
-import { orderSourceOf } from '../paymentLinkStore'
 
 const { Text } = Typography
 
@@ -62,12 +60,11 @@ function fmtMoney(amount: number, currency: string) {
 }
 
 export default function OrderCenter({ detailsPath, exportPermission = 'orders_export' }: { detailsPath?: string; exportPermission?: 'orders_export' | 'ordersV3_export' }) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
-  const [query, setQuery] = useSearchParams()
+  const [query] = useSearchParams()
   const targetStudentId = query.get('studentId') || ''
-  const linkFilter = query.get('payment_link_id') || ''
   const dashboardContext = useDashboardContext()
   const d = useDashboardText()
   const { can, actor, allowedLines } = usePerm()
@@ -80,12 +77,11 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const [keyword, setKeyword] = useState('')
   const [orderStatus, setOrderStatus] = useState<string | undefined>()
   const [payMethod, setPayMethod] = useState<string | undefined>()
-  const [sourceFilter, setSourceFilter] = useState<string | undefined>()
   const [countryFilter, setCountryFilter] = useState<string | undefined>()
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
 
-  useEffect(() => { if (targetStudentId || linkFilter || dashboardScope) setLineSel([]) }, [targetStudentId, linkFilter, dashboardScope])
+  useEffect(() => { if (targetStudentId || dashboardScope) setLineSel([]) }, [targetStudentId, dashboardScope])
 
   const lineOptions = useMemo(
     () => Array.from(new Set([...channels.map((c) => c.name), ...students.map((s) => s.businessLine)].filter(Boolean))),
@@ -122,7 +118,6 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       orders.filter((o) => {
         if (dashboardScope && (!matchesDashboardScope(dashboardScope, o.studentId, o.orderId) || !permittedDashboardIds?.has(o.studentId))) return false
         if (targetStudentId && o.studentId !== targetStudentId) return false
-        if (linkFilter && o.paymentLinkId !== linkFilter) return false
         if (!matchLine(lineOf(o.studentId))) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
@@ -135,12 +130,11 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           matchKw &&
           (!orderStatus || o.orderStatus === orderStatus) &&
           (!payMethod || o.payMethod === payMethod) &&
-          (!sourceFilter || orderSourceOf(o) === sourceFilter) &&
           (!countryFilter || countryOf(o.studentId) === countryFilter) &&
           (!typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
-    [orders, dashboardScope, permittedDashboardIds, targetStudentId, linkFilter, keyword, orderStatus, payMethod, sourceFilter, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
+    [orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
   )
 
   const exportOrders = () => {
@@ -220,12 +214,6 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       render: (v, r) => <Text strong>{fmtMoney(v, r.currency)}</Text>,
     },
     {
-      title: lang === 'en' ? 'Order source' : '订单来源',
-      key: 'orderSource',
-      width: 170,
-      render: (_: unknown, r: Order) => <OrderSourceTag order={r} />,
-    },
-    {
       title: t('order.col.payMethod'),
       dataIndex: 'payMethod',
       width: 130,
@@ -249,19 +237,6 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
     <Card className="page-card" bordered={false} title={<span className="section-title">{t('order.title')}</span>}>
       <DashboardLinkContext filter />
       <Space wrap style={{ marginBottom: 16 }}>
-        {linkFilter && (
-          <Tag
-            color="cyan"
-            closable
-            onClose={() => {
-              const next = new URLSearchParams(query)
-              next.delete('payment_link_id')
-              setQuery(next, { replace: true })
-            }}
-          >
-            {d('filterLink')} {linkFilter}
-          </Tag>
-        )}
         <Input
           allowClear
           prefix={<SearchOutlined />}
@@ -301,19 +276,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           style={{ width: 160 }}
           value={payMethod}
           onChange={setPayMethod}
-          options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay', 'Payment Link'].map((l) => ({ label: l, value: l }))}
-        />
-        <Select
-          allowClear
-          placeholder={lang === 'en' ? 'Order source' : '订单来源'}
-          style={{ width: 160 }}
-          value={sourceFilter}
-          onChange={setSourceFilter}
-          options={[
-            { label: 'App', value: 'APP' },
-            { label: 'Landing Page', value: 'LANDING_PAGE' },
-            { label: 'Payment Link', value: 'PAYMENT_LINK' },
-          ]}
+          options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay'].map((l) => ({ label: l, value: l }))}
         />
         {canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>{d('export')}</Button>}
       </Space>

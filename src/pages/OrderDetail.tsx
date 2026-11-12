@@ -5,14 +5,12 @@ import { useMemo } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useStore } from '../store'
 import type { OrderTransaction, UserStatus, UserType } from '../types'
 import { usePerm } from '../perm'
 import LocalTime from '../components/LocalTime'
 import { resolveUserType } from '../userType'
-import { findPaymentLink } from '../paymentLinkStore'
-import OrderSourceTag from '../components/OrderSourceTag'
 
 const { Text } = Typography
 
@@ -43,13 +41,10 @@ function money(amount: number, currency: string) {
 
 export default function OrderDetail({ backPath = '/orders' }: { backPath?: string }) {
   const navigate = useNavigate()
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const d = useDashboardText()
   const dashboardContext = useDashboardContext()
   const { orderId = '' } = useParams()
-  const [query] = useSearchParams()
-  const fromLinks = query.get('from') === 'payment-links'
-  const focusSub = query.get('sub') || ''
   const orders = useStore((s) => s.orders)
   const students = useStore((s) => s.students)
   const { allowedLines } = usePerm()
@@ -57,10 +52,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const order = useMemo(() => orders.find((item) => item.orderId === orderId), [orders, orderId])
   const student = useMemo(() => students.find((item) => item.studentId === order?.studentId), [students, order?.studentId])
   const inScope = order && (!scope || (student && scope.includes(student.businessLine)))
-  const linkPage = (id?: string) => `/marketing-center-v5/${id && findPaymentLink(id)?.audience === 'open' ? 'open-links' : 'payment-links'}${id ? `?link=${encodeURIComponent(id)}` : ''}`
-  const back = fromLinks
-    ? <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(linkPage(order?.paymentLinkId))}>{d('backPaymentLinks')}</Button>
-    : <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
+  const back = <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
 
   if (!order || !inScope) {
     return (
@@ -76,19 +68,10 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const transactions = [...(order.transactions ?? [])].sort((a, b) => b.time.localeCompare(a.time))
   const columns: ColumnsType<OrderTransaction> = [
     { title: d('subOrder'), dataIndex: 'id', width: 190, render: (id) => <Text code>{id}</Text> },
-    {
-      title: d('subOrderEvent'),
-      dataIndex: 'event',
-      width: 150,
-      render: (event: string, row: OrderTransaction) => (row.payStage
-        ? d(row.payStage === 'FULL' ? 'stageFull' : row.payStage === 'DEPOSIT_FIRST' ? 'stageFirst' : 'stageBalance')
-        : event),
-    },
     { title: d('recordTime'), dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
-    { title: d('txnStatus'), dataIndex: 'status', width: 120, render: (status: OrderTransaction['status']) => <Tag color={STATUS_COLOR[status]}>{status === '支付失败' ? d('txnFailed') : t(`enum.order.${status}`)}</Tag> },
+    { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderTransaction['status']) => <Tag color={STATUS_COLOR[status]}>{status === '支付失败' ? d('txnFailed') : t(`enum.order.${status}`)}</Tag> },
     { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
     { title: t('order.col.payMethod'), dataIndex: 'paymentMethod', width: 130, render: (method) => method || <Text type="secondary">—</Text> },
-    { title: d('channelRef'), dataIndex: 'channelRef', width: 190, render: (ref) => (ref ? <Text code>{ref}</Text> : <Text type="secondary">—</Text>) },
   ]
 
   return (
@@ -106,29 +89,15 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
           <Descriptions.Item label={t('order.col.orderStatus')}><Tag color={STATUS_COLOR[order.orderStatus]}>{t(`enum.order.${order.orderStatus}`)}</Tag></Descriptions.Item>
           <Descriptions.Item label={t('order.col.original')}>{money(order.originalPrice, order.currency)}</Descriptions.Item>
           <Descriptions.Item label={t('order.col.paid')}>{money(order.paidAmount, order.currency)}</Descriptions.Item>
-          <Descriptions.Item label={lang === 'en' ? 'Order source' : '订单来源'}><OrderSourceTag order={order} /></Descriptions.Item>
           <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
-          {order.singlePayment && (
-            <>
-              <Descriptions.Item label={lang === 'en' ? 'Paid with' : '实际支付方式'}>{order.channelMethod || '—'}</Descriptions.Item>
-              <Descriptions.Item label={d('channelRef')}>{order.channelRef ? <Text code>{order.channelRef}</Text> : '—'}</Descriptions.Item>
-            </>
-          )}
-          {order.paymentLinkId && (
-            <Descriptions.Item label={d('sourceLink')}>
-              <a onClick={() => navigate(linkPage(order.paymentLinkId))}>{order.paymentLinkId}</a>
-            </Descriptions.Item>
-          )}
           <Descriptions.Item label={t('order.col.paidTime')}><LocalTime time={order.paidTime} country={country} /></Descriptions.Item>
           <Descriptions.Item label={t('order.col.validUntil')}><LocalTime time={order.validUntil} country={country} /></Descriptions.Item>
         </Descriptions>
       </Card>
 
-      {!order.singlePayment && (
-        <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderTransactions')}</span>}>
-          <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} rowClassName={(row) => (row.id === focusSub ? 'order-sub--focus' : '')} />
-        </Card>
-      )}
+      <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderTransactions')}</span>}>
+        <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} />
+      </Card>
     </Space>
   )
 }

@@ -441,7 +441,7 @@ export function orderSourceOf(order: Pick<Order, 'orderSource' | 'payMethod'>): 
   return order.payMethod === 'Payment Link' ? 'PAYMENT_LINK' : 'LANDING_PAGE'
 }
 
-/** Order center: one row per web order. Deposit orders list their transactions; full-link orders carry their one payment. */
+/** Order center (unchanged this phase): one row per web order with its payment attempts as the existing transaction log. */
 function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
   return orders.map((order) => {
     const mine = txns.filter((txn) => txn.orderNo === order.orderNo)
@@ -458,9 +458,7 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
       note: txn.status === 'PENDING' && txn.declaredAt ? `用户已声明转账 ${txn.declaredAt}` : txn.failReason,
     }))
     const sortKey = [order.createdAt, ...mine.map((txn) => txn.paidAt || txn.createdAt)].sort().pop() || ''
-    const link = findPaymentLink(order.paymentLinkId)
-    const open = link?.audience === 'open'
-    const single = !!link && singlePayment(link)
+    const open = findPaymentLink(order.paymentLinkId)?.audience === 'open'
     return {
       sortKey,
       order: {
@@ -477,10 +475,7 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
         paymentLinkId: order.paymentLinkId,
         orderSource: 'PAYMENT_LINK',
         paymentLinkType: open ? 'OPEN' : 'PERSONAL',
-        singlePayment: single,
-        channelMethod: single ? mine[0]?.method : undefined,
-        channelRef: single ? mine[0]?.providerRef || mine[0]?.transferReference : undefined,
-        transactions: single ? [] : transactions,
+        transactions,
       } as Order,
     }
   })

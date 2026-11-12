@@ -1002,11 +1002,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const collected = (row: PaymentLink) => txnsOf(row.id).filter((txn) => txn.status === 'SUCCESS')
 
-  const openOrder = (orderNo: string, txnId?: string) => {
-    const query = new URLSearchParams({ from: 'payment-links', ...(txnId ? { sub: txnId } : {}) })
-    navigate(`/orders/${orderNo}?${query.toString()}`)
-  }
-
   const txnStatusTag = (txn: LinkTxn) => {
     if (txn.status === 'SUCCESS') return <Tag color="success" bordered={false}>SUCCESS</Tag>
     if (txn.status === 'FAILED') return <Tag color="error" bordered={false}>FAILED</Tag>
@@ -1028,7 +1023,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const txnLine = (row: PaymentLink, txn: LinkTxn) => (
     <div key={txn.txnId} className={`pl-order-line is-${txn.status.toLowerCase()}`}>
-      <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(txn.orderNo, txn.txnId)}>{txn.txnId}</Button>
+      <Typography.Text className="pl-order-no" copyable>{txn.txnId}</Typography.Text>
       <span className="pl-order-line__method">{methodName(row, txn.method)}</span>
       {txnStatusTag(txn)}
       <Typography.Text type="secondary" className="pl-order-line__time">
@@ -1179,7 +1174,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {order ? (
             <>
               <span className="pl-order-head__label">Web Order</span>
-              <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(order.orderNo)}>{order.orderNo}</Button>
+              <Typography.Text className="pl-order-no" copyable>{order.orderNo}</Typography.Text>
               {orderStateTag(order)}
               <Typography.Text type="secondary">
                 {order.skuName || (en ? 'SKU picked by customer' : '用户付款时选 SKU')}
