@@ -247,8 +247,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [activeLine, catalog.skus, lineChannels])
 
   useEffect(() => {
+    if (editingId) return
     setPayMethods(methodsForLine(activeLine).map((item) => item.code))
-  }, [activeLine])
+  }, [activeLine]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = (next: PaymentLink[]) => {
     setLinks(next)
@@ -277,6 +278,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setAudience(openPage ? 'open' : 'user')
     setEventName('')
     setValidUntil('')
+    setPayMethods(methodsForLine(activeLine).map((item) => item.code))
   }
 
   const onLine = (value: string) => {
@@ -943,7 +945,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const dueLine = (row: PaymentLink) => {
     const orders = txnsOf(row.id)
-    if (paidOf(orders, 'DEPOSIT_BALANCE')) return null
+    if (paidOf(orders, 'DEPOSIT_BALANCE') || isExpired(row)) return null
     const due = balanceDeadline(row, orders)
     if (!due) {
       return <Typography.Text type="secondary" className="pl-due-line">{en ? `Balance within ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} days of first payment` : `首款后 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天内付清尾款`}</Typography.Text>
