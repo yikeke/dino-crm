@@ -313,14 +313,9 @@
   line-height: 1.4;
 }
 
-.pl-plan-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pl-plan-bar .pl-label {
-  margin: 0;
+.pl-promo .pl-field-hint {
+  display: block;
+  margin-top: 4px;
 }
 
 .pl-offers {

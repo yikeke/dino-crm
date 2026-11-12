@@ -663,22 +663,19 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             </div>
             {activeChannel?.plan ? (
               <>
-                <div className="pl-plan-bar">
-                  <span className="pl-label">{en ? 'Promo' : '优惠'}</span>
-                  {hasDiscount ? (
-                    <Segmented
-                      size="small"
-                      value={usePromo ? 'yes' : 'no'}
-                      disabled={firstLocked}
-                      onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
-                      options={[
-                        { value: 'yes', label: `${en ? 'Use' : '使用'} ${activeChannel.plan.promoCode}` },
-                        { value: 'no', label: en ? 'List price' : '全部原价' },
-                      ]}
-                    />
-                  ) : (
-                    <Typography.Text type="secondary">{en ? 'This plan has no promo. Every SKU is at list price.' : '当前方案无优惠，全部按原价'}</Typography.Text>
-                  )}
+                <div className="pl-promo">
+                  <div className="pl-label">{en ? 'Use a promo?' : '是否使用优惠'}</div>
+                  <Select
+                    style={{ width: 360 }}
+                    value={hasDiscount && usePromo ? 'yes' : 'no'}
+                    disabled={!hasDiscount || firstLocked}
+                    onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
+                    options={[
+                      ...(hasDiscount ? [{ value: 'yes', label: `${en ? 'Use promo' : '使用优惠'} - ${activeChannel.plan.promoCode}` }] : []),
+                      { value: 'no', label: en ? 'No promo, all at list price' : '不使用优惠，全部原价售卖' },
+                    ]}
+                  />
+                  {!hasDiscount && <Typography.Text type="secondary" className="pl-field-hint">{en ? 'This plan has no promo.' : '当前方案没有优惠。'}</Typography.Text>}
                 </div>
                 <div className="pl-label">
                   {mode === 'full'
