@@ -214,7 +214,16 @@ function withPaymentLinkDemo(state: AppState): AppState {
       if (account.email === 'sales.lead@dinoai.ai') return { ...account, businessLines: Array.from(new Set([...account.businessLines, '越南', '泰国'])) }
       return account
     }),
+    roles: migrateOpsOpenLinkReadOnly(state.roles),
   }
+}
+
+// One-time: roles saved before ops became read-only on open links keep 'none'; later edits in the demo stay.
+function migrateOpsOpenLinkReadOnly(roles: AppState['roles']): AppState['roles'] {
+  const marker = 'dino-pl-ops-openlinks-readonly-v1'
+  if (localStorage.getItem(marker)) return roles
+  localStorage.setItem(marker, '1')
+  return roles.map((role) => (role.id === 'role_ops' && role.perms.marketingV2_openlinks === 'none' ? { ...role, perms: { ...role.perms, marketingV2_openlinks: 'view' } } : role))
 }
 
 function load(): AppState {
@@ -919,7 +928,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
-        marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none',
+        marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'view', marketingV2_openlinks_edit: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
         marketing: 'operate',

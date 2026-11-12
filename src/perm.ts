@@ -64,7 +64,7 @@ export function usePerm() {
     // Payment link permissions added after roles were saved in localStorage.
     const payLinkDefaults: Record<string, Partial<Record<ModuleKey, PermLevel>>> = {
       role_growth: { marketingV2_paylinks: 'none', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
-      role_ops: { marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
+      role_ops: { marketingV2_paylinks: 'view', marketingV2_paylinks_edit: 'none', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'view', marketingV2_openlinks_edit: 'none' },
       role_support: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'none', marketingV2_openlinks: 'none', marketingV2_openlinks_edit: 'none' },
       role_admin: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate' },
       role_sales_leader: { marketingV2_paylinks: 'operate', marketingV2_paylinks_edit: 'operate', marketingV2_paylinks_confirm: 'operate', marketingV2_openlinks: 'operate', marketingV2_openlinks_edit: 'operate' },

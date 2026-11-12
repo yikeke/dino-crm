@@ -145,7 +145,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const canEditPersonal = can('marketingV2_paylinks_edit') === 'operate'
   const teamView = !role || role.dataScope === 'all' || can('sales_reassign') === 'operate' || can('sales_config') === 'operate'
   const inMyLines = (row: PaymentLink) => !role || role.dataScope === 'all' || (account?.businessLines || []).includes(LINE_ZH[row.line] || row.line)
-  const visible = (row: PaymentLink) => (row.audience === 'open' || teamView ? inMyLines(row) : row.createdBy === myEmail)
+  const visible = (row: PaymentLink) => (row.audience === 'open' || teamView || !canEditPersonal ? inMyLines(row) : row.createdBy === myEmail)
   const students = useStore((s) => s.students)
   const accounts = useStore((s) => s.accounts)
   const actorName = (email?: string) => accounts.find((item) => item.email === email)?.name || email || '—'
