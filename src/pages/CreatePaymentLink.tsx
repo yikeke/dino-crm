@@ -133,7 +133,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [lineFilter, setLineFilter] = useState<string | undefined>()
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
-  const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string } | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string; stage: PayStage } | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { account, role } = useCurrentAccount()
@@ -430,10 +430,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setScreen('form')
   }
 
-  const confirmTransfer = (row: PaymentLink, skuId?: string) => {
-    const txn = confirmBankPayment(row.id, skuId)
-    if (!txn || txn.status !== 'SUCCESS') return
-    logAction(row.id, txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
+  const confirmTransfer = (row: PaymentLink, stage: PayStage, skuId?: string) => {
+    const result = confirmBankPayment(row.id, skuId, stage)
+    if (!result || result.txn.status !== 'SUCCESS') return
+    const { txn, already } = result
+    if (!already) logAction(row.id, txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
       `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)}${txn.payStage === 'DEPOSIT_FIRST' ? '' : '，开通会员'}`)
     reload()
     setConfirmTarget(null)
@@ -442,8 +443,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
   }
 
-  const confirmTransferSafely = (row: PaymentLink, skuId?: string) => {
-    const stage = currentStage(row, txnsOf(row.id))
+  const confirmTransferSafely = (row: PaymentLink, stage: PayStage, skuId?: string) => {
     const first = stage === 'DEPOSIT_FIRST'
     const order = ordersOf(row.id).find((item) => !item.cancelled)
     const offer = row.offers.find((item) => item.skuId === (skuId || order?.skuId)) || (row.offers.length === 1 ? row.offers[0] : undefined)
@@ -454,7 +454,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-confirm-modal">
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
           <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
-          <p>{stageName(stage || 'FULL')}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
+          <p>{stageName(stage)}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
           <p>{first
             ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
             : (en ? 'Membership opens right away. This cannot be undone.' : '确认后马上开通会员，不能撤销。')}</p>
@@ -462,17 +462,17 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       ),
       okText: first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员'),
       cancelText: en ? 'Cancel' : '取消',
-      onOk: () => confirmTransfer(row, skuId),
+      onOk: () => confirmTransfer(row, stage, skuId),
     })
   }
 
-  const askConfirm = (row: PaymentLink) => {
+  const askConfirm = (row: PaymentLink, stage: PayStage) => {
     const order = ordersOf(row.id).find((item) => !item.cancelled)
     if (row.offers.length > 1 && !order?.skuId) {
-      setConfirmTarget({ link: row, skuId: row.offers[0]?.skuId || '' })
+      setConfirmTarget({ link: row, skuId: row.offers[0]?.skuId || '', stage })
       return
     }
-    confirmTransferSafely(row)
+    confirmTransferSafely(row, stage)
   }
 
   const linkedStudent = students.find((student) => student.studentId === linkedUserId)
@@ -1043,7 +1043,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   )
 
   const confirmButton = (row: PaymentLink, stage: PayStage) => (
-    <Button size="small" type="primary" onClick={() => askConfirm(row)}>
+    <Button size="small" type="primary" onClick={() => askConfirm(row, stage)}>
       {stage === 'DEPOSIT_FIRST'
         ? (en ? 'Confirm first transfer' : '确认首款已到账')
         : (en ? 'Confirm transfer & open membership' : '确认到账并开通会员')}
@@ -1522,7 +1522,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         title={en ? 'Confirm manual bank transfer' : '确认手动银行转账'}
         open={!!confirmTarget}
         onCancel={() => setConfirmTarget(null)}
-        onOk={() => { if (!confirmTarget) return; const { link, skuId } = confirmTarget; setConfirmTarget(null); confirmTransferSafely(link, skuId) }}
+        onOk={() => { if (!confirmTarget) return; const { link, skuId, stage } = confirmTarget; setConfirmTarget(null); confirmTransferSafely(link, stage, skuId) }}
         okText={en ? 'Confirm' : '确认到账'}
         cancelText={en ? 'Cancel' : '取消'}
         destroyOnClose

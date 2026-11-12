@@ -389,17 +389,26 @@ export function failTxn(txnId: string, reason = '支付失败') {
  * CC manager confirms a bank transfer for the payment the link is collecting. Uses the customer's pending
  * bank transaction when there is one; otherwise records a bank transaction on the order directly.
  */
-export function confirmBankPayment(linkId: string, skuId?: string) {
+/**
+ * A manager confirms the bank transfer for `expected` (the payment shown on their screen). If that payment already
+ * succeeded through a third-party method in the meantime, nothing new is recorded and it simply reads as received.
+ */
+export function confirmBankPayment(linkId: string, skuId?: string, expected?: PayStage): { txn: LinkTxn; already: boolean } | undefined {
   const link = findPaymentLink(linkId)
   if (!link) return undefined
   const linkTxns = txnsOfLink(linkId)
+  if (expected) {
+    const settled = linkTxns.find((txn) => txn.payStage === expected && txn.status === 'SUCCESS')
+    if (settled) return { txn: settled, already: true }
+  }
   const stage = currentStage(link, linkTxns)
-  if (!stage) return undefined
-  const pending = linkTxns.filter((txn) => txn.payStage === stage && txn.status === 'PENDING' && txn.method === 'bank_transfer')
-  const target = pending[0]
-  if (target) return completeTxn(target.txnId)
-  const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
-  return started ? completeTxn(started.txn.txnId) : undefined
+  if (!stage || (expected && stage !== expected)) return undefined
+  const target = linkTxns.find((txn) => txn.payStage === stage && txn.status === 'PENDING' && txn.method === 'bank_transfer')
+  const done = target ? completeTxn(target.txnId) : (() => {
+    const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
+    return started ? completeTxn(started.txn.txnId) : undefined
+  })()
+  return done ? { txn: done, already: false } : undefined
 }
 
 const TXN_STATUS: Record<TxnStatus, OrderTransaction['status']> = { PENDING: '待支付', SUCCESS: '已支付', FAILED: '支付失败' }
