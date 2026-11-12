@@ -41,7 +41,6 @@ import {
   balanceOverdue,
   confirmBankPayment,
   currentStage,
-  declaredTxn,
   historyEntry,
   logLinkAction,
   ensurePaymentLinkData,
@@ -69,7 +68,7 @@ import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
-type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
+type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
 
 const OPEN_LINK_LINES = ['Korea']
 const PERSONAL_LINK_LINES = ['Malaysia', 'Thailand', 'Vietnam', 'Korea']
@@ -972,7 +971,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     : stage === 'DEPOSIT_FIRST' ? (en ? 'First payment' : '首款') : (en ? 'Balance' : '尾款'))
 
   const paidOf = paidTxn
-  const declaredOf = declaredTxn
 
   const leftText = (due: string) => {
     const left = parseTime(due) - Date.now()
@@ -1008,20 +1006,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     if (row.kind === 'full') {
       if (paidOf(orders, 'FULL')) return { label: en ? 'Paid' : '已支付', color: 'success' }
       if (isExpired(row)) return expired
-      if (declaredOf(orders, 'FULL')) return { label: en ? 'Transfer to confirm' : '转账待确认', color: 'warning' }
       return { label: en ? 'Awaiting payment' : '待支付', color: 'processing' }
     }
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return { label: en ? 'Fully paid' : '已付清', color: 'success' }
     if (balanceOverdue(row, orders)) return { label: en ? 'Expired · first payment paid' : '已过期 · 已付首款', color: 'error' }
     if (isExpired(row)) return expired
     if (paidOf(orders, 'DEPOSIT_FIRST')) {
-      return declaredOf(orders, 'DEPOSIT_BALANCE')
-        ? { label: en ? 'Balance transfer to confirm' : '尾款待确认', color: 'warning' }
-        : { label: en ? 'Balance due' : '待付尾款', color: 'orange' }
+      return { label: en ? 'Balance due' : '待付尾款', color: 'orange' }
     }
-    return declaredOf(orders, 'DEPOSIT_FIRST')
-      ? { label: en ? 'First transfer to confirm' : '首款待确认', color: 'warning' }
-      : { label: en ? 'First payment due' : '待付首款', color: 'processing' }
+    return { label: en ? 'First payment due' : '待付首款', color: 'processing' }
   }
 
   const collected = (row: PaymentLink) => txnsOf(row.id).filter((txn) => txn.status === 'SUCCESS')
@@ -1029,7 +1022,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const txnStatusTag = (txn: LinkTxn) => {
     if (txn.status === 'SUCCESS') return <Tag color="success" bordered={false}>SUCCESS</Tag>
     if (txn.status === 'FAILED') return <Tag color="error" bordered={false}>FAILED</Tag>
-    if (txn.declaredAt) return <Tag color="warning" bordered={false}>{en ? 'PENDING · transfer declared' : 'PENDING · 用户已声明转账'}</Tag>
     return <Tag color="processing" bordered={false}>PENDING</Tag>
   }
 
@@ -1053,9 +1045,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       <Typography.Text type="secondary" className="pl-order-line__time">
         {txn.status === 'SUCCESS'
           ? `${en ? 'Paid' : '支付'} ${(txn.paidAt || '').slice(0, 16)}`
-          : txn.declaredAt
-            ? `${en ? 'Declared' : '用户声明转账'} ${txn.declaredAt.slice(0, 16)}`
-            : `${en ? 'Started' : '发起'} ${txn.createdAt.slice(0, 16)}`}
+          : `${en ? 'Started' : '发起'} ${txn.createdAt.slice(0, 16)}`}
       </Typography.Text>
       {txn.status === 'FAILED' && txn.failReason && <Typography.Text type="secondary" className="pl-leg__id">{txn.failReason}</Typography.Text>}
       {txn.status !== 'FAILED' && txn.transferReference && (
@@ -1146,7 +1136,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       title: en ? 'Created / Updated' : '创建 / 更新',
       width: 140,
       render: (_: unknown, row: PaymentLink) => {
-        const latest = [row.updatedAt, ...txnsOf(row.id).map((txn) => (txn.paidAt || txn.declaredAt || txn.createdAt).slice(0, 16))].sort().pop()
+        const latest = [row.updatedAt, ...txnsOf(row.id).map((txn) => (txn.paidAt || txn.createdAt).slice(0, 16))].sort().pop()
         return (
           <div className="pl-two-line">
             <span>{row.createdAt}</span>
@@ -1416,7 +1406,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const sceneMatch = (row: PaymentLink, value: Scene) => {
     const orders = txnsOf(row.id)
     const stage = currentStage(row, orders)
-    if (value === 'confirm') return row.status === 'ACTIVE' && orders.some((txn) => txn.status === 'PENDING' && !!txn.declaredAt)
     if (value === 'first') return row.kind === 'deposit' && stage === 'DEPOSIT_FIRST'
     if (value === 'balance') return row.kind === 'deposit' && (stage === 'DEPOSIT_BALANCE')
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
@@ -1440,7 +1429,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     { value: 'expired', label: en ? 'Expired' : '已过期' },
   ] : [
     { value: 'all', label: en ? 'All' : '全部' },
-    { value: 'confirm', label: en ? 'Transfer to confirm' : '待确认转账' },
     { value: 'first', label: en ? 'First payment due' : '待付首款' },
     { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
     { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
@@ -1502,7 +1490,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               label: (
                 <span className="pl-scene">
                   {item.label}
-                  <span className={`pl-scene__count${item.value === 'confirm' && count ? ' is-alert' : ''}`}>{count}</span>
+                  <span className="pl-scene__count">{count}</span>
                 </span>
               ),
             }

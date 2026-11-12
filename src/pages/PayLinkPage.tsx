@@ -8,7 +8,6 @@ import {
   balanceOverdue,
   completeTxn,
   currentStage,
-  declareTransfer,
   ensurePaymentLinkData,
   failTxn,
   findPaymentLink,
@@ -211,7 +210,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const [account, setAccount] = useState<Account | null>(() => (open && !preview ? savedAccount() : null))
   const [loginOpen, setLoginOpen] = useState(false)
   const doneTxn = null as LinkTxn | null
-  const [previewAcked, setPreviewAcked] = useState(false)
+  const [acked, setAcked] = useState(false)
   const stage = link ? currentStage(link, txns) : null
   const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
   const offers = link?.offers || []
@@ -328,15 +327,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
     begin(next)
   }
 
-  const declare = () => {
-    if (preview) {
-      setPreviewAcked(true)
-      return
-    }
-    if (!bankTxn) return
-    declareTransfer(bankTxn.txnId)
-    refresh()
-  }
+  const declare = () => setAcked(true)
 
   if (host) {
     return (
@@ -383,7 +374,6 @@ function PayLinkView({ linkId }: { linkId: string }) {
     ? txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
     : undefined
   const note = bankTxn?.transferReference || transferReference(preview ? 'TXN-PREVIEW' : linkId)
-  const acked = preview ? previewAcked : !!bankTxn?.declaredAt
 
   return (
     <div className="pay-link-page" dir={copy.dir}>

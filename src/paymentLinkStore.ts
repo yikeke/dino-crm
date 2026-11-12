@@ -2,7 +2,7 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v13'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v14'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
@@ -10,7 +10,7 @@ export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13',
   'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
 
@@ -95,7 +95,6 @@ export type LinkTxn = {
   method: string
   transferReference?: string
   providerRef?: string
-  declaredAt?: string
   status: TxnStatus
   failReason?: string
   createdAt: string
@@ -207,10 +206,6 @@ export function parseTime(value: string) {
 
 export function paidTxn(txns: LinkTxn[], stage: PayStage) {
   return txns.find((txn) => txn.payStage === stage && txn.status === 'SUCCESS')
-}
-
-export function declaredTxn(txns: LinkTxn[], stage: PayStage) {
-  return txns.find((txn) => txn.payStage === stage && txn.status === 'PENDING' && !!txn.declaredAt)
 }
 
 /** Order status is derived from its transactions; nothing is stored on the order. */
@@ -350,11 +345,6 @@ export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?:
   return { order, txn }
 }
 
-/** Customer says they transferred. The transaction stays PENDING until a CC manager matches it to the bank statement. */
-export function declareTransfer(txnId: string) {
-  writeAll(readLinkOrders(), readLinkTxns().map((txn) => (txn.txnId === txnId && txn.status === 'PENDING' ? { ...txn, declaredAt: txn.declaredAt || now() } : txn)))
-}
-
 /**
  * Third-party callback succeeded, or a manager confirmed the transfer. Other open attempts on the same payment fail;
  * on a personal full link that also cancels the link's other unpaid orders (the upfront bank order included).
@@ -406,7 +396,7 @@ export function confirmBankPayment(linkId: string, skuId?: string) {
   const stage = currentStage(link, linkTxns)
   if (!stage) return undefined
   const pending = linkTxns.filter((txn) => txn.payStage === stage && txn.status === 'PENDING' && txn.method === 'bank_transfer')
-  const target = pending.find((txn) => txn.declaredAt) || pending[0]
+  const target = pending[0]
   if (target) return completeTxn(target.txnId)
   const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
   return started ? completeTxn(started.txn.txnId) : undefined
@@ -437,7 +427,7 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
       amount: txn.amount,
       paymentMethod: txn.method,
       channelRef: txn.providerRef || txn.transferReference,
-      note: txn.status === 'PENDING' && txn.declaredAt ? `用户已声明转账 ${txn.declaredAt}` : txn.failReason,
+      note: txn.failReason,
     }))
     const sortKey = [order.createdAt, ...mine.map((txn) => txn.paidAt || txn.createdAt)].sort().pop() || ''
     const open = findPaymentLink(order.paymentLinkId)?.audience === 'open'
@@ -559,11 +549,11 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const txns: LinkTxn[] = [
     t({ txnId: 'TXN-261028-TB02', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_BALANCE', amount: 8910, method: 'KPLUS', status: 'PENDING', createdAt: '2026-10-28 15:42:10' }),
     t({ txnId: 'TXN-261028-TF01', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', amount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
-    t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', declaredAt: '2026-10-28 15:30:00', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
+    t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
     t({ txnId: 'TXN-261027-VF01', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
     t({ txnId: 'TXN-261028-RF01', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
     t({ txnId: 'TXN-261020-LF01', orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
-    t({ txnId: 'TXN-261028-BK01', orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', amount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', declaredAt: '2026-10-28 13:22:00', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
+    t({ txnId: 'TXN-261028-BK01', orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', amount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
     t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),
     t({ txnId: 'TXN-261027-KP01', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
     t({ txnId: 'TXN-261028-EX03', orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),
