@@ -1100,11 +1100,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       ),
     },
     {
-      title: en ? 'Payment methods' : '支付方式',
-      width: 200,
-      render: (_: unknown, row: PaymentLink) => methodsCell(row, row.methods || []),
-    },
-    {
       title: en ? 'Status' : '状态',
       width: 210,
       render: (_: unknown, row: PaymentLink) => {
@@ -1329,10 +1324,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const status = linkStatus(row)
     const paid = collected(row)
     const open = row.audience === 'open'
-    const prices = (row.offers || []).map((item) => item.payable).filter((value) => value > 0)
-    const amount = row.kind === 'deposit'
-      ? `${formatMoney(row.payable, row.currency)}（${en ? 'first' : '首款'} ${formatMoney(row.amount, '')} + ${en ? 'balance' : '尾款'} ${formatMoney(Math.max(row.payable - row.amount, 0), '')}）`
-      : prices.length > 1 ? `${formatMoney(Math.min(...prices), '')} – ${formatMoney(Math.max(...prices), row.currency)}` : formatMoney(prices[0] || row.payable, row.currency)
+    const promo = row.promoCode ? `${en ? 'Use' : '使用'} ${row.promoCode}` : (en ? 'List price' : '全部原价')
     return (
       <div className="pl-detail">
         <div className="pl-form-head">
@@ -1368,7 +1360,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               : detailField('User ID', <Typography.Text copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>)}
             {detailField(en ? 'Channel' : '渠道', `${enValue(row.line)} · ${row.channelName || '—'}`)}
             {detailField('SKU', (row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName)}
-            {detailField(en ? 'Amount' : '金额', amount)}
+            {detailField(en ? 'Promo' : '优惠', promo)}
             {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
             {open
               ? detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))
