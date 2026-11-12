@@ -75,7 +75,7 @@ export default function AppLayout() {
   const { account, role } = useCurrentAccount()
   const accounts = useStore((s) => s.accounts)
   const roles = useStore((s) => s.roles)
-  // Create Payment Link demo only switches between the two CC roles.
+  // Payment link demo only switches between the two CC roles.
   const onPaymentLinks = location.pathname.startsWith('/marketing-center-v5/payment-links') || location.pathname.startsWith('/marketing-center-v5/open-links')
   const ccRoles = [
     { email: 'sales.lead@dinoai.ai', label: lang === 'en' ? 'CC manager' : 'CC 主管' },
@@ -136,7 +136,7 @@ export default function AppLayout() {
     { key: '/marketing-center-v5/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
     ...((can('salesV3') !== 'none' || can('marketingV2_landing') !== 'none')
       ? [
-          { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: 'Create Payment Link' },
+          { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' },
           { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
         ]
       : []),
@@ -184,7 +184,7 @@ export default function AppLayout() {
         { key: '/marketing-center-v5/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
         { key: 'landing-placeholder', icon: <LinkOutlined />, label: placeholder(lang === 'en' ? 'Landing Page Management' : '落地页管理'), disabled: true },
         { key: '/marketing-center-v6/skins', icon: <SkinOutlined />, label: lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理' },
-        { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: 'Create Payment Link' },
+        { key: '/marketing-center-v5/payment-links', icon: <CreditCardOutlined />, label: lang === 'en' ? 'Personal Payment Link' : '专属支付链接' },
         { key: '/marketing-center-v5/open-links', icon: <QrcodeOutlined />, label: lang === 'en' ? 'Open Payment Link' : '通用支付链接' },
       ],
     },
@@ -208,7 +208,7 @@ export default function AppLayout() {
     '/marketing-center-v5/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-center-v5/skins': lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理',
     '/marketing-center-v6/skins': lang === 'en' ? 'Landing page skin management' : '落地页皮肤管理',
-    '/marketing-center-v5/payment-links': 'Create Payment Link',
+    '/marketing-center-v5/payment-links': lang === 'en' ? 'Personal Payment Link' : '专属支付链接',
     '/marketing-center-v5/open-links': lang === 'en' ? 'Open Payment Link' : '通用支付链接',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),

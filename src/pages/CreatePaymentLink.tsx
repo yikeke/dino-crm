@@ -20,7 +20,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, DownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -73,8 +73,6 @@ import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
 type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired' | 'void'
-
-const OPEN_ORDER_PREVIEW = 10
 
 function depositFloor(line: string, payable: number) {
   if (line === 'Vietnam' || line === '越南') {
@@ -131,7 +129,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [validUntil, setValidUntil] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [screen, setScreen] = useState<'list' | 'form'>(presetUserId ? 'form' : 'list')
-  const [keyword, setKeyword] = useState(focusLinkId)
+  const [keyword, setKeyword] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const [scene, setScene] = useState<Scene>('all')
   const [lineFilter, setLineFilter] = useState<string | undefined>()
@@ -141,7 +139,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [qrImage, setQrImage] = useState('')
   const [methodTarget, setMethodTarget] = useState<{ link: PaymentLink; stage: PayStage } | null>(null)
   const [methodDraft, setMethodDraft] = useState<string[]>([])
-  const [expanded, setExpanded] = useState<string[]>(focusLinkId ? [focusLinkId] : [])
   const [memberTarget, setMemberTarget] = useState<string | null>(null)
   const [memberLink, setMemberLink] = useState('')
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
@@ -208,9 +205,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const planKey = shown.map((offer) => offer.skuId).join(',')
 
   useEffect(() => {
-    if (!presetUserId && !focusLinkId) return
+    if (!presetUserId) return
     setSearchParams({}, { replace: true })
-  }, [presetUserId, focusLinkId, setSearchParams])
+  }, [presetUserId, setSearchParams])
+
+  const openDetail = (id: string) => setSearchParams({ link: id })
+  const closeDetail = () => setSearchParams({})
 
   useEffect(() => {
     if (!qrTarget?.url) {
@@ -1049,8 +1049,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       width: 240,
       render: (_: unknown, row: PaymentLink) => (
         <div className="pl-two-line">
-          {row.audience === 'open' && <b>{row.eventName || '—'}</b>}
-          <Typography.Text className="pl-link-id">{row.id}</Typography.Text>
+          {row.audience === 'open' && <a className="pl-link-title" onClick={() => openDetail(row.id)}>{row.eventName || '—'}</a>}
+          <a className="pl-link-id" onClick={() => openDetail(row.id)}>{row.id}</a>
           {row.audience === 'open'
             ? <Typography.Text type="secondary">{en ? 'Payer bound at login' : '付款人扫码登录后绑定'}</Typography.Text>
             : (
@@ -1169,6 +1169,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       fixed: 'right' as const,
       render: (_: unknown, row: PaymentLink) => (
         <Space direction="vertical" size={4}>
+          <Button size="small" type="link" icon={<RightOutlined />} className="pl-history-btn" onClick={() => openDetail(row.id)}>{en ? 'Details' : '查看详情'}</Button>
           {linkActions(row)}
           <Button size="small" type="link" icon={<HistoryOutlined />} className="pl-history-btn" onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
           {row.status === 'ACTIVE' && (
@@ -1279,43 +1280,113 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     )
   }
 
-  const openRows = (row: PaymentLink) => {
+  const openOrders = (row: PaymentLink) => {
     const txns = txnsOf(row.id)
-    const orders = ordersOf(row.id)
-    const paid = txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))
+    const orders = [...ordersOf(row.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    const paidCount = orders.filter((order) => orderState(order, linkTxns).state === 'COMPLETED').length
     return (
-      <div className="pl-legs">
-        {paid.length ? (
-          <div className="pl-open-list">
-            {paid.slice(0, OPEN_ORDER_PREVIEW).map((txn) => {
-              const order = orders.find((item) => item.orderNo === txn.orderNo)
-              return (
-                <div key={txn.txnId} className="pl-open-list__row">
-                  <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(txn.orderNo, txn.txnId)}>{txn.orderNo}</Button>
-                  <Typography.Text type="secondary">{order?.userId}</Typography.Text>
-                  <span>{order?.skuName}</span>
-                  <b>{formatMoney(txn.amount, txn.currency)}</b>
-                  <span>{methodName(row, txn.method)} · {txn.txnId}</span>
-                  <Typography.Text type="secondary">{(txn.paidAt || '').slice(0, 16)}</Typography.Text>
-                </div>
-              )
-            })}
+      <Table
+        rowKey="orderNo"
+        size="middle"
+        pagination={{ pageSize: 20, hideOnSinglePage: true }}
+        dataSource={orders}
+        locale={{ emptyText: <Empty description={en ? 'No one has paid yet. Each payment is one order with one transaction.' : '还没有人付款。每笔付款是一张订单 + 一笔交易。'} /> }}
+        title={() => (
+          <div className="pl-detail-orders__head">
+            <span>{en ? `${orders.length} orders · ${paidCount} paid` : `共 ${orders.length} 张订单 · 已支付 ${paidCount} 张`}</span>
+            {orders.length > 0 && (
+              <Button size="small" type="link" onClick={() => navigate(`/orders?payment_link_id=${encodeURIComponent(row.id)}`)}>
+                {en ? 'Open in the order center' : '在订单中心查看'}
+              </Button>
+            )}
           </div>
-        ) : (
-          <Typography.Text type="secondary">{en ? 'No one has paid yet. Each payment is one order with one transaction.' : '还没有人付款。每笔付款是一张订单 + 一笔交易。'}</Typography.Text>
         )}
-        <div className="pl-legs__note pl-open-foot">
-          <span>
-            {en
-              ? `${paid.length} paid${paid.length > OPEN_ORDER_PREVIEW ? ` · latest ${OPEN_ORDER_PREVIEW} shown` : ''}`
-              : `已支付 ${paid.length} 单${paid.length > OPEN_ORDER_PREVIEW ? ` · 这里只显示最近 ${OPEN_ORDER_PREVIEW} 单` : ''}`}
-          </span>
-          {orders.length > 0 && (
-            <Button size="small" type="link" onClick={() => navigate(`/orders?payment_link_id=${encodeURIComponent(row.id)}`)}>
-              {en ? `View all ${orders.length} orders in the order center` : `在订单中心查看全部 ${orders.length} 单`}
-            </Button>
-          )}
+        columns={[
+          { title: en ? 'Order no.' : '订单号', dataIndex: 'orderNo', width: 200, render: (value: string) => <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(value)}>{value}</Button> },
+          { title: 'User ID', dataIndex: 'userId', width: 200, render: (value?: string) => <Typography.Text copyable={!!value}>{value || '—'}</Typography.Text> },
+          { title: 'SKU', dataIndex: 'skuName', width: 170, render: (value?: string) => value || '—' },
+          { title: en ? 'Payable' : '应付', dataIndex: 'payable', width: 140, render: (value: number, order: WebOrder) => formatMoney(value, order.currency) },
+          { title: en ? 'Order status' : '订单状态', key: 'state', width: 110, render: (_: unknown, order: WebOrder) => orderStateTag(order) },
+          {
+            title: en ? 'Payment' : '支付方式 · 交易号',
+            key: 'txn',
+            render: (_: unknown, order: WebOrder) => {
+              const mine = txns.filter((txn) => txn.orderNo === order.orderNo).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              const live = mine.find((txn) => txn.status === 'SUCCESS') || mine.find((txn) => txn.status === 'PENDING') || mine[0]
+              return live ? txnLine(row, live) : <Typography.Text type="secondary">{en ? 'No transaction yet' : '暂无交易'}</Typography.Text>
+            },
+          },
+        ]}
+      />
+    )
+  }
+
+  const detailField = (label: string, value: React.ReactNode) => (
+    <div className="pl-detail-field">
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      <div>{value}</div>
+    </div>
+  )
+
+  const detailPage = (row: PaymentLink) => {
+    const status = linkStatus(row)
+    const paid = collected(row)
+    const open = row.audience === 'open'
+    const prices = (row.offers || []).map((item) => item.payable).filter((value) => value > 0)
+    const amount = row.kind === 'deposit'
+      ? `${formatMoney(row.payable, row.currency)}（${en ? 'first' : '首款'} ${formatMoney(row.amount, '')} + ${en ? 'balance' : '尾款'} ${formatMoney(Math.max(row.payable - row.amount, 0), '')}）`
+      : prices.length > 1 ? `${formatMoney(Math.min(...prices), '')} – ${formatMoney(Math.max(...prices), row.currency)}` : formatMoney(prices[0] || row.payable, row.currency)
+    return (
+      <div className="pl-detail">
+        <div className="pl-form-head">
+          <Button icon={<ArrowLeftOutlined />} onClick={closeDetail}>{en ? 'Back to list' : '返回列表'}</Button>
+          <div className="pl-form-head__title">
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              {open ? (row.eventName || row.id) : row.id}
+              <Tag color={status.color} bordered={false} style={{ marginLeft: 8 }}>{status.label}</Tag>
+              {!open && (row.kind === 'full' ? <Tag color="green">{en ? 'Full' : '全款'}</Tag> : <Tag color="orange">{en ? 'Deposit' : '定金'}</Tag>)}
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              {open ? `${row.id} · ${en ? 'Open payment link' : '通用支付链接'}` : `${en ? 'Personal payment link' : '专属支付链接'} · User ID ${row.userId || '—'}`}
+            </Typography.Text>
+          </div>
+          <Space wrap className="pl-detail__actions">
+            {linkActions(row)}
+            <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
+            {!open && row.userId && (
+              <Button size="small" type="link" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberLink(row.id); setMemberDays(7) }}>
+                {en ? 'Add membership' : '添加会员'}
+              </Button>
+            )}
+            {row.status === 'ACTIVE' && editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
+            {row.status === 'ACTIVE' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
+              <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
+            )}
+          </Space>
         </div>
+        <Card size="small" title={en ? 'Link' : '链接信息'}>
+          <div className="pl-detail-grid">
+            {open
+              ? detailField(en ? 'Payer' : '付款人', en ? 'Bound to the account that logs in' : '扫码登录后绑定')
+              : detailField('User ID', <Typography.Text copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>)}
+            {detailField(en ? 'Channel' : '渠道', `${enValue(row.line)} · ${row.channelName || '—'}`)}
+            {detailField('SKU', (row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName)}
+            {detailField(en ? 'Amount' : '金额', amount)}
+            {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
+            {open
+              ? detailField(en ? 'Valid until' : '有效期', row.validUntil || (en ? 'No end date' : '不限'))
+              : row.kind === 'deposit' && row.status === 'ACTIVE' ? detailField(en ? 'Balance deadline' : '尾款截止', dueLine(row) || '—') : null}
+            {detailField(en ? 'Collected' : '已收', paid.length
+              ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${en ? `${paid.length} successful` : `${paid.length} 笔成功交易`}`
+              : (en ? 'Nothing yet' : '暂无'))}
+            {detailField(en ? 'Creator' : '创建人', `${actorName(row.createdBy)}${row.createdBy ? ` · ${row.createdBy}` : ''}`)}
+            {detailField(en ? 'Created / Updated' : '创建 / 更新', `${row.createdAt} / ${row.updatedAt}`)}
+            {detailField(en ? 'Link URL' : '链接地址', <Typography.Text copyable className="pl-detail-url">{row.url}</Typography.Text>)}
+          </div>
+        </Card>
+        <Card size="small" title={open ? (en ? 'Orders' : '订单') : (en ? 'Order and transactions' : '订单与交易')} className="pl-detail-orders">
+          {open ? openOrders(row) : stageRows(row)}
+        </Card>
       </div>
     )
   }
@@ -1422,12 +1493,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setOnlyMine(false)
     setScene('all')
   }
-  const depositKey = rows.filter((row) => row.kind === 'deposit').map((row) => row.id).sort().join('|')
-  useEffect(() => {
-    if (focusLinkId) return
-    setExpanded(depositKey ? depositKey.split('|') : [])
-  }, [depositKey, focusLinkId])
-
   const openCreate = (kind: 'full' | 'deposit', who: 'user' | 'open' = 'user') => {
     setEditingId(null)
     resetCustomer()
@@ -1445,7 +1510,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             <Typography.Title level={5} style={{ margin: 0 }}>
               {openPage
                 ? (editingId ? (en ? 'Edit open payment link' : '编辑通用支付链接') : (en ? 'New open payment link' : '新建通用支付链接'))
-                : (editingId ? (en ? 'Edit payment link' : '编辑支付链接') : (en ? 'New payment link' : '新建支付链接'))}
+                : (editingId ? (en ? 'Edit personal payment link' : '编辑专属支付链接') : (en ? 'New personal payment link' : '新建专属支付链接'))}
             </Typography.Title>
             <Typography.Text type="secondary">
               {openPage
@@ -1459,8 +1524,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     )
   }
 
+  const detailRow = focusLinkId ? links.find((row) => row.id === focusLinkId && (row.audience === 'open') === openPage) : undefined
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
+      {detailRow ? detailPage(detailRow) : (
+      <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <Segmented
           value={scene}
@@ -1480,7 +1549,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         />
         {openPage
           ? <Button type="primary" icon={<QrcodeOutlined />} onClick={() => openCreate('full', 'open')}>{en ? 'New open payment link' : '新建通用支付链接'}</Button>
-          : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New payment link' : '新建支付链接'}</Button>}
+          : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
       </div>
       <Space wrap>
         <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link / user / order no.' : '活动 / 链接 / User ID / 订单号') : (en ? 'Link / user / order no.' : '链接 / User ID / 订单号')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
@@ -1504,11 +1573,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each payment is one order with one transaction. Expand a row to see the latest paid orders.'
-            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，每笔付款是一张订单 + 一笔交易；展开看最近的已支付订单。')
+            ? 'Each row is one expo or printed QR code. Anyone who scans logs in and pays; each payment is one order with one transaction. Click a link to see all its orders.'
+            : '每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，每笔付款是一张订单 + 一笔交易；点击链接进入详情查看全部订单。')
           : en
-          ? `Each row is one payment link with one web order; expand it to see the order and its transactions. Links that offer bank transfer get the order when the link is created; otherwise when the customer presses pay. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
-          : `每一行是一条支付链接，对应一张 Web Order；展开看订单和它下面的交易。挂了银行转账的链接在创建时就生成订单，只挂三方支付的在用户点支付时生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one personal payment link with one web order; click it to see the order and its transactions. Links that offer bank transfer get the order when the link is created; otherwise when the customer presses pay. ${ccManager ? 'As a CC manager you can confirm bank transfers and move the balance deadline of unpaid deposits.' : 'As a CC you see the balance deadline; ask your CC manager to move it or to confirm bank transfers.'}`
+          : `每一行是一条专属支付链接，对应一张 Web Order；点击链接进入详情查看订单和它下面的交易。挂了银行转账的链接在创建时就生成订单，只挂三方支付的在用户点支付时生成。${ccManager ? '当前是 CC 主管：可以确认银行转账，并调整未付尾款定金的截止时间。' : '当前是普通 CC：可以看到尾款截止时间；调整截止时间、确认银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"
@@ -1518,22 +1587,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         dataSource={rows}
         pagination={false}
         scroll={{ x: 1850 }}
-        expandable={{
-          expandedRowKeys: expanded,
-          onExpandedRowsChange: (keys) => setExpanded(keys.map(String)),
-          expandedRowRender: (row: PaymentLink) => (row.audience === 'open' ? openRows(row) : stageRows(row)),
-          expandIcon: ({ expanded: open, record, onExpand }) => (
-            <Button
-              type="text"
-              size="small"
-              icon={open ? <DownOutlined /> : <RightOutlined />}
-              onClick={(event) => onExpand(record, event)}
-            />
-          ),
-        }}
-        rowClassName={(row: PaymentLink) => [expanded.includes(row.id) ? 'pl-row--open' : '', row.status === 'VOID' ? 'pl-row--void' : ''].join(' ')}
-        locale={{ emptyText: openPage ? (en ? 'No open payment links yet' : '还没有通用支付链接') : (en ? 'No payment links yet' : '还没有支付链接') }}
+        rowClassName={(row: PaymentLink) => (row.status === 'VOID' ? 'pl-row--void' : '')}
+        locale={{ emptyText: openPage ? (en ? 'No open payment links yet' : '还没有通用支付链接') : (en ? 'No personal payment links yet' : '还没有专属支付链接') }}
       />
+      </>
+      )}
       <Modal
         title={methodTarget ? `${stageName(methodTarget.stage)} · ${en ? 'payment methods' : '支付方式'}` : ''}
         open={!!methodTarget}

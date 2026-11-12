@@ -302,6 +302,8 @@ export type OrderTransaction = {
   payStage?: 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
 }
 
+export type OrderSource = 'APP' | 'LANDING_PAGE' | 'PAYMENT_LINK'
+
 export type Order = {
   orderId: string
   productName: string
@@ -316,6 +318,10 @@ export type Order = {
   validUntil?: string // 有效期到期时间
   /** Payment Link orders: the link the customer paid through (web_order.payment_link_id). */
   paymentLinkId?: string
+  /** Where the order was placed. Landing page and payment link orders are both web orders, so this keeps them apart. */
+  orderSource?: OrderSource
+  /** Payment Link orders: personal (one User ID) or open (expo QR). */
+  paymentLinkType?: 'PERSONAL' | 'OPEN'
   transactions: OrderTransaction[]
 }
 

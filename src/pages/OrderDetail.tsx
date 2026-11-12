@@ -12,6 +12,7 @@ import { usePerm } from '../perm'
 import LocalTime from '../components/LocalTime'
 import { resolveUserType } from '../userType'
 import { findPaymentLink } from '../paymentLinkStore'
+import OrderSourceTag from '../components/OrderSourceTag'
 
 const { Text } = Typography
 
@@ -42,7 +43,7 @@ function money(amount: number, currency: string) {
 
 export default function OrderDetail({ backPath = '/orders' }: { backPath?: string }) {
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const d = useDashboardText()
   const dashboardContext = useDashboardContext()
   const { orderId = '' } = useParams()
@@ -105,6 +106,7 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
           <Descriptions.Item label={t('order.col.orderStatus')}><Tag color={STATUS_COLOR[order.orderStatus]}>{t(`enum.order.${order.orderStatus}`)}</Tag></Descriptions.Item>
           <Descriptions.Item label={t('order.col.original')}>{money(order.originalPrice, order.currency)}</Descriptions.Item>
           <Descriptions.Item label={t('order.col.paid')}>{money(order.paidAmount, order.currency)}</Descriptions.Item>
+          <Descriptions.Item label={lang === 'en' ? 'Order source' : '订单来源'}><OrderSourceTag order={order} /></Descriptions.Item>
           <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
           {order.paymentLinkId && (
             <Descriptions.Item label={d('sourceLink')}>

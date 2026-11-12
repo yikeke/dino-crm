@@ -1,5 +1,5 @@
 import { setState } from './store'
-import type { Order, OrderStatus, OrderTransaction } from './types'
+import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
 export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v7'
@@ -402,6 +402,13 @@ const TXN_STATUS: Record<TxnStatus, OrderTransaction['status']> = { PENDING: '�
 const ORDER_STATUS: Record<OrderState, OrderStatus> = { PENDING: '待支付', PARTIALLY_PAID: '部分付款', COMPLETED: '已支付', CANCELLED: '已取消' }
 const STAGE_EVENT: Record<PayStage, string> = { FULL: '全款', DEPOSIT_FIRST: '定金首款', DEPOSIT_BALANCE: '定金尾款' }
 
+/** App store orders are APP; web orders without a payment link came from a landing page. */
+export function orderSourceOf(order: Pick<Order, 'orderSource' | 'payMethod'>): OrderSource {
+  if (order.orderSource) return order.orderSource
+  if (order.payMethod === 'App Store' || order.payMethod === 'Google Play') return 'APP'
+  return order.payMethod === 'Payment Link' ? 'PAYMENT_LINK' : 'LANDING_PAGE'
+}
+
 /** Order center: one row per web order, its transactions underneath. */
 function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
   return orders.map((order) => {
@@ -433,6 +440,8 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
         currency: order.currency,
         paidTime: paidAt,
         paymentLinkId: order.paymentLinkId,
+        orderSource: 'PAYMENT_LINK',
+        paymentLinkType: findPaymentLink(order.paymentLinkId)?.audience === 'open' ? 'OPEN' : 'PERSONAL',
         transactions,
       } as Order,
     }

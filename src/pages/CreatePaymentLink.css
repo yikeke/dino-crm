@@ -724,6 +724,43 @@
   font-size: 12px;
 }
 
+.pl-link-title {
+  font-weight: 600;
+}
+
+.pl-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.pl-detail__actions {
+  margin-left: auto;
+}
+
+.pl-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+
+.pl-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pl-detail-url {
+  word-break: break-all;
+  font-size: 12px;
+}
+
+.pl-detail-orders__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .pl-open-list {
   display: grid;
   gap: 2px;
