@@ -135,8 +135,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
   const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
   const [qrImage, setQrImage] = useState('')
-  const [methodTarget, setMethodTarget] = useState<{ link: PaymentLink; stage: PayStage } | null>(null)
-  const [methodDraft, setMethodDraft] = useState<string[]>([])
   const [memberTarget, setMemberTarget] = useState<string | null>(null)
   const [memberLink, setMemberLink] = useState('')
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
@@ -1180,7 +1178,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           const failed = mine.filter((txn) => txn.status === 'FAILED')
           const waiting = stage === 'DEPOSIT_BALANCE' && !firstPaid
           const amount = stage === 'FULL' && !offer ? (live?.amount ?? 0) : stageAmount(row, stage, offer, txns)
-          const changeable = !paid && row.status === 'ACTIVE' && !!collectingStage
           const canConfirm = canConfirmBank && row.status === 'ACTIVE' && collectingStage === stage && stageMethods(row, stage).includes('bank_transfer')
           return (
             <div key={stage} className={`pl-leg${paid ? ' is-paid' : ''}`}>
@@ -1212,11 +1209,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </div>
               <div className="pl-leg__actions">
                 {methodsCell(row, stageMethods(row, stage))}
-                {changeable && (
-                  <Button size="small" type="link" icon={<EditOutlined />} onClick={() => { setMethodTarget({ link: row, stage }); setMethodDraft(stageMethods(row, stage)) }}>
-                    {en ? 'Methods' : '改支付方式'}
-                  </Button>
-                )}
               </div>
             </div>
           )
@@ -1359,32 +1351,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         </Card>
       </div>
     )
-  }
-
-  const saveStageMethods = () => {
-    if (!methodTarget) return
-    if (!methodDraft.length) {
-      message.warning(en ? 'Select at least one payment method' : '请至少选择一种支付方式')
-      return
-    }
-    const { link, stage } = methodTarget
-    persist(links.map((item) => {
-      if (item.id !== link.id) return item
-      const update = stage === 'DEPOSIT_BALANCE'
-        ? { balanceMethods: methodDraft }
-        : { methods: methodDraft, balanceMethods: item.kind === 'deposit' ? (item.balanceMethods || item.methods) : undefined }
-      return {
-        ...item,
-        ...update,
-        updatedAt: nowText(),
-        history: [...(item.history || []), historyEntry(myEmail || 'admin@dinoai.ai', '修改支付方式', `${stageName(stage)}：${methodDraft.map((code) => methodName(item, code)).join('、')}`)],
-      }
-    }))
-    const changed = readPaymentLinks().find((item) => item.id === link.id)
-    if (changed) syncUpfrontOrder(changed)
-    reload()
-    setMethodTarget(null)
-    message.success(en ? 'Payment methods updated. The link stays the same.' : '支付方式已更新，链接地址不变。')
   }
 
   const addMembership = () => {
@@ -1541,32 +1507,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       />
       </>
       )}
-      <Modal
-        title={methodTarget ? `${stageName(methodTarget.stage)} · ${en ? 'payment methods' : '支付方式'}` : ''}
-        open={!!methodTarget}
-        onCancel={() => setMethodTarget(null)}
-        onOk={saveStageMethods}
-        okText={en ? 'Save' : '保存'}
-        cancelText={en ? 'Cancel' : '取消'}
-      >
-        <Typography.Paragraph type="secondary">
-          {en
-            ? 'Pick again from every method on this line; you can add methods that were not offered before. Only the payment not yet made is affected. The customer still picks one method when paying, and that order keeps it. The link address does not change.'
-            : '从这条业务线的全部支付方式里重新勾选，可以新增原来没给的方式。只影响还没付的这一笔；用户付款时从中选一种，生成的订单就用那一种。链接地址不变。'}
-        </Typography.Paragraph>
-        <Checkbox.Group value={methodDraft} onChange={(value) => setMethodDraft(value as string[])}>
-          <Space direction="vertical">
-            {methodTarget && methodsForLine(methodTarget.link.line).filter((method) => !(methodTarget.link.audience === 'open' && method.kind === 'manual')).map((method) => (
-              <Checkbox key={method.code} value={method.code}>
-                <span className="pl-method">
-                  <img src={method.icon} alt="" />
-                  {methodDisplayName(method, en ? 'en' : 'zh')}
-                </span>
-              </Checkbox>
-            ))}
-          </Space>
-        </Checkbox.Group>
-      </Modal>
       <Drawer
         title={`${historyOf?.id || ''} · ${en ? 'Operation history' : '操作记录'}`}
         open={!!historyOf}
@@ -1578,8 +1518,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           showIcon
           style={{ marginBottom: 16 }}
           message={en
-            ? 'Creating, editing, changing methods, stopping or resuming payments, confirming transfers and adding membership are logged with the operator.'
-            : '新建、编辑、改支付方式、停止 / 恢复收款、确认转账、添加会员都会记录操作人和变更内容。'}
+            ? 'Creating, editing, stopping or resuming payments, confirming transfers and adding membership are logged with the operator.'
+            : '新建、编辑、停止 / 恢复收款、确认转账、添加会员都会记录操作人和变更内容。'}
         />
         <Table
           rowKey="id"
