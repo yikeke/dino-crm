@@ -455,13 +455,37 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
   }
 
+  const confirmTransferSafely = (row: PaymentLink, skuId?: string) => {
+    const stage = currentStage(row, txnsOf(row.id))
+    const first = stage === 'DEPOSIT_FIRST'
+    const order = ordersOf(row.id).find((item) => !item.cancelled)
+    const offer = row.offers.find((item) => item.skuId === (skuId || order?.skuId)) || (row.offers.length === 1 ? row.offers[0] : undefined)
+    const amount = first ? row.amount : stage === 'DEPOSIT_BALANCE' ? Math.max(row.payable - row.amount, 0) : offer?.payable || row.payable
+    Modal.confirm({
+      title: first ? (en ? 'Confirm the first payment arrived?' : '确认首款已到账？') : (en ? 'Confirm the transfer and open membership?' : '确认到账并开通会员？'),
+      content: (
+        <div className="pl-confirm-modal">
+          <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
+          <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
+          <p>{stageName(stage || 'FULL')}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
+          <p>{first
+            ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
+            : (en ? 'Membership opens right away. This cannot be undone.' : '确认后马上开通会员，不能撤销。')}</p>
+        </div>
+      ),
+      okText: first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员'),
+      cancelText: en ? 'Cancel' : '取消',
+      onOk: () => confirmTransfer(row, skuId),
+    })
+  }
+
   const askConfirm = (row: PaymentLink) => {
     const order = ordersOf(row.id).find((item) => !item.cancelled)
     if (row.offers.length > 1 && !order?.skuId) {
       setConfirmTarget({ link: row, skuId: row.offers[0]?.skuId || '' })
       return
     }
-    confirmTransfer(row)
+    confirmTransferSafely(row)
   }
 
   const linkedStudent = students.find((student) => student.studentId === linkedUserId)
@@ -1171,7 +1195,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </Typography.Text>
               <Typography.Text type="secondary" className="pl-leg__relation">
                 {order.origin === 'link'
-                  ? (en ? 'Created with the link (bank transfer offered)' : '链接含银行转账，创建链接时已生成')
+                  ? (en ? 'Created with the link (manual bank transfer offered)' : '链接含手动银行转账，创建链接时已生成')
                   : (en ? 'Created when the customer reached the payment page' : '用户进入三方支付页时生成')}
               </Typography.Text>
             </>
@@ -1273,7 +1297,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             render: (value: string, order: WebOrder) => (
               <div className="pl-two-line">
                 <Typography.Text className="pl-order-no" copyable>{value}</Typography.Text>
-                {order.origin === 'link' && <Typography.Text type="secondary">{en ? 'Created with the link (bank transfer)' : '创建链接时生成（银行转账）'}</Typography.Text>}
+                {order.origin === 'link' && <Typography.Text type="secondary">{en ? 'Created with the link (manual bank transfer)' : '创建链接时生成（手动银行转账）'}</Typography.Text>}
               </div>
             ),
           },
@@ -1503,8 +1527,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy links and QR codes; ask your CC manager to create or edit.'}`
             : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制链接和二维码；新建、编辑需要 CC 主管。'}`)
           : en
-          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer bank transfer get an order when the link is created, for the manager to confirm the transfer. Valid-until controls when a link stops taking payments; deposits must be fully paid by then. ${ccManager ? 'As a CC manager you can confirm bank transfers.' : 'Ask your CC manager to confirm bank transfers.'}`
-          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了银行转账的链接在创建时就生成一张订单，供主管确认转账。有效期决定链接什么时候停止收款，定金的首款和尾款都要在有效期内付完。${ccManager ? '当前是 CC 主管：可以确认银行转账。' : '确认银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer manual bank transfer get an order when the link is created, for the manager to confirm the transfer. Valid-until controls when a link stops taking payments; deposits must be fully paid by then. ${ccManager ? 'As a CC manager you can confirm manual bank transfers.' : 'Ask your CC manager to confirm manual bank transfers.'}`
+          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了手动银行转账的链接在创建时就生成一张订单，供主管确认转账。有效期决定链接什么时候停止收款，定金的首款和尾款都要在有效期内付完。${ccManager ? '当前是 CC 主管：可以确认手动银行转账。' : '确认手动银行转账需要 CC 主管操作。'}`}
       />
       <Table
         className="pl-table"
@@ -1550,10 +1574,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         />
       </Drawer>
       <Modal
-        title={en ? 'Confirm bank transfer' : '确认银行转账'}
+        title={en ? 'Confirm manual bank transfer' : '确认手动银行转账'}
         open={!!confirmTarget}
         onCancel={() => setConfirmTarget(null)}
-        onOk={() => confirmTarget && confirmTransfer(confirmTarget.link, confirmTarget.skuId)}
+        onOk={() => { if (!confirmTarget) return; const { link, skuId } = confirmTarget; setConfirmTarget(null); confirmTransferSafely(link, skuId) }}
         okText={en ? 'Confirm' : '确认到账'}
         cancelText={en ? 'Cancel' : '取消'}
         destroyOnClose

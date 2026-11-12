@@ -234,7 +234,7 @@ const BANK_EN: BankCopy = {
   notedTitle: 'We have recorded your transfer notice',
   notedBody: 'Membership opens after the payment is confirmed. On business days this usually takes about an hour.',
   copied: 'Copied',
-  methodName: 'Bank transfer',
+  methodName: 'Manual bank transfer',
 }
 
 const BANK_ZH: BankCopy = {
@@ -251,7 +251,7 @@ const BANK_ZH: BankCopy = {
   notedTitle: '已记下你的转账申报',
   notedBody: '确认到账后才会开通会员。工作日通常大约 1 小时内完成。',
   copied: '已复制',
-  methodName: '银行转账',
+  methodName: '手动银行转账',
 }
 
 export function bankCopy(lang: ReviewLang): BankCopy {

@@ -2,7 +2,7 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v12'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v13'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
@@ -10,7 +10,7 @@ export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12',
   'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
 
@@ -519,7 +519,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
     'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 391,000 VND，有效期至 ${day(7)}`]] },
-    'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Bank transfer']] },
+    'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · 手动银行转账']] },
     'PL-FULL-PAID': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Card、Kakao Pay']] },
     'PL-OPEN-KR': { by: lead, log: [[lead, '新建通用链接', 'Seoul Edu Expo 2026 · Booth B12，有效期至 2026-11-30'], [lead, '编辑链接', '支付方式 Card → Card、Kakao Pay', '2026-10-27 11:40']] },
     'PL-FULL-WAIT': { by: cc, log: [[cc, '新建全款链接', '4 个 SKU · Card、Kakao Pay']] },
