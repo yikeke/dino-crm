@@ -479,7 +479,6 @@ function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
   const [level, setLevel] = useState('')
   const [goal, setGoal] = useState('')
   const [learning, setLearning] = useState('')
-  const [callPref, setCallPref] = useState('')
   const levels = toArabic(englishLevelOptions(age), AR_LEVEL)
   return (
     <div className="lp-pay">
@@ -499,17 +498,6 @@ function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
       {age ? <LeadSelect label="مستوى الإنجليزية" value={level} placeholder="اختر المستوى" options={levels} onChange={setLevel} /> : null}
       <LeadSelect label="هدف التعلّم" value={goal} placeholder="اختر هدفًا" options={toArabic(LEARNING_GOALS, AR_GOAL)} onChange={setGoal} />
       <LeadSelect label="كيف يتعلم طفلك الإنجليزية حاليًا؟" value={learning} placeholder="اختر واحدًا" options={toArabic(CURRENTLY_LEARNING, AR_LEARNING)} onChange={setLearning} />
-      <p className="lp-lead-optional">اختر وقتًا لنتصل بك (اختياري)</p>
-      <LeadSelect
-        label="هل تريد أن يتصل بك مستشارنا التعليمي في وقت محدد؟"
-        value={callPref}
-        placeholder="لا يهم"
-        options={[
-          { id: 'yes', label: 'نعم، اختر وقتًا' },
-          { id: 'no', label: 'لا يهم' },
-        ]}
-        onChange={setCallPref}
-      />
       <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={onContinue}>متابعة</button>
     </div>
   )
@@ -522,7 +510,7 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   download: '后续交互 · 下载 App 弹窗',
   lead_my: '后续交互 Page 2 · 马来补充资料（四项选填 + 预约）',
   lead_vn: '后续交互 Page 2 · 越南补充资料（两项选填 + 预约）',
-  lead_sa: '后续交互 Page 2 · 沙特补充资料（阿语，四项选填 + 预约）',
+  lead_sa: '后续交互 Page 2 · 沙特补充资料（阿语，四项选填，不展示预约时间）',
   lead_done: '后续交互 Page 3 · 完成 → 下一步出下载 App',
   onelink: '打开 OneLink（原型模拟）',
 }
