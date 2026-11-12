@@ -241,6 +241,22 @@
 
 /* 10.7 登录区 */
 .skin-login-state { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
+.skin-layout-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; }
+.skin-layout-card { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 10px; border: 1px solid #d0d3d9; border-radius: 8px; background: #fff; cursor: pointer; font: inherit; color: inherit; transition: border-color .15s, box-shadow .15s; }
+.skin-layout-card:hover:not(:disabled) { border-color: #85a5ff; }
+.skin-layout-card.is-on { border-color: #2f54eb; box-shadow: 0 0 0 2px #dbe5ff; }
+.skin-layout-card:disabled { cursor: not-allowed; opacity: .55; }
+.skin-layout-card > b { font-weight: 600; }
+.skin-layout-mini { height: 96px; border-radius: 6px; background: #f2f4f7; padding: 8px 18px; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.skin-layout-mini i { display: block; height: 10px; border-radius: 5px; background: #c9d3e6; }
+.skin-layout-mini i.f { height: 12px; background: #fff; border: 1px solid #d5dae3; border-radius: 4px; }
+.skin-layout-mini i.c { height: 12px; background: #ffb35c; }
+.skin-layout-mini i.p { height: 12px; border-radius: 6px; background: #fff; border: 1px solid #c9d3e6; }
+.skin-layout-mini .dots { display: flex; gap: 6px; justify-content: center; margin-top: 2px; }
+.skin-layout-mini .dots i { width: 12px; height: 12px; border-radius: 50%; }
+.skin-layout-mini .dv { display: flex; align-items: center; gap: 6px; color: #8f959e; font-size: 10px; line-height: 1; }
+.skin-layout-mini .dv::before, .skin-layout-mini .dv::after { content: ''; flex: 1; height: 1px; background: #c9d3e6; }
+.skin-layout-hint { color: #8f959e; font-size: 12px; line-height: 1.5; }
 .skin-login-order { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
 .skin-login-order li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
 .skin-login-order li b { flex: 1; font-weight: 500; }

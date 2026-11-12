@@ -688,16 +688,38 @@ export default function LandingSkinManagement() {
               <div className="skin-form-row">
                 <label>{en ? 'Layout' : '登录区样式'}</label>
                 <div>
-                  <Radio.Group
-                    className="skin-radio-stack"
-                    disabled={!editing.line}
-                    value={login.loginLayout}
-                    onChange={(e) => patchLogin({ loginLayout: e.target.value as LoginLayout })}
-                    options={LOGIN_LAYOUT_OPTIONS.map((x) => ({
-                      value: x.value,
-                      label: <span>{en ? x.en : x.zh}<Text type="secondary" style={{ marginLeft: 8 }}>{en ? x.hintEn : x.hintZh}</Text></span>,
-                    }))}
-                  />
+                  <div className="skin-layout-cards" role="radiogroup">
+                    {LOGIN_LAYOUT_OPTIONS.map((x) => (
+                      <button
+                        key={x.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={login.loginLayout === x.value}
+                        disabled={!editing.line}
+                        className={`skin-layout-card${login.loginLayout === x.value ? ' is-on' : ''}`}
+                        onClick={() => patchLogin({ loginLayout: x.value as LoginLayout })}
+                      >
+                        <b>{en ? x.en : x.zh}</b>
+                        {x.value === 'form_first' ? (
+                          <div className="skin-layout-mini">
+                            <i className="f" />
+                            <i className="f" />
+                            <i className="c" />
+                            <div className="dots"><i /><i /><i /></div>
+                          </div>
+                        ) : (
+                          <div className="skin-layout-mini">
+                            <i className="p" />
+                            <i className="p" />
+                            <i className="p" />
+                            <div className="dv"><span>{en ? 'Other ways' : '其他方式'}</span></div>
+                            <div className="dots"><i /><i /></div>
+                          </div>
+                        )}
+                        <span className="skin-layout-hint">{en ? x.hintEn : x.hintZh}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="skin-form-row">
