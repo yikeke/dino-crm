@@ -580,7 +580,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 {validField}
               </div>
             ) : (
-              <>
+              <div className="pl-grid-2 pl-grid-2--wide">
+              <div>
+                <div className="pl-label">{en ? 'User' : '用户'} <span className="pl-required">*</span></div>
             <AutoComplete
               value={userQuery}
               options={userMatches.map((student) => ({
@@ -618,8 +620,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   : (en ? 'The link is tied to one user. Only that user can pay with it.' : '链接绑定一个用户，只给这个用户付款。')}
               </Typography.Text>
             ) : null}
-            <div className="pl-grid-2 pl-grid-2--wide" style={{ marginTop: 12 }}>{validField}</div>
-              </>
+              </div>
+                {validField}
+              </div>
             )}
           </Card>
 
