@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Alert, Button, Card, Checkbox, Drawer, Empty, Input, Modal, Radio, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, HolderOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
@@ -110,6 +110,63 @@ function SkinCreateGuide({ en }: { en: boolean }) {
           : <>基本配置（业务线、类型）→ 注册配置 → 前置图 / 后置图（表单上 / 下，至少一张；前置第 1 张即首屏）→ SEO 主副标题。配完先预览；暂时保存不上线，提交后发布并生成模板 ID。到「落地页管理 → 皮肤类型」选用。</>}
       </p>
     </div>
+  )
+}
+
+function LoginOrderList({ methods, en, disabled, onReorder, renderExtra }: {
+  methods: LoginMethod[]
+  en: boolean
+  disabled?: boolean
+  onReorder: (next: LoginMethod[]) => void
+  renderExtra: (m: LoginMethod) => ReactNode
+}) {
+  const [dragging, setDragging] = useState<LoginMethod | null>(null)
+  /** Insertion slot 0..methods.length while dragging. */
+  const [slot, setSlot] = useState<number | null>(null)
+  const end = () => { setDragging(null); setSlot(null) }
+  const drop = () => {
+    if (dragging && slot !== null) {
+      const next = methods.filter((x) => x !== dragging)
+      const from = methods.indexOf(dragging)
+      next.splice(slot > from ? slot - 1 : slot, 0, dragging)
+      if (next.some((x, i) => x !== methods[i])) onReorder(next)
+    }
+    end()
+  }
+  return (
+    <ol className={`skin-login-order${dragging ? ' is-dragging' : ''}`} onDragLeave={(e) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setSlot(null)
+    }}>
+      {methods.map((m, i) => (
+        <li
+          key={m}
+          draggable={!disabled}
+          className={[
+            dragging === m ? 'is-source' : '',
+            slot === i ? 'drop-before' : '',
+            slot === methods.length && i === methods.length - 1 ? 'drop-after' : '',
+          ].join(' ')}
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData('text/plain', m)
+            setDragging(m)
+          }}
+          onDragOver={(e) => {
+            if (!dragging) return
+            e.preventDefault()
+            const r = e.currentTarget.getBoundingClientRect()
+            setSlot(e.clientY < r.top + r.height / 2 ? i : i + 1)
+          }}
+          onDrop={(e) => { e.preventDefault(); drop() }}
+          onDragEnd={end}
+        >
+          <HolderOutlined className="skin-login-order-handle" />
+          <span className="skin-login-order-idx">{i + 1}</span>
+          <b>{loginMethodLabel(m, en)}</b>
+          {renderExtra(m)}
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -410,14 +467,6 @@ export default function LandingSkinManagement() {
     const oneLinkLock = pageType === 'lead' && (editing.line === '香港' || editing.line === '日本')
     /** Every login edit goes through the same rules the save path uses. */
     const patchLogin = (patch: Partial<LandingSkin>) => setEditing(normalizeLoginConfig({ ...editing, ...patch }))
-    const moveMethod = (method: LoginMethod, delta: number) => {
-      const next = methods.slice()
-      const i = next.indexOf(method)
-      const j = i + delta
-      if (i < 0 || j < 0 || j >= next.length) return
-      ;[next[i], next[j]] = [next[j], next[i]]
-      patchLogin({ loginOrder: next })
-    }
     const life = skinLifecycle(editing)
     const addAsset = (key: 'registerBefore' | 'registerAfter') =>
       setEditing({ ...editing, [key]: [...editing[key], emptySceneImage()] })
@@ -695,32 +744,26 @@ export default function LandingSkinManagement() {
               <div className="skin-form-row">
                 <label>{en ? 'Order' : '方式顺序'}</label>
                 <div>
-                  <ol className="skin-login-order">
-                    {methods.map((m, i) => (
-                      <li key={m}>
-                        <span className="skin-login-order-idx">{i + 1}</span>
-                        <b>{loginMethodLabel(m, en)}</b>
-                        {twoZone ? (
-                          <Radio.Group
-                            size="small"
-                            optionType="button"
-                            value={secondary.includes(m) ? 'S' : 'P'}
-                            onChange={(e) => patchLogin({
-                              secondaryLogins: e.target.value === 'S' ? [...secondary, m] : secondary.filter((x) => x !== m),
-                            })}
-                            options={[
-                              { value: 'P', label: en ? 'Primary' : '主区' },
-                              { value: 'S', label: en ? 'Other ways' : '其他方式' },
-                            ]}
-                          />
-                        ) : null}
-                        <Space size={4}>
-                          <Button size="small" disabled={i === 0} onClick={() => moveMethod(m, -1)}>↑</Button>
-                          <Button size="small" disabled={i === methods.length - 1} onClick={() => moveMethod(m, 1)}>↓</Button>
-                        </Space>
-                      </li>
-                    ))}
-                  </ol>
+                  <LoginOrderList
+                    methods={methods}
+                    en={en}
+                    disabled={!editing.line}
+                    onReorder={(loginOrder) => patchLogin({ loginOrder })}
+                    renderExtra={(m) => (twoZone ? (
+                      <Radio.Group
+                        size="small"
+                        optionType="button"
+                        value={secondary.includes(m) ? 'S' : 'P'}
+                        onChange={(e) => patchLogin({
+                          secondaryLogins: e.target.value === 'S' ? [...secondary, m] : secondary.filter((x) => x !== m),
+                        })}
+                        options={[
+                          { value: 'P', label: en ? 'Primary' : '主区' },
+                          { value: 'S', label: en ? 'Other ways' : '其他方式' },
+                        ]}
+                      />
+                    ) : null)}
+                  />
                 </div>
               </div>
             </div>
