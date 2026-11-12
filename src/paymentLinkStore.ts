@@ -2,7 +2,7 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v14'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v15'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
@@ -10,7 +10,7 @@ export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13', 'dino-cc-payment-links-v14',
   'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
 
@@ -502,10 +502,9 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   ]
   const lead = 'sales.lead@dinoai.ai'
   const cc = 'sales.kr@dinoai.ai'
-  const ops = 'ops.vn@dinoai.ai'
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
     'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，有效期至 2026-11-27 · KPLUS']] },
-    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [ops, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
+    'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
     'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
     'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 391,000 VND，有效期至 ${day(7)}`]] },

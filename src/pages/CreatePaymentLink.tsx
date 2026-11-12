@@ -144,7 +144,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const { account, role } = useCurrentAccount()
   const session = useSession()
   const myEmail = account?.email || session?.email || ''
-  const canConfirmBank = !role || role.id === 'role_admin' || role.id === 'role_ops' || role.id === 'role_sales_leader'
+  const canConfirmBank = role?.id === 'role_sales_leader'
   const ccManager = role?.id !== 'role_support'
   const students = useStore((s) => s.students)
   const accounts = useStore((s) => s.accounts)
@@ -258,7 +258,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience !== 'open' || ccManager)
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : row.createdBy === myEmail)
   const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
   const DEPOSIT_VALID_DAYS = 7
@@ -381,7 +381,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const blockedEdit = () => {
     const row = editingId ? links.find((item) => item.id === editingId) : undefined
     if (row && !editable(row)) {
-      message.warning(en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑')
+      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator can edit this link' : '只有创建人能编辑这条链接'))
       return true
     }
     return false
@@ -423,7 +423,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const startEdit = (row: PaymentLink) => {
     if (!editable(row)) {
-      message.warning(en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑')
+      message.warning(row.audience === 'open' ? (en ? 'Only CC managers can edit open links' : '通用链接只有 CC 主管能编辑') : (en ? 'Only the creator can edit this link' : '只有创建人能编辑这条链接'))
       return
     }
     if (row.line !== activeLine) holdLineReset.current = true
@@ -1515,8 +1515,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy links and QR codes; ask your CC manager to create or edit.'}`
             : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制链接和二维码；新建、编辑需要 CC 主管。'}`)
           : en
-          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer manual bank transfer get an order when the link is created, for the manager to confirm the transfer. Valid-until controls when a link stops taking payments; deposits must be fully paid by then. ${ccManager ? 'As a CC manager you can confirm manual bank transfers.' : 'Ask your CC manager to confirm manual bank transfers.'}`
-          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了手动银行转账的链接在创建时就生成一张订单，供主管确认转账。有效期决定链接什么时候停止收款，定金的首款和尾款都要在有效期内付完。${ccManager ? '当前是 CC 主管：可以确认手动银行转账。' : '确认手动银行转账需要 CC 主管操作。'}`}
+          ? `Each row is one personal payment link. Full: like the landing page, each payment is one order (a failed attempt cancels its order). Deposit: one order holding two transactions (first payment, balance). Links that offer manual bank transfer get an order when the link is created, for the manager to confirm the transfer. Valid-until controls when a link stops taking payments; deposits must be fully paid by then. Only the creator can edit a link, including its valid-until. ${canConfirmBank ? 'As a CC manager you can confirm manual bank transfers.' : 'Only CC managers can confirm manual bank transfers.'}`
+          : `每一行是一条专属支付链接。全款：和落地页一样每次支付一张订单，失败的那张取消；定金：一张订单下两笔交易（首款、尾款）。挂了手动银行转账的链接在创建时就生成一张订单，供主管确认转账。有效期决定链接什么时候停止收款，定金的首款和尾款都要在有效期内付完。链接只有创建人能编辑（包括有效期）。${canConfirmBank ? '当前是 CC 主管：可以确认手动银行转账。' : '确认手动银行转账只有 CC 主管能操作。'}`}
       />
       <Table
         className="pl-table"
