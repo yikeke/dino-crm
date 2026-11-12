@@ -165,7 +165,7 @@ export function txnsOfLink(id: string, txns = readLinkTxns()) {
 
 export function payLinkUrl(id: string) {
   const root = import.meta.env.BASE_URL.replace(/\/$/, '')
-  return `${window.location.origin}${root}/#/lp/pay-link?link=${encodeURIComponent(id)}`
+  return `${window.location.origin}${root}/#/pay-link?link=${encodeURIComponent(id)}`
 }
 
 export function now() {

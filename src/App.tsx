@@ -99,6 +99,7 @@ export default function App() {
           element={session ? <Navigate to="/" replace /> : <Login />}
         />
         <Route path="/website/promotion/landingpage" element={<LandingSkinPreview />} />
+        <Route path="/pay-link" element={<PayLinkPage />} />
         <Route path="/lp/pay-link" element={<PayLinkPage />} />
         <Route
           path="/"
