@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -30,7 +30,7 @@ import {
   type LinkOffer,
 } from '../paymentLinkCatalog'
 import dayjs from 'dayjs'
-import { setState, useStore } from '../store'
+import { useStore } from '../store'
 import { useCurrentAccount } from '../perm'
 import { useSession } from '../auth'
 import {
@@ -131,10 +131,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [scene, setScene] = useState<Scene>('all')
   const [lineFilter, setLineFilter] = useState<string | undefined>()
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
-  const [memberTarget, setMemberTarget] = useState<string | null>(null)
-  const [memberLink, setMemberLink] = useState('')
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
-  const [memberDays, setMemberDays] = useState<number | null>(7)
   const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string } | null>(null)
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
@@ -1073,14 +1070,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {row.audience === 'open'
             ? <Typography.Text type="secondary">{en ? 'Payer bound at login' : '付款人扫码登录后绑定'}</Typography.Text>
             : (
-              <>
-                <Typography.Text type="secondary" copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>
-                {row.userId && (
-                  <Button size="small" type="link" className="pl-member-btn" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberLink(row.id); setMemberDays(7) }}>
-                    {en ? 'Add membership' : '添加会员'}
-                  </Button>
-                )}
-              </>
+              <Typography.Text type="secondary" copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>
             )}
         </div>
       ),
@@ -1330,11 +1320,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {linkActions(row)}
             {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
             <Button size="small" type="link" icon={<HistoryOutlined />} onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
-            {!open && row.userId && (
-              <Button size="small" type="link" icon={<CrownOutlined />} onClick={() => { setMemberTarget(row.userId || null); setMemberLink(row.id); setMemberDays(7) }}>
-                {en ? 'Add membership' : '添加会员'}
-              </Button>
-            )}
           </Space>
         </div>
         <Card size="small" title={en ? 'Link' : '链接信息'}>
@@ -1361,25 +1346,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         </Card>
       </div>
     )
-  }
-
-  const addMembership = () => {
-    if (!memberTarget || !memberDays || memberDays <= 0) return
-    setState((prev) => ({
-      ...prev,
-      students: prev.students.map((student) => {
-        if (student.studentId !== memberTarget) return student
-        const current = student.expireTime ? dayjs(student.expireTime) : dayjs()
-        const base = current.isAfter(dayjs()) ? current : dayjs()
-        return { ...student, expireTime: base.add(memberDays, 'day').format('YYYY-MM-DD HH:mm:ss'), lastModifier: myEmail || student.lastModifier }
-      }),
-    }))
-    if (memberLink) {
-      logAction(memberLink, '添加会员', `${memberTarget} · ${memberDays} 天`)
-      reload()
-    }
-    message.success(en ? `Added ${memberDays} days for ${memberTarget}` : `已为 ${memberTarget} 添加 ${memberDays} 天会员`)
-    setMemberTarget(null)
   }
 
   const textMatch = (row: PaymentLink) => {
@@ -1526,8 +1492,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           showIcon
           style={{ marginBottom: 16 }}
           message={en
-            ? 'Creating, editing, stopping or resuming payments, confirming transfers and adding membership are logged with the operator.'
-            : '新建、编辑、停止 / 恢复收款、确认转账、添加会员都会记录操作人和变更内容。'}
+            ? 'Creating, editing, stopping or resuming payments and confirming transfers are logged with the operator.'
+            : '新建、编辑、停止 / 恢复收款、确认转账都会记录操作人和变更内容。'}
         />
         <Table
           rowKey="id"
@@ -1563,27 +1529,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           onChange={(skuId) => setConfirmTarget((current) => (current ? { ...current, skuId } : current))}
           options={(confirmTarget?.link.offers || []).map((item) => ({ value: item.skuId, label: `${item.skuName} · ${formatMoney(item.payable, item.currency)}` }))}
         />
-      </Modal>
-      <Modal
-        title={`${en ? 'Add membership' : '添加会员'} · ${memberTarget || ''}`}
-        open={!!memberTarget}
-        onCancel={() => setMemberTarget(null)}
-        onOk={addMembership}
-        okButtonProps={{ disabled: !memberDays || memberDays <= 0 }}
-        okText={en ? 'Save' : '保存'}
-        cancelText={en ? 'Cancel' : '取消'}
-        destroyOnClose
-      >
-        <Typography.Paragraph type="secondary">
-          {en
-            ? 'For example, give trial days after the first payment. This only extends the membership; it does not create or change any order of this link.'
-            : '例如首款到账后先给用户开通体验天数。这里只延长会员有效期，不生成也不修改这条链接下的任何订单。'}
-        </Typography.Paragraph>
-        <div className="pl-label">{en ? 'Days' : '有效期天数'}</div>
-        <InputNumber min={1} max={365} value={memberDays} onChange={(value) => setMemberDays(typeof value === 'number' ? value : null)} addonAfter={en ? 'days' : '天'} style={{ width: '100%' }} />
-        <Typography.Text type="secondary" className="pl-field-hint">
-          {en ? 'No active membership: counted from now. Active membership: added after the current expiry.' : '无有效会员从当前时间起算；有效会员从当前到期时间向后续期。'}
-        </Typography.Text>
       </Modal>
     </div>
   )

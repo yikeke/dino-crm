@@ -790,13 +790,6 @@
   opacity: 0.55;
 }
 
-.pl-member-btn {
-  align-self: flex-start;
-  height: auto;
-  padding: 0;
-  font-size: 12px;
-}
-
 .pl-due-line {
   display: inline-flex;
   flex-wrap: wrap;
