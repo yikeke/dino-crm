@@ -20,7 +20,6 @@ import {
   message,
 } from 'antd'
 import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
-import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -132,8 +131,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [scene, setScene] = useState<Scene>('all')
   const [lineFilter, setLineFilter] = useState<string | undefined>()
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
-  const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
-  const [qrImage, setQrImage] = useState('')
   const [memberTarget, setMemberTarget] = useState<string | null>(null)
   const [memberLink, setMemberLink] = useState('')
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
@@ -206,18 +203,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const openDetail = (id: string) => setSearchParams({ link: id })
   const closeDetail = () => setSearchParams({})
-
-  useEffect(() => {
-    if (!qrTarget?.url) {
-      setQrImage('')
-      return
-    }
-    let cancelled = false
-    QRCode.toDataURL(qrTarget.url, { width: 320, margin: 1 }).then((image) => {
-      if (!cancelled) setQrImage(image)
-    })
-    return () => { cancelled = true }
-  }, [qrTarget])
 
   useEffect(() => {
     if (!planKey) return
@@ -393,7 +378,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     save(row)
     message.success(editingId
       ? (en ? 'Payment link updated' : '支付链接已更新')
-      : row.audience === 'open' ? (en ? 'Open payment link created. Download the QR code for print.' : '通用支付链接已生成，可下载二维码用于印刷物料') : (en ? 'Full payment link created' : '全款链接已生成'))
+      : row.audience === 'open' ? (en ? 'Open payment link created' : '通用支付链接已生成') : (en ? 'Full payment link created' : '全款链接已生成'))
   }
 
   const createDeposit = () => {
@@ -1065,8 +1050,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const linkActions = (row: PaymentLink) => (
     <Space size={4} wrap>
       <Button size="small" type="link" icon={<CopyOutlined />} onClick={() => copyText(row.url)}>{en ? 'Copy link' : '复制链接'}</Button>
-      <Button size="small" type="link" icon={<QrcodeOutlined />} onClick={() => setQrTarget(row)}>{en ? 'QR' : '二维码'}</Button>
-      <Button size="small" type="link" icon={<EyeOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Preview' : '预览'}</Button>
+      <Button size="small" type="link" icon={<LinkOutlined />} onClick={() => window.open(row.url, '_blank')}>{en ? 'Open link' : '打开链接'}</Button>
     </Space>
   )
 
@@ -1512,8 +1496,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         showIcon
         message={openPage
           ? (en
-            ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy links and QR codes; ask your CC manager to create or edit.'}`
-            : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制链接和二维码；新建、编辑需要 CC 主管。'}`)
+            ? `Each row is one expo or printed QR code. Anyone who scans logs in and pays; each visit to the payment page after login is one order, like the landing page. Click a link to see all its orders. ${ccManager ? 'As a CC manager you can create and edit.' : 'As a CC you can view, copy and open links; ask your CC manager to create or edit.'}`
+            : `每一行是一个展会 / 物料二维码。任何人扫码登录后都能付款，和落地页一样登录后每次进入三方支付页生成一张订单；点击链接进入详情查看全部订单。${ccManager ? '当前是 CC 主管：可以新建和编辑。' : '当前是普通 CC：只能查看、复制和打开链接；新建、编辑需要 CC 主管。'}`)
           : en
           ? 'One link per customer: pay in full at once, or as a deposit in two parts (first payment, then balance), before the valid-until date. Only the creator can edit a link. Manual bank transfers are confirmed by a CC manager on the details page.'
           : '一条链接对应一个用户：全款一次付清，定金分首款、尾款两次付，都要在有效期内付完。链接只有创建人能编辑；手动银行转账到账后，由 CC 主管在详情页确认。'}
@@ -1600,30 +1584,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <Typography.Text type="secondary" className="pl-field-hint">
           {en ? 'No active membership: counted from now. Active membership: added after the current expiry.' : '无有效会员从当前时间起算；有效会员从当前到期时间向后续期。'}
         </Typography.Text>
-      </Modal>
-      <Modal
-        title={en ? 'Payment link QR code' : '支付链接二维码'}
-        open={!!qrTarget}
-        onCancel={() => setQrTarget(null)}
-        footer={[
-          <Button key="close" onClick={() => setQrTarget(null)}>{en ? 'Close' : '关闭'}</Button>,
-          <Button
-            key="download"
-            type="primary"
-            disabled={!qrImage}
-            onClick={() => {
-              const link = document.createElement('a')
-              link.href = qrImage
-              link.download = `${qrTarget?.id || 'payment-link'}.png`
-              link.click()
-            }}
-          >{en ? 'Download QR code' : '下载二维码'}</Button>,
-        ]}
-      >
-        <Space direction="vertical" align="center" style={{ width: '100%' }}>
-          {qrImage && <img src={qrImage} alt="" width={280} height={280} />}
-          <Typography.Text type="secondary">{en ? 'The QR code only carries the link ID. Scanning opens the same page as the link.' : '二维码里只有链接 ID，扫码打开的页面和复制链接是同一个。'}</Typography.Text>
-        </Space>
       </Modal>
     </div>
   )
