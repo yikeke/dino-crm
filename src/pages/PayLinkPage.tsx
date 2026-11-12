@@ -25,6 +25,7 @@ import {
   type PayStage,
 } from '../paymentLinkStore'
 import { useStore } from '../store'
+import { PayLinkReturn } from './PayLinkResult'
 import './PayLinkPage.css'
 
 const ACCOUNT_KEY = 'dino-pay-link-account'
@@ -180,7 +181,12 @@ function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string
 
 export default function PayLinkPage() {
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const linkId = params.get('link') || params.get('pay_link') || ''
+  const orderNo = params.get('orderNo')
+  if (orderNo) {
+    return <PayLinkReturn key={orderNo} linkId={linkId} orderNo={orderNo} demo={params.get('demo')} onBack={() => navigate(`/pay-link?link=${encodeURIComponent(linkId)}`)} />
+  }
   return <PayLinkView key={linkId} linkId={linkId} />
 }
 
@@ -205,7 +211,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const open = link?.audience === 'open'
   const [account, setAccount] = useState<Account | null>(() => (open && !preview ? savedAccount() : null))
   const [loginOpen, setLoginOpen] = useState(false)
-  const [doneTxn, setDoneTxn] = useState<LinkTxn | null>(null)
+  const doneTxn = null as LinkTxn | null
   const [previewAcked, setPreviewAcked] = useState(false)
   const stage = link ? currentStage(link, txns) : null
   const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
@@ -282,19 +288,18 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const pay = () => {
     if (!host) return
     const paid = !preview && host.txn ? completeTxn(host.txn.txnId) : undefined
-    if (paid && open) {
-      navigate(`/pay-link/result?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(paid.orderNo)}`)
+    if (paid) {
+      navigate(`/pay-link?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(paid.orderNo)}`)
       return
     }
-    if (paid) setDoneTxn(paid)
     setHost(null)
     refresh()
   }
 
   const leaveHost = (reason: string, toResult = false) => {
     if (!preview && host?.txn) failTxn(host.txn.txnId, reason)
-    if (toResult && open && !preview && host?.orderNo) {
-      navigate(`/pay-link/result?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(host.orderNo)}`)
+    if (toResult && !preview && host?.orderNo) {
+      navigate(`/pay-link?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(host.orderNo)}`)
       return
     }
     setHost(null)

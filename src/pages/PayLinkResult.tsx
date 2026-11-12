@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier } from '../paymentLinkCatalog'
 import { findMethods, localLangLabel, methodDisplayName, type ReviewLang } from '../paymentMethods'
 import { ensurePaymentLinkData, findPaymentLink, ordersOfLink, txnsOfLink } from '../paymentLinkStore'
@@ -15,6 +15,8 @@ type ResultCopy = {
   refresh: string
   success: string
   successSub: string
+  firstSub: string
+  paidOut: string
   failed: string
   failedSub: string
   notFound: string
@@ -35,7 +37,7 @@ const RESULT_COPY: Record<'ko' | 'zh' | 'en', ResultCopy> = {
   ko: {
     confirming: '결제 결과를 확인하고 있습니다', confirmingSub: '잠시만 기다려 주세요',
     processing: '결제 결과를 아직 확인 중입니다', processingSub: '잠시 후 새로고침해 주세요', refresh: '새로고침',
-    success: '결제가 완료되었습니다', successSub: '멤버십이 개통되었습니다',
+    success: '결제가 완료되었습니다', successSub: '멤버십이 개통되었습니다', firstSub: '남은 금액은 같은 링크로 나중에 결제할 수 있습니다', paidOut: '이 링크는 결제가 완료되었습니다',
     failed: '결제가 완료되지 않았습니다', failedSub: '결제 금액은 청구되지 않았습니다. 다시 결제하거나 다른 결제 수단을 선택해 주세요.',
     notFound: '주문을 찾을 수 없습니다',
     plan: '멤버십', paid: '결제 금액', method: '결제 수단', paidAt: '결제 시간', account: '사용자 ID', order: '주문 번호',
@@ -45,7 +47,7 @@ const RESULT_COPY: Record<'ko' | 'zh' | 'en', ResultCopy> = {
   zh: {
     confirming: '正在确认支付结果', confirmingSub: '请稍候',
     processing: '支付结果还在确认', processingSub: '请稍后刷新', refresh: '刷新',
-    success: '支付成功', successSub: '会员已开通',
+    success: '支付成功', successSub: '会员已开通', firstSub: '尾款之后可以通过同一条链接支付', paidOut: '这条支付链接已支付',
     failed: '支付未完成', failedSub: '没有扣款。你可以重新支付，或换一种支付方式。',
     notFound: '找不到这笔订单',
     plan: '会员套餐', paid: '实付金额', method: '支付方式', paidAt: '支付时间', account: 'User ID', order: '订单号',
@@ -55,7 +57,7 @@ const RESULT_COPY: Record<'ko' | 'zh' | 'en', ResultCopy> = {
   en: {
     confirming: 'Confirming your payment', confirmingSub: 'Please wait a moment',
     processing: 'Your payment is still being confirmed', processingSub: 'Please refresh in a moment', refresh: 'Refresh',
-    success: 'Payment successful', successSub: 'Your membership is now active',
+    success: 'Payment successful', successSub: 'Your membership is now active', firstSub: 'You can pay the balance later with the same link', paidOut: 'This payment link has been paid',
     failed: 'Payment not completed', failedSub: 'You have not been charged. Pay again or choose another payment method.',
     notFound: 'Order not found',
     plan: 'Membership', paid: 'Amount paid', method: 'Payment method', paidAt: 'Paid at', account: 'User ID', order: 'Order number',
@@ -70,12 +72,14 @@ function resultCopy(line: string, lang: ReviewLang) {
   return RESULT_COPY.en
 }
 
-export default function PayLinkResult() {
+/** Old result URL: the result now lives on the payment link page itself. */
+export default function PayLinkResultRedirect() {
   const [params] = useSearchParams()
-  const navigate = useNavigate()
-  const linkId = params.get('link') || ''
-  const orderNo = params.get('orderNo') || ''
-  const demo = params.get('demo')
+  return <Navigate replace to={`/pay-link?${params.toString()}`} />
+}
+
+/** The payment link page after the customer comes back from the provider with ?orderNo=. */
+export function PayLinkReturn({ linkId, orderNo, demo, onBack }: { linkId: string; orderNo: string; demo?: string | null; onBack: () => void }) {
   const [lang, setLang] = useState<ReviewLang>('local')
   const [confirming, setConfirming] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -96,10 +100,12 @@ export default function PayLinkResult() {
       : !order ? 'missing'
         : txn?.status === 'SUCCESS' ? 'success'
           : order.cancelled || txn?.status === 'FAILED' ? 'failed' : 'processing'
+  const presetUser = !!link?.userId
+  const firstPaid = txn?.payStage === 'DEPOSIT_FIRST'
+  const settled = state === 'success' && presetUser && !firstPaid
   const method = txn ? findMethods(line, [txn.method])[0] : undefined
   const offer = link?.offers?.find((item) => item.skuId === order?.skuId)
   const tier = memberTier(offer?.memberLevel)
-  const backToLink = () => navigate(`/pay-link?link=${encodeURIComponent(linkId)}`)
 
   const copyOrder = async () => {
     try {
@@ -149,7 +155,7 @@ export default function PayLinkResult() {
           </h1>
           {state === 'confirming' && <p className="pay-result__sub">{copy.confirmingSub}</p>}
           {state === 'processing' && <p className="pay-result__sub">{copy.processingSub}</p>}
-          {state === 'success' && <p className="pay-result__sub">{copy.successSub}</p>}
+          {state === 'success' && <p className="pay-result__sub">{firstPaid ? copy.firstSub : settled ? copy.paidOut : copy.successSub}</p>}
           {state === 'failed' && <p className="pay-result__sub">{copy.failedSub}</p>}
         </section>
 
@@ -165,18 +171,18 @@ export default function PayLinkResult() {
                 ))}
               </div>
             </section>
-            <p className="pay-result__hint">{copy.appHint}</p>
+            {!firstPaid && <p className="pay-result__hint">{copy.appHint}</p>}
           </>
         )}
       </div>
 
-      {state !== 'confirming' && (
+      {state !== 'confirming' && !settled && (
         <div className="pay-bar">
           {state === 'processing' ? (
             <button className="pay-continue" type="button" onClick={() => window.location.reload()}>{copy.refresh}</button>
           ) : (
-            <button className="pay-continue" type="button" onClick={backToLink}>
-              {state === 'success' ? copy.payAgain : state === 'failed' ? copy.retry : copy.back}
+            <button className="pay-continue" type="button" onClick={onBack}>
+              {state === 'success' ? (presetUser ? copy.back : copy.payAgain) : state === 'failed' ? copy.retry : copy.back}
             </button>
           )}
         </div>

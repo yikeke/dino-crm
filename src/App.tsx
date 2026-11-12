@@ -26,7 +26,7 @@ import LandingSkinManagement from './pages/LandingSkinManagement'
 import LandingSkinPreview from './pages/LandingSkinPreview'
 import CreatePaymentLink from './pages/CreatePaymentLink'
 import PayLinkPage from './pages/PayLinkPage'
-import PayLinkResult from './pages/PayLinkResult'
+import PayLinkResultRedirect from './pages/PayLinkResult'
 import SystemConfig from './pages/SystemConfig'
 import { loadLandingSkinStore } from './landingSkin'
 
@@ -101,7 +101,7 @@ export default function App() {
         />
         <Route path="/website/promotion/landingpage" element={<LandingSkinPreview />} />
         <Route path="/pay-link" element={<PayLinkPage />} />
-        <Route path="/pay-link/result" element={<PayLinkResult />} />
+        <Route path="/pay-link/result" element={<PayLinkResultRedirect />} />
         <Route path="/lp/pay-link" element={<PayLinkPage />} />
         <Route
           path="/"

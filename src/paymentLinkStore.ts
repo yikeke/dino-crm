@@ -474,7 +474,6 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
         paidTime: paidAt,
         paymentLinkId: order.paymentLinkId,
         orderSource: 'PAYMENT_LINK',
-        paymentLinkType: open ? 'OPEN' : 'PERSONAL',
         transactions,
       } as Order,
     }

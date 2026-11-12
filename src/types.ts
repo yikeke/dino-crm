@@ -320,8 +320,6 @@ export type Order = {
   paymentLinkId?: string
   /** Where the order was placed. Landing page and payment link orders are both web orders, so this keeps them apart. */
   orderSource?: OrderSource
-  /** Payment Link orders: personal (one User ID) or open (expo QR). */
-  paymentLinkType?: 'PERSONAL' | 'OPEN'
   transactions: OrderTransaction[]
 }
 
