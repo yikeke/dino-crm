@@ -846,3 +846,10 @@
   display: block;
   margin-top: 6px;
 }
+
+.pl-payer-fixed {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: rgba(0, 0, 0, 0.65);
+}

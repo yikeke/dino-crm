@@ -606,8 +606,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-form__main">
           {validityCard(++stepNo, mode === 'deposit')}
 
-          <Card size="small" title={step(++stepNo, en ? 'Who pays' : '付款人', open ? (en ? 'Anyone who scans logs in first' : '扫码用户先登录再付款') : (en ? 'Phone number or User ID' : '手机号或 User ID'))}>
-            {open ? (
+          {open && (
+            <Card size="small" title={step(++stepNo, en ? 'Event / material name' : '活动 / 物料名称', en ? 'Open links only' : '通用支付链接专有')}>
               <div className="pl-field">
                 <div>
                   <div className="pl-label">{en ? 'Event / material name' : '活动 / 物料名称'} <span className="pl-required">*</span></div>
@@ -619,6 +619,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     showCount
                   />
                   <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Shown at the top of the customer page; also used to attribute orders.' : '显示在用户页面顶部，同时用于统计订单来源。'}</Typography.Text>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <Card size="small" title={step(++stepNo, en ? 'Who pays' : '付款人', open ? (en ? 'Set by default' : '默认，不用配置') : (en ? 'Phone number or User ID' : '手机号或 User ID'))}>
+            {open ? (
+              <div className="pl-field">
+                <div>
+                  <div className="pl-label">{en ? 'Payer' : '付款人'}</div>
+                  <div className="pl-payer-fixed">{en ? 'Whoever scans logs in to Dino AI first; the payment binds to that account' : '扫码用户先登录 Dino AI 再付款，付款绑定到登录的账号'}</div>
+                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Fixed for open links. No User ID to pick.' : '通用支付链接固定如此，不用指定 User ID。'}</Typography.Text>
                 </div>
               </div>
             ) : (
