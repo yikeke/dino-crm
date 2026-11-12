@@ -770,7 +770,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               : (en ? 'The customer only sees the methods checked here' : '用户只会看到这里勾选的方式'))}
           >
             {hiddenManual && (
-              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Bank transfer is not offered on open links: each transfer has to be matched to a person by an admin.' : '通用链接不提供银行转账：转账需要管理员按人核对，没法对应到扫码用户。'}</Typography.Text>
+              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer is not offered on open links in this release.' : '通用链接本期不提供手动银行转账。'}</Typography.Text>
             )}
             <div className="pl-method-tiles">
               {methodList.map((method) => {
@@ -1075,32 +1075,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           <Typography.Text type="secondary">{(row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName}</Typography.Text>
         </div>
       ),
-    },
-    {
-      title: en ? 'Amount' : '金额',
-      width: 210,
-      render: (_: unknown, row: PaymentLink) => {
-        if (row.kind === 'deposit') {
-          return (
-            <div className="pl-two-line">
-              <b>{formatMoney(row.payable, row.currency)}</b>
-              <Typography.Text type="secondary">
-                {en ? 'First' : '首款'} {formatMoney(row.amount, '')} + {en ? 'balance' : '尾款'} {formatMoney(Math.max(row.payable - row.amount, 0), '')}
-              </Typography.Text>
-            </div>
-          )
-        }
-        const prices = (row.offers || []).map((item) => item.payable).filter((value) => value > 0)
-        if (prices.length > 1) {
-          return (
-            <div className="pl-two-line">
-              <b>{formatMoney(Math.min(...prices), '')} – {formatMoney(Math.max(...prices), row.currency)}</b>
-              <Typography.Text type="secondary">{en ? `${prices.length} SKUs, customer picks one` : `${prices.length} 个 SKU，用户选一个`}</Typography.Text>
-            </div>
-          )
-        }
-        return <b>{formatMoney(prices[0] || row.payable, row.currency)}</b>
-      },
     },
     {
       title: en ? 'Payment methods' : '支付方式',
