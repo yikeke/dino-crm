@@ -267,7 +267,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }, [linkTxns])
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
-  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && !txnsOf(row.id).some((txn) => txn.status !== 'FAILED')
+  const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' || !txnsOf(row.id).some((txn) => txn.status !== 'FAILED'))
 
   const resetCustomer = () => {
     setUserQuery('')
@@ -291,6 +291,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   }
 
   const openMode = tab === 'full' && audience === 'open'
+  const scopeLocked = !!editingId && openMode
   const methodsFor = (mode: 'full' | 'deposit') => methodsForLine(activeLine)
     .filter((method) => !(mode === 'full' && openMode && method.kind === 'manual'))
 
@@ -358,7 +359,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const previous = editingId ? links.find((item) => item.id === editingId) : undefined
     const action = previous ? '编辑链接' : row.audience === 'open' ? '新建通用链接' : row.kind === 'deposit' ? '新建定金链接' : '新建全款链接'
     const methodText = row.methods.map((code) => methodName(row, code)).join('、')
-    const detail = row.kind === 'deposit'
+    const openChanges = previous && row.audience === 'open'
+      ? [
+          previous.eventName !== row.eventName && `活动名 ${previous.eventName || '—'} → ${row.eventName || '—'}`,
+          (previous.validUntil || '') !== (row.validUntil || '') && `有效期 ${previous.validUntil || '不限'} → ${row.validUntil || '不限'}`,
+          previous.methods.join() !== row.methods.join() && `支付方式 ${previous.methods.map((code) => methodName(previous, code)).join('、')} → ${methodText}`,
+          (previous.promoCode || '') !== (row.promoCode || '') && `优惠 ${previous.promoCode || '全部原价'} → ${row.promoCode || '全部原价'}`,
+        ].filter(Boolean).join('；') || '未改动'
+      : ''
+    const detail = openChanges ? openChanges : row.kind === 'deposit'
       ? `首款 ${formatMoney(row.amount, row.currency)}，尾款 ${formatMoney(Math.max(row.payable - row.amount, 0), row.currency)}，尾款期限 ${row.balanceDueDays || DEFAULT_BALANCE_DUE_DAYS} 天 · ${methodText}`
       : row.audience === 'open'
         ? `${row.eventName || ''}${row.validUntil ? `，有效期至 ${row.validUntil}` : ''} · ${row.offers.length} 个 SKU · ${methodText}`
@@ -625,15 +634,21 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   placeholder={en ? 'Select a line' : '选择业务线'}
                   options={lines.map((item) => ({ value: item, label: item }))}
                   onChange={onLine}
+                  disabled={scopeLocked}
                 />
                 {openPage && (
-                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。'}</Typography.Text>
+                  <Typography.Text type="secondary" className="pl-field-hint">
+                    {scopeLocked
+                      ? (en ? 'Business line and channel cannot be changed after the link is created.' : '链接生成后，业务线和渠道不能改。')
+                      : (en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。')}
+                  </Typography.Text>
                 )}
               </div>
               <div>
                 <div className="pl-label">{en ? 'Channel' : '渠道'}</div>
                 <Select
                   style={{ width: '100%' }}
+                  disabled={scopeLocked}
                   value={activeChannel?.channel.id}
                   options={lineChannels.map((item) => ({
                     value: item.channel.id,
