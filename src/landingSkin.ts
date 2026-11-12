@@ -372,6 +372,14 @@ export function loginPolicy(line: string | undefined, pageType: LandingPageKind,
       reasonEn: 'Japan payment pages have no SMS: phone stays off; pick at least one provider.',
     }
   }
+  if (lineHasNoThirdParty(line)) {
+    return {
+      phone: pageType === 'pay' || isLeadCollectAction(action) ? 'on' : 'free',
+      thirds: 'off',
+      reasonZh: `${line}还没有支持三方登录。`,
+      reasonEn: 'Third-party login is not supported on this line yet.',
+    }
+  }
   if (pageType === 'lead' && isLeadCollectAction(action)) {
     return {
       phone: 'on',
@@ -428,7 +436,15 @@ export function thirdPartyOptionsForLine(line?: string) {
   return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line' && (x.value !== 'kakao' || line === '韩国'))
 }
 
+/** Lines where third-party login is not live yet: the options show greyed out and nothing is kept. */
+export const NO_THIRD_PARTY_LINES = ['马来', '越南', '泰国', '印尼']
+
+export function lineHasNoThirdParty(line?: string) {
+  return !!line && NO_THIRD_PARTY_LINES.includes(line)
+}
+
 export function thirdPartyLoginsForLine(line: string | undefined, ids?: string[]): ThirdPartyLogin[] {
+  if (lineHasNoThirdParty(line)) return []
   const picked = new Set(normalizeThirdPartyLogins(ids))
   return thirdPartyOptionsForLine(line).map((x) => x.value).filter((id) => picked.has(id))
 }

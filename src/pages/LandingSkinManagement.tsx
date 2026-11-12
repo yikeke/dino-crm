@@ -11,6 +11,7 @@ import {
   PAGE_TYPE_HINT,
   PAGE_TYPE_OPTIONS,
   LOGIN_LAYOUT_OPTIONS,
+  lineHasNoThirdParty,
   loginPolicy,
   loginRenderState,
   loginMethodLabel,
@@ -696,6 +697,11 @@ export default function LandingSkinManagement() {
                 options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
                 onChange={(vals) => patchLogin({ thirdPartyLogins: vals as ThirdPartyLogin[] })}
               />
+              {lineHasNoThirdParty(editing.line) ? (
+                <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                  {en ? 'Not supported on this line yet.' : '该业务线暂不支持三方登录。'}
+                </Text>
+              ) : null}
             </div>
           </div>
           </div>
