@@ -2,14 +2,15 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v7'
-export const LINK_ORDER_KEY = 'dino-cc-link-orders-v2'
-export const LINK_TXN_KEY = 'dino-cc-link-txns-v1'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v8'
+export const LINK_ORDER_KEY = 'dino-cc-link-orders-v3'
+export const LINK_TXN_KEY = 'dino-cc-link-txns-v2'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
-  'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-link-orders-v1',
+  'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-link-orders-v1',
+  'dino-cc-link-orders-v2', 'dino-cc-link-txns-v1',
 ]
 export const DEFAULT_BALANCE_DUE_DAYS = 7
 
@@ -300,8 +301,9 @@ export function stageMethods(link: PaymentLink, stage: PayStage) {
 }
 
 /**
- * The customer pressed pay (or picked bank transfer). Finds or creates the order, then the transaction;
- * an open attempt with the same method is reused. Amount comes from the link, not the page.
+ * The customer pressed pay (or picked bank transfer). Personal links find or create their one order, then a
+ * transaction; an open attempt with the same method is reused. Open links work like the landing page: every
+ * press is a new order with exactly one payment. Amount comes from the link, not the page.
  */
 export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?: string; method: string; userId?: string }) {
   const link = findPaymentLink(linkId)
@@ -313,8 +315,7 @@ export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?:
   const userId = link.audience === 'open' ? detail.userId : link.userId
   if (!userId) return undefined
   const offer = link.offers.find((item) => item.skuId === detail.skuId) || link.offers[0]
-  let order = ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.userId === userId
-    && (link.audience === 'user' || orderState(item, txns).state === 'PENDING'))
+  let order = link.audience === 'open' ? undefined : ordersOfLink(linkId, orders).find((item) => !item.cancelled && item.userId === userId)
   if (!order) {
     order = orderFor(link, link.audience === 'user' && needsUpfrontOrder(link) ? 'link' : 'checkout', userId, offer?.skuId)
     orders = [order, ...orders]
@@ -371,7 +372,14 @@ export function completeTxn(txnId: string) {
 
 /** The provider reported a failure, or the customer abandoned the provider page. */
 export function failTxn(txnId: string, reason = '支付失败') {
-  writeAll(readLinkOrders(), readLinkTxns().map((txn) => (txn.txnId === txnId && txn.status === 'PENDING' ? { ...txn, status: 'FAILED', failReason: reason } : txn)))
+  const txns = readLinkTxns()
+  const target = txns.find((txn) => txn.txnId === txnId && txn.status === 'PENDING')
+  if (!target) return
+  const cancelOrder = findPaymentLink(target.paymentLinkId)?.audience === 'open'
+  writeAll(
+    readLinkOrders().map((order) => (cancelOrder && order.orderNo === target.orderNo ? { ...order, cancelled: true } : order)),
+    txns.map((txn) => (txn === target ? { ...txn, status: 'FAILED', failReason: reason } : txn)),
+  )
 }
 
 /**
@@ -426,6 +434,7 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
       note: txn.status === 'PENDING' && txn.declaredAt ? `用户已声明转账 ${txn.declaredAt}` : txn.failReason,
     }))
     const sortKey = [order.createdAt, ...mine.map((txn) => txn.paidAt || txn.createdAt)].sort().pop() || ''
+    const open = findPaymentLink(order.paymentLinkId)?.audience === 'open'
     return {
       sortKey,
       order: {
@@ -441,8 +450,10 @@ function centerOrders(orders: WebOrder[], txns: LinkTxn[]): Order[] {
         paidTime: paidAt,
         paymentLinkId: order.paymentLinkId,
         orderSource: 'PAYMENT_LINK',
-        paymentLinkType: findPaymentLink(order.paymentLinkId)?.audience === 'open' ? 'OPEN' : 'PERSONAL',
-        transactions,
+        paymentLinkType: open ? 'OPEN' : 'PERSONAL',
+        channelMethod: open ? mine[0]?.method : undefined,
+        channelRef: open ? mine[0]?.providerRef : undefined,
+        transactions: open ? [] : transactions,
       } as Order,
     }
   })
@@ -532,6 +543,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     { orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:15:00' },
     { orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824356011', ...krH, origin: 'checkout', createdAt: '2026-10-28 10:05:00' },
     { orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824355846', ...krH, origin: 'checkout', createdAt: '2026-10-27 11:38:00' },
+    { orderNo: 'WEB-261027-EX04', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824355846', ...krH, origin: 'checkout', createdAt: '2026-10-27 11:31:00', cancelled: true },
     { orderNo: 'WEB-261026-EX01', paymentLinkId: 'PL-OPEN-KR', userId: '2060199610824356004', ...krQ, origin: 'checkout', createdAt: '2026-10-26 14:10:00' },
   ]
   const t = (row: Omit<LinkTxn, 'status' | 'currency'> & { status?: TxnStatus }): LinkTxn => ({
@@ -551,6 +563,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     t({ txnId: 'TXN-261027-KP01', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
     t({ txnId: 'TXN-261028-EX03', orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),
     t({ txnId: 'TXN-261027-EX02', orderNo: 'WEB-261027-EX02', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', providerRef: 'CARD-27114033KR', createdAt: '2026-10-27 11:38:00', paidAt: '2026-10-27 11:40:00' }),
+    t({ txnId: 'TXN-261027-EX04', orderNo: 'WEB-261027-EX04', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'kakaopay', status: 'FAILED', failReason: '用户从支付页返回', createdAt: '2026-10-27 11:31:00' }),
     t({ txnId: 'TXN-261026-EX01', orderNo: 'WEB-261026-EX01', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 89100, method: 'kakaopay', providerRef: 'KAKAO-26141209KR', createdAt: '2026-10-26 14:10:00', paidAt: '2026-10-26 14:12:00' }),
   ]
   return { links, orders, txns }

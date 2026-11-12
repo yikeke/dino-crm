@@ -322,6 +322,9 @@ export type Order = {
   orderSource?: OrderSource
   /** Payment Link orders: personal (one User ID) or open (expo QR). */
   paymentLinkType?: 'PERSONAL' | 'OPEN'
+  /** Open payment link orders hold their single payment themselves, like landing page orders: method and third-party id. */
+  channelMethod?: string
+  channelRef?: string
   transactions: OrderTransaction[]
 }
 
