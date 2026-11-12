@@ -97,7 +97,8 @@ export default function PayLinkResult() {
         : txn?.status === 'SUCCESS' ? 'success'
           : order.cancelled || txn?.status === 'FAILED' ? 'failed' : 'processing'
   const method = txn ? findMethods(line, [txn.method])[0] : undefined
-  const tier = memberTier(link?.offers?.find((offer) => offer.skuId === order?.skuId)?.memberLevel)
+  const offer = link?.offers?.find((item) => item.skuId === order?.skuId)
+  const tier = memberTier(offer?.memberLevel)
   const backToLink = () => navigate(`/pay-link?link=${encodeURIComponent(linkId)}`)
 
   const copyOrder = async () => {
@@ -111,7 +112,7 @@ export default function PayLinkResult() {
   }
 
   const rows: [string, React.ReactNode][] = order && txn ? [
-    [copy.plan, <span className="pay-result__plan"><span className={`tier-badge tier-${tier.toLowerCase()}`}>{tier}</span>{order.skuName}</span>],
+    [copy.plan, <span className="pay-result__plan"><span className={`tier-badge tier-${tier.toLowerCase()}`}>{tier}</span>{offer?.skuName || order.skuName}</span>],
     [copy.paid, formatMoney(txn.amount, txn.currency)],
     [copy.method, method ? methodDisplayName(method, lang) : txn.method],
     [copy.paidAt, txn.paidAt?.slice(0, 16) || '—'],
