@@ -74,6 +74,8 @@ import './CreatePaymentLink.css'
 
 type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired' | 'void'
 
+const OPEN_LINK_LINES = ['Korea']
+
 function depositFloor(line: string, payable: number) {
   if (line === 'Vietnam' || line === '越南') {
     return { min: 500_000, label: '越南首款不低于 500,000 VND' }
@@ -189,8 +191,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
-  const lines = useMemo(() => linesInCatalog(catalog.skus, catalog.channels), [catalog.skus, catalog.channels])
-  const activeLine = line || lines[0] || ''
+  const lines = useMemo(() => {
+    const all = linesInCatalog(catalog.skus, catalog.channels)
+    return openPage ? all.filter((item) => OPEN_LINK_LINES.includes(item)) : all
+  }, [catalog.skus, catalog.channels, openPage])
+  const activeLine = (lines.includes(line) ? line : '') || lines[0] || ''
   const lineChannels = useMemo(
     () => channelsOnLine(activeLine, catalog.channels, catalog.plans),
     [activeLine, catalog.channels, catalog.plans],
@@ -621,6 +626,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   options={lines.map((item) => ({ value: item, label: item }))}
                   onChange={onLine}
                 />
+                {openPage && (
+                  <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。'}</Typography.Text>
+                )}
               </div>
               <div>
                 <div className="pl-label">{en ? 'Channel' : '渠道'}</div>
