@@ -1117,12 +1117,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     {
       title: en ? 'Creator' : '创建人',
       width: 150,
-      render: (_: unknown, row: PaymentLink) => (
-        <div className="pl-two-line">
-          <span>{actorName(row.createdBy)}</span>
-          {row.createdBy && <Typography.Text type="secondary">{row.createdBy}</Typography.Text>}
-        </div>
-      ),
+      render: (_: unknown, row: PaymentLink) => row.createdBy || '—',
     },
     {
       title: en ? 'Created / Updated' : '创建 / 更新',
@@ -1378,7 +1373,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {detailField(en ? 'Collected' : '已收', paid.length
               ? `${formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)} · ${single ? (en ? `${paid.length} paid orders` : `${paid.length} 张已支付订单`) : (en ? `${paid.length} successful` : `${paid.length} 笔成功交易`)}`
               : (en ? 'Nothing yet' : '暂无'))}
-            {detailField(en ? 'Creator' : '创建人', `${actorName(row.createdBy)}${row.createdBy ? ` · ${row.createdBy}` : ''}`)}
+            {detailField(en ? 'Creator' : '创建人', row.createdBy || '—')}
             {detailField(en ? 'Created / Updated' : '创建 / 更新', `${row.createdAt} / ${row.updatedAt}`)}
             {detailField(en ? 'Link URL' : '链接地址', <Typography.Text copyable className="pl-detail-url">{row.url}</Typography.Text>)}
           </div>
