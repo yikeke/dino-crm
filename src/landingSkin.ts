@@ -336,12 +336,12 @@ export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: st
   { value: 'lead_th', zh: '出收集两个留资页面（泰国版）-> 出下载 App 弹窗', en: 'Two lead pages (Thailand) → download-app popup' },
 ]
 
-/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，沙特是下载弹窗或四项留资（阿语），泰国是下载弹窗或两项留资（泰语），其余业务线只有下载弹窗。 */
+/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，沙特是下载弹窗或四项留资（阿语），泰国只有两项留资（泰语），其余业务线只有下载弹窗。 */
 export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
     if (x.value === 'onelink') return line === '日本' || line === '香港'
-    if (x.value === 'download_app') return line !== '越南' && line !== '马来' && line !== '香港'
+    if (x.value === 'download_app') return line !== '越南' && line !== '马来' && line !== '泰国' && line !== '香港'
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
     if (x.value === 'lead_sa') return line === '沙特'
@@ -523,6 +523,7 @@ export function followUpActionForPageType(pageType: LandingPageKind, action?: st
   if (allowed.includes(next)) return next
   if (line === '越南') return 'lead_vn'
   if (line === '马来') return 'lead_my'
+  if (line === '泰国') return 'lead_th'
   if (line === '日本') return 'onelink'
   return 'download_app'
 }
