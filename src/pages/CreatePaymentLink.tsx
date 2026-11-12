@@ -1485,15 +1485,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const channelOptions = Array.from(
     new Map(scopedLinks.filter((row) => !lineFilter || row.line === lineFilter).filter((row) => row.channelId).map((row) => [row.channelId, row.channelName])).entries(),
   ).map(([value, label]) => ({ value, label }))
-  const filtersOn = !!(keyword || typeFilter || lineFilter || channelFilter || onlyMine || scene !== 'all')
-  const clearFilters = () => {
-    setKeyword('')
-    setTypeFilter(undefined)
-    setLineFilter(undefined)
-    setChannelFilter(undefined)
-    setOnlyMine(false)
-    setScene('all')
-  }
   const openCreate = (kind: 'full' | 'deposit', who: 'user' | 'open' = 'user') => {
     setEditingId(null)
     resetCustomer()
@@ -1566,9 +1557,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           onChange={(value) => { setLineFilter(value); setChannelFilter(undefined) }}
         />
         <Select allowClear showSearch optionFilterProp="label" placeholder={en ? 'Channel' : '渠道'} value={channelFilter} onChange={setChannelFilter} style={{ width: 200 }} options={channelOptions} />
-        {!openPage && <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>}
-        {filtersOn && <Button type="link" onClick={clearFilters}>{en ? 'Clear filters' : '清空筛选'}</Button>}
-      </Space>
+        {!openPage && <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>}      </Space>
       <Alert
         type="info"
         showIcon
