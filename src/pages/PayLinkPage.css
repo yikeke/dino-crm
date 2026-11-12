@@ -870,6 +870,11 @@
   gap: 8px;
 }
 
+.pay-social.is-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 .pay-social__btn {
   flex: 1;
   height: 42px;
@@ -885,6 +890,50 @@
   border-color: #fee500;
   background: #fee500;
   color: #191600;
+}
+
+.pay-social__btn.is-facebook {
+  border-color: #1877f2;
+  background: #1877f2;
+  color: #fff;
+}
+
+.pay-social__btn.is-phone.is-on {
+  border-color: #111;
+}
+
+.pay-kakao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: #fee500;
+  color: #191600;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pay-kakao__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #191600;
+  color: #fee500;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pay-phone-login {
+  margin-top: 14px;
 }
 
 .pay-social__btn.is-apple {

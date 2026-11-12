@@ -55,7 +55,8 @@ function LoginSheet({ line, copy, onClose, onConfirm }: {
   const [account, setAccount] = useState<Account | null>(null)
   const dial = DIAL[line] || '+82'
   const digits = phone.replace(/\D/g, '')
-  const social = line === 'Korea' ? ['Kakao', 'Google', 'Apple'] : ['Google', 'Apple']
+  const korea = line === 'Korea'
+  const [phoneOpen, setPhoneOpen] = useState(!korea)
 
   const resolve = (value: string): Account => {
     const match = value.length >= 4
@@ -81,28 +82,51 @@ function LoginSheet({ line, copy, onClose, onConfirm }: {
           <>
             <p className="pay-sheet__title">{copy.loginTitle}</p>
             <p className="pay-sheet__sub">{copy.loginSub}</p>
-            <label className="pay-field">
-              <span>{copy.phone}</span>
-              <span className="pay-field__row">
-                <span className="pay-field__dial">{dial}</span>
-                <input inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="10 1234 5678" />
-                <button type="button" className="pay-field__btn" disabled={digits.length < 6} onClick={() => setSent(true)}>{copy.getCode}</button>
-              </span>
-            </label>
-            {sent && (
-              <label className="pay-field">
-                <span>{copy.code}</span>
-                <input inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} placeholder="000000" />
-                <small>{copy.codeHint}</small>
-              </label>
+            {korea && (
+              <>
+                <button type="button" className="pay-kakao" onClick={() => socialLogin('Kakao')}>
+                  <span className="pay-kakao__mark" aria-hidden>K</span>
+                  {copy.kakaoContinue || 'Continue with Kakao'}
+                </button>
+                <p className="pay-sheet__or"><span>{copy.orWith}</span></p>
+                <div className="pay-social is-grid">
+                  <button type="button" className={`pay-social__btn is-phone${phoneOpen ? ' is-on' : ''}`} onClick={() => setPhoneOpen((open) => !open)}>{copy.phone}</button>
+                  {['Google', 'Apple', 'Facebook'].map((provider) => (
+                    <button key={provider} type="button" className={`pay-social__btn is-${provider.toLowerCase()}`} onClick={() => socialLogin(provider)}>{provider}</button>
+                  ))}
+                </div>
+              </>
             )}
-            <button type="button" className="pay-continue" disabled={!sent || code.length !== 6} onClick={() => setAccount(resolve(digits))}>{copy.login}</button>
-            <p className="pay-sheet__or"><span>{copy.orWith}</span></p>
-            <div className="pay-social">
-              {social.map((provider) => (
-                <button key={provider} type="button" className={`pay-social__btn is-${provider.toLowerCase()}`} onClick={() => socialLogin(provider)}>{provider}</button>
-              ))}
-            </div>
+            {phoneOpen && (
+              <div className={korea ? 'pay-phone-login' : undefined}>
+                <label className="pay-field">
+                  <span>{copy.phone}</span>
+                  <span className="pay-field__row">
+                    <span className="pay-field__dial">{dial}</span>
+                    <input inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="10 1234 5678" />
+                    <button type="button" className="pay-field__btn" disabled={digits.length < 6} onClick={() => setSent(true)}>{copy.getCode}</button>
+                  </span>
+                </label>
+                {sent && (
+                  <label className="pay-field">
+                    <span>{copy.code}</span>
+                    <input inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} placeholder="000000" />
+                    <small>{copy.codeHint}</small>
+                  </label>
+                )}
+                <button type="button" className="pay-continue" disabled={!sent || code.length !== 6} onClick={() => setAccount(resolve(digits))}>{copy.login}</button>
+              </div>
+            )}
+            {!korea && (
+              <>
+                <p className="pay-sheet__or"><span>{copy.orWith}</span></p>
+                <div className="pay-social">
+                  {['Google', 'Apple'].map((provider) => (
+                    <button key={provider} type="button" className={`pay-social__btn is-${provider.toLowerCase()}`} onClick={() => socialLogin(provider)}>{provider}</button>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <>

@@ -43,6 +43,7 @@ export type PayCopy = {
   codeHint: string
   login: string
   orWith: string
+  kakaoContinue?: string
   confirmTitle: string
   confirmBody: string
   confirmPay: string
@@ -102,7 +103,7 @@ const COPY: Record<string, PayCopy> = {
     terms: '이용약관', privacy: '개인정보 처리방침',
     first: '계약금', balance: '잔금', packageDue: '패키지 결제금액', installment: '', forLink: '이 결제 링크의 고객', chooseSku: '패키지 선택',
     summary: '주문 요약', dueNow: '지금 결제', paidTag: '결제 완료', laterTag: '추후 결제', secure: '안전한 결제', account: '사용자 ID', dueRule: '계약금 결제 후 {days}일 이내에 잔금을 결제해 주세요', dueLeft: '{days}일 이내에 잔금을 결제해 주세요', overdue: '잔금 결제 기간이 지났습니다. 담당 상담사에게 문의해 주세요', fullTag: '일시불', linkPaid: '이 링크는 결제가 완료되었습니다',
-    bindAfterLogin: '로그인 후 연결', loginTitle: '로그인하고 결제 계속하기', loginSub: '결제는 로그인한 Dino AI 계정에 연결됩니다', phone: '휴대폰 번호', getCode: '인증번호 받기', code: '인증번호', codeHint: '데모: 아무 6자리 숫자', login: '로그인', orWith: '또는', confirmTitle: '결제 계정 확인', confirmBody: '이 계정으로 결제하고 멤버십을 개통합니다', confirmPay: '확인하고 결제하기', switchAccount: '다른 계정으로 로그인', newAccount: '신규 계정 · 자동 가입됨', paySuccess: '결제가 완료되었습니다', expired: '이 결제 링크는 만료되었습니다', balanceNext: '남은 금액은 같은 링크로 나중에 결제할 수 있습니다', notFound: '결제 링크를 찾을 수 없습니다', dir: 'ltr',
+    bindAfterLogin: '로그인 후 연결', loginTitle: '로그인하고 결제 계속하기', loginSub: '결제는 로그인한 Dino AI 계정에 연결됩니다', phone: '휴대폰 번호', getCode: '인증번호 받기', code: '인증번호', codeHint: '데모: 아무 6자리 숫자', login: '로그인', orWith: '또는', kakaoContinue: '카카오로 계속하기', confirmTitle: '결제 계정 확인', confirmBody: '이 계정으로 결제하고 멤버십을 개통합니다', confirmPay: '확인하고 결제하기', switchAccount: '다른 계정으로 로그인', newAccount: '신규 계정 · 자동 가입됨', paySuccess: '결제가 완료되었습니다', expired: '이 결제 링크는 만료되었습니다', balanceNext: '남은 금액은 같은 링크로 나중에 결제할 수 있습니다', notFound: '결제 링크를 찾을 수 없습니다', dir: 'ltr',
   },
   Vietnam: {
     title: 'Thanh toán', discount: 'Giảm giá', total: 'Tổng cộng', choose: 'Chọn phương thức thanh toán', pay: 'Thanh toán ngay',
@@ -149,7 +150,7 @@ const ZH: PayCopy = {
   first: '定金首款', balance: '定金尾款', packageDue: '套餐应付', installment: '分期支付需要在 3,000,000 越南盾以上。',
   forLink: '这条支付链接的客户', chooseSku: '选择套餐',
     summary: '订单摘要', dueNow: '本次应付', paidTag: '已支付', laterTag: '稍后支付', secure: '安全支付', account: '用户 ID', dueRule: '付首款后需在 {days} 天内付清尾款', dueLeft: '请在 {days} 天内付清尾款', overdue: '尾款支付期限已过，请联系你的课程顾问', fullTag: '全款', linkPaid: '这条支付链接已支付',
-    bindAfterLogin: '登录后绑定', loginTitle: '登录后继续支付', loginSub: '付款将绑定到你登录的 Dino AI 账号', phone: '手机号', getCode: '获取验证码', code: '验证码', codeHint: '演示：任意 6 位数字', login: '登录', orWith: '或', confirmTitle: '确认付款账号', confirmBody: '将为这个账号付款并开通会员', confirmPay: '确认并去支付', switchAccount: '换个账号', newAccount: '新账号 · 已自动注册', paySuccess: '支付成功', expired: '这条支付链接已过期', balanceNext: '尾款之后可以通过同一条链接支付', notFound: '找不到这条支付链接', dir: 'ltr',
+    bindAfterLogin: '登录后绑定', loginTitle: '登录后继续支付', loginSub: '付款将绑定到你登录的 Dino AI 账号', phone: '手机号', getCode: '获取验证码', code: '验证码', codeHint: '演示：任意 6 位数字', login: '登录', orWith: '或', kakaoContinue: '使用 Kakao 继续', confirmTitle: '确认付款账号', confirmBody: '将为这个账号付款并开通会员', confirmPay: '确认并去支付', switchAccount: '换个账号', newAccount: '新账号 · 已自动注册', paySuccess: '支付成功', expired: '这条支付链接已过期', balanceNext: '尾款之后可以通过同一条链接支付', notFound: '找不到这条支付链接', dir: 'ltr',
 }
 
 const EN: PayCopy = {
@@ -158,7 +159,7 @@ const EN: PayCopy = {
   first: 'Deposit', balance: 'Balance', packageDue: 'Package price', installment: 'Instalments require at least 3,000,000 VND.',
   forLink: 'Payment link for', chooseSku: 'Choose a plan',
     summary: 'Order summary', dueNow: 'Due now', paidTag: 'Paid', laterTag: 'Pay later', secure: 'Secure payment', account: 'User ID', dueRule: 'Please pay the balance within {days} days after the deposit', dueLeft: 'Please pay the balance within {days} days', overdue: 'The balance payment period has ended. Please contact your advisor.', fullTag: 'Full payment', linkPaid: 'This payment link has been paid',
-    bindAfterLogin: 'Linked after login', loginTitle: 'Log in to continue', loginSub: 'The payment is linked to the Dino AI account you log in with', phone: 'Phone number', getCode: 'Get code', code: 'Verification code', codeHint: 'Demo: any 6 digits', login: 'Log in', orWith: 'or', confirmTitle: 'Confirm the paying account', confirmBody: 'You will pay for this account and its membership opens', confirmPay: 'Confirm and pay', switchAccount: 'Use another account', newAccount: 'New account · signed up automatically', paySuccess: 'Payment successful', expired: 'This payment link has expired', balanceNext: 'You can pay the balance later with the same link', notFound: 'Payment link not found', dir: 'ltr',
+    bindAfterLogin: 'Linked after login', loginTitle: 'Log in to continue', loginSub: 'The payment is linked to the Dino AI account you log in with', phone: 'Phone number', getCode: 'Get code', code: 'Verification code', codeHint: 'Demo: any 6 digits', login: 'Log in', orWith: 'or', kakaoContinue: 'Continue with Kakao', confirmTitle: 'Confirm the paying account', confirmBody: 'You will pay for this account and its membership opens', confirmPay: 'Confirm and pay', switchAccount: 'Use another account', newAccount: 'New account · signed up automatically', paySuccess: 'Payment successful', expired: 'This payment link has expired', balanceNext: 'You can pay the balance later with the same link', notFound: 'Payment link not found', dir: 'ltr',
 }
 
 export function methodsForLine(line: string): PayMethod[] {
