@@ -57,6 +57,8 @@ const SEED_SKUS: CatalogSku[] = [
   { id: 'VN-H-2026', productCode: 'web-vn-max-6m', name: 'Max 6 Months', line: 'Vietnam', price: '1,790,000 VND', memberLevel: 'MAX', valid: '180 days after purchase', status: 'Active' },
   { id: 'VN-Y-2026', productCode: 'web-vn-pro-1y', name: 'Pro Yearly', line: 'Vietnam', price: '2,990,000 VND', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
   { id: 'VN-MY-2026', productCode: 'web-vn-max-1y', name: 'Max Yearly', line: 'Vietnam', price: '3,990,000 VND', memberLevel: 'MAX', valid: '365 days after purchase', status: 'Active' },
+  { id: 'TH-Q-2026', productCode: 'web-th-pro-1q', name: 'Pro Quarterly', line: 'Thailand', price: '9,900 THB', memberLevel: 'PRO', valid: '90 days after purchase', status: 'Active' },
+  { id: 'MY-Y-2026', productCode: 'web-my-pro-1y', name: 'Pro Yearly', line: 'Malaysia', price: '388 MYR', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
 ]
 
 const SEED_CHANNELS: CatalogChannel[] = [
@@ -65,6 +67,8 @@ const SEED_CHANNELS: CatalogChannel[] = [
   { id: 'ad_kr_meta', name: 'Korea Meta Back to School', line: 'Korea', channelCode: 'CH-KR-0003', type: 'Ads', enabled: true },
   { id: 'sales_linh_nguyen', name: 'Linh Nguyen', line: 'Vietnam', channelCode: 'CH-VN-0005', type: 'Sales', enabled: true },
   { id: 'ad_vn_meta', name: 'Vietnam Meta Mid-Autumn', line: 'Vietnam', channelCode: 'CH-VN-0007', type: 'Ads', enabled: true },
+  { id: 'th_ground', name: 'Bangkok Ground Team', line: 'Thailand', channelCode: 'CH-TH-0001', type: 'Sales', enabled: true },
+  { id: 'sales_my_kl', name: 'Kuala Lumpur Sales', line: 'Malaysia', channelCode: 'CH-MY-0001', type: 'Sales', enabled: true },
 ]
 
 const SEED_PLANS: CatalogPlan[] = [
@@ -73,6 +77,8 @@ const SEED_PLANS: CatalogPlan[] = [
   { id: 'CSP-KR-META', channelId: 'ad_kr_meta', promoCode: 'CSP-KR-META-PROMO', status: 'Active', rules: [{ skuId: 'KR-Y-2026', mode: 'Amount off', value: '59600' }, { skuId: 'KR-H-2026', mode: 'Percent off', value: '10' }] },
   { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: 'Active', rules: [{ skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'VN-H-2026', mode: 'List price', value: '' }, { skuId: 'VN-Y-2026', mode: 'Percent off', value: '15' }, { skuId: 'VN-MY-2026', mode: 'Amount off', value: '500000' }] },
   { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: 'Active', rules: [{ skuId: 'VN-Y-2026', mode: 'Amount off', value: '500000' }, { skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }] },
+  { id: 'CSP-TH', channelId: 'th_ground', promoCode: '', status: 'Active', rules: [{ skuId: 'TH-Q-2026', mode: 'List price', value: '' }] },
+  { id: 'CSP-MY', channelId: 'sales_my_kl', promoCode: '', status: 'Active', rules: [{ skuId: 'MY-Y-2026', mode: 'List price', value: '' }] },
 ]
 
 export const PAY_HOST: Record<string, string> = {
@@ -123,10 +129,14 @@ export function loadMarketingCatalog(): { skus: CatalogSku[]; channels: CatalogC
   const skus = savedSkus.length
     ? [...savedSkus, ...SEED_SKUS.filter((sku) => !savedSkus.some((item) => item.id === sku.id))]
     : SEED_SKUS
-  const channels = Array.isArray(saved?.distributors) && saved.distributors.length ? saved.distributors : SEED_CHANNELS
+  const savedChannels = Array.isArray(saved?.distributors) && saved.distributors.length ? saved.distributors : []
+  const channels = savedChannels.length
+    ? [...savedChannels, ...SEED_CHANNELS.filter((channel) => !savedChannels.some((item) => item.line === channel.line))]
+    : SEED_CHANNELS
   const savedPlans = Array.isArray(saved?.channelSkuPlans) ? saved.channelSkuPlans : []
   const savedHasMax = savedPlans.some((plan) => (plan.rules || []).some((rule) => memberTier(skus.find((sku) => sku.id === rule.skuId)?.memberLevel) === 'Max'))
-  const plans = savedPlans.length && savedHasMax ? savedPlans : SEED_PLANS
+  const basePlans = savedPlans.length && savedHasMax ? savedPlans : SEED_PLANS
+  const plans = [...basePlans, ...SEED_PLANS.filter((plan) => !basePlans.some((item) => item.channelId === plan.channelId))]
   return {
     skus: skus.filter((sku) => sku.status !== '下架'),
     channels,
