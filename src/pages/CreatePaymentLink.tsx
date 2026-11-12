@@ -75,6 +75,7 @@ import './CreatePaymentLink.css'
 type Scene = 'all' | 'confirm' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
 
 const OPEN_LINK_LINES = ['Korea']
+const PERSONAL_LINK_LINES = ['Malaysia', 'Thailand', 'Vietnam', 'Korea']
 
 function depositFloor(line: string, payable: number) {
   if (line === 'Vietnam' || line === '越南') {
@@ -132,11 +133,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [editingId, setEditingId] = useState<string | null>(null)
   const [screen, setScreen] = useState<'list' | 'form'>(presetUserId ? 'form' : 'list')
   const [keyword, setKeyword] = useState('')
-  const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const [scene, setScene] = useState<Scene>('all')
   const [lineFilter, setLineFilter] = useState<string | undefined>()
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
-  const [onlyMine, setOnlyMine] = useState(false)
   const [qrTarget, setQrTarget] = useState<PaymentLink | null>(null)
   const [qrImage, setQrImage] = useState('')
   const [methodTarget, setMethodTarget] = useState<{ link: PaymentLink; stage: PayStage } | null>(null)
@@ -193,7 +192,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const lines = useMemo(() => {
     const all = linesInCatalog(catalog.skus, catalog.channels)
-    return openPage ? all.filter((item) => OPEN_LINK_LINES.includes(item)) : all
+    return all.filter((item) => (openPage ? OPEN_LINK_LINES : PERSONAL_LINK_LINES).includes(item))
   }, [catalog.skus, catalog.channels, openPage])
   const activeLine = (lines.includes(line) ? line : '') || lines[0] || ''
   const lineChannels = useMemo(
@@ -636,13 +635,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   onChange={onLine}
                   disabled={scopeLocked}
                 />
-                {(openPage || scopeLocked) && (
-                  <Typography.Text type="secondary" className="pl-field-hint">
-                    {scopeLocked
-                      ? (en ? 'Business line and channel cannot be changed after the link is created.' : '链接生成后，业务线和渠道不能改。')
-                      : (en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。')}
-                  </Typography.Text>
-                )}
+                <Typography.Text type="secondary" className="pl-field-hint">
+                  {scopeLocked
+                    ? (en ? 'Business line and channel cannot be changed after the link is created.' : '链接生成后，业务线和渠道不能改。')
+                    : openPage
+                      ? (en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。')
+                      : (en ? 'Personal links are open to Malaysia, Thailand, Vietnam and Korea in this release.' : '专属链接本期开放马来西亚、泰国、越南、韩国。')}
+                </Typography.Text>
               </div>
               <div>
                 <div className="pl-label">{en ? 'Channel' : '渠道'}</div>
@@ -1429,8 +1428,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const textMatch = (row: PaymentLink) => {
     if (!keyword.trim()) return true
     if (row.audience === 'open') return [row.id, row.eventName].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
-    return [row.userId, row.id, row.channelName, row.skuName, row.eventName, ...ordersOf(row.id).flatMap((order) => [order.orderNo, order.userId]), ...txnsOf(row.id).map((txn) => txn.txnId)]
-      .join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
+    return [row.id, row.userId].join(' ').toLowerCase().includes(keyword.trim().toLowerCase())
   }
   const sceneMatch = (row: PaymentLink, value: Scene) => {
     const orders = txnsOf(row.id)
@@ -1448,11 +1446,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const baseRows = links.filter((row) => {
     if ((row.audience === 'open') !== openPage) return false
     if (!textMatch(row)) return false
-    if (typeFilter === 'full' && row.kind !== 'full') return false
-    if (typeFilter === 'deposit' && row.kind !== 'deposit') return false
     if (lineFilter && row.line !== lineFilter) return false
     if (channelFilter && row.channelId !== channelFilter) return false
-    if (onlyMine && row.createdBy !== myEmail) return false
     return true
   })
   const rows = baseRows.filter((row) => sceneMatch(row, scene))
@@ -1534,20 +1529,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           : <Button type="primary" icon={<LinkOutlined />} onClick={() => openCreate('full')}>{en ? 'New personal payment link' : '新建专属支付链接'}</Button>}
       </div>
       <Space wrap>
-        <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link ID' : '活动名 / 链接号') : (en ? 'Link / user / order no.' : '链接 / User ID / 订单号')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
-        {!openPage && (
-          <Select allowClear placeholder={en ? 'Type' : '类型'} value={typeFilter} onChange={setTypeFilter} style={{ width: 150 }}
-            options={[
-              { value: 'full', label: en ? 'Full · not split' : '全款（不拆分）' },
-              { value: 'deposit', label: en ? 'Deposit · split' : '定金（拆两笔）' },
-            ]}
-          />
-        )}
+        <Input.Search allowClear placeholder={openPage ? (en ? 'Event / link ID' : '活动名 / 链接号') : (en ? 'Link ID / User ID' : '链接号 / User ID')} value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ width: 260 }} />
         <Select allowClear placeholder={en ? 'Business line' : '业务线'} value={lineFilter} style={{ width: 150 }} options={lineOptions}
           onChange={(value) => { setLineFilter(value); setChannelFilter(undefined) }}
         />
         <Select allowClear showSearch optionFilterProp="label" placeholder={en ? 'Channel' : '渠道'} value={channelFilter} onChange={setChannelFilter} style={{ width: 200 }} options={channelOptions} />
-        {!openPage && <Checkbox checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)}>{en ? 'Created by me' : '只看我创建的'}</Checkbox>}      </Space>
+      </Space>
       <Alert
         type="info"
         showIcon
