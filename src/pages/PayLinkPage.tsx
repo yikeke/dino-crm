@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
 import {
@@ -26,6 +26,16 @@ import {
 } from '../paymentLinkStore'
 import { useStore } from '../store'
 import './PayLinkPage.css'
+
+const ACCOUNT_KEY = 'dino-pay-link-account'
+
+function savedAccount(): Account | null {
+  try {
+    return JSON.parse(sessionStorage.getItem(ACCOUNT_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
 
@@ -176,6 +186,7 @@ export default function PayLinkPage() {
 
 function PayLinkView({ linkId }: { linkId: string }) {
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const preview = params.get('preview') === '1' || linkId === PREVIEW_LINK_ID
   const [version, setVersion] = useState(0)
   const refresh = () => setVersion((value) => value + 1)
@@ -192,7 +203,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const copy = payCopy(line, lang)
   const bank = bankCopy(lang)
   const open = link?.audience === 'open'
-  const [account, setAccount] = useState<Account | null>(null)
+  const [account, setAccount] = useState<Account | null>(() => (open && !preview ? savedAccount() : null))
   const [loginOpen, setLoginOpen] = useState(false)
   const [doneTxn, setDoneTxn] = useState<LinkTxn | null>(null)
   const [previewAcked, setPreviewAcked] = useState(false)
@@ -271,13 +282,21 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const pay = () => {
     if (!host) return
     const paid = !preview && host.txn ? completeTxn(host.txn.txnId) : undefined
+    if (paid && open) {
+      navigate(`/pay-link/result?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(paid.orderNo)}`)
+      return
+    }
     if (paid) setDoneTxn(paid)
     setHost(null)
     refresh()
   }
 
-  const leaveHost = (reason: string) => {
+  const leaveHost = (reason: string, toResult = false) => {
     if (!preview && host?.txn) failTxn(host.txn.txnId, reason)
+    if (toResult && open && !preview && host?.orderNo) {
+      navigate(`/pay-link/result?link=${encodeURIComponent(linkId)}&orderNo=${encodeURIComponent(host.orderNo)}`)
+      return
+    }
     setHost(null)
     refresh()
   }
@@ -300,6 +319,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
 
   const confirmAccount = (next: Account) => {
     setAccount(next)
+    if (!preview) sessionStorage.setItem(ACCOUNT_KEY, JSON.stringify(next))
     setLoginOpen(false)
     begin(next)
   }
@@ -328,7 +348,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           {open && account && <p className="psp-sku">ID {account.userId}</p>}
           <button className="psp-pay" type="button" onClick={pay}>{copy.pay}</button>
           <button className="psp-cancel" type="button" onClick={() => leaveHost('用户返回，未完成支付')}>{copy.choose}</button>
-          <button className="psp-fail" type="button" onClick={() => leaveHost('支付失败')}>模拟支付失败 · Simulate failure</button>
+          <button className="psp-fail" type="button" onClick={() => leaveHost('支付失败', true)}>模拟支付失败 · Simulate failure</button>
         </div>
       </div>
     )
