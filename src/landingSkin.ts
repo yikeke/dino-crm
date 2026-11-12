@@ -1338,7 +1338,7 @@ export function seedLandingSkins(): LandingSkinStore {
         thirdPartyLogins: ['line', 'apple', 'google', 'facebook'],
         loginLayout: 'two_zone' as const,
         loginOrder: ['line', 'apple', 'google', 'facebook'],
-        secondaryLogins: ['apple', 'google', 'facebook'],
+        secondaryLogins: ['facebook'],
         afterRegisterAction: 'sku_promo_pay' as const,
         ctaStyle: applyButtonPreset('midnight', false),
         stickyCtaStyle: applyButtonPreset('midnight', true),
