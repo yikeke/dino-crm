@@ -182,19 +182,19 @@ export default function LandingSkinManagement() {
     const login = normalizeLoginConfig(editing)
     const methods = login.loginOrder || []
     if (login.pageType === 'pay' && !methods.length) {
-      message.error(en ? 'V1: payment landings need at least one login method (phone or a provider).' : 'V1：支付落地页至少要有一种登录方式（手机号或任一家三方）')
+      message.error(en ? 'Payment landings need at least one login method (phone or a provider).' : '支付落地页至少要有一种登录方式（手机号或任一家三方）')
       return false
     }
     if (login.pageType === 'pay' && login.registerMode === 'full' && !login.verifyEnabled) {
-      message.error(en ? 'V2: payment landings with phone must use OTP.' : 'V2：支付落地页开了手机号，必须有验证')
+      message.error(en ? 'Payment landings with phone must use OTP.' : '支付落地页开了手机号，必须有验证')
       return false
     }
     if (login.loginLayout === 'two_zone' && methods.length && methods.every((m) => (login.secondaryLogins || []).includes(m))) {
-      message.error(en ? 'V4: put at least one method in the primary zone.' : 'V4：主次两区时，主区至少放一种方式')
+      message.error(en ? 'Put at least one method in the primary zone.' : '主次两区时，主区至少放一种方式')
       return false
     }
     if (login.registerMode === 'full' && login.extraFields.some((f) => !f.label.trim())) {
-      message.error(en ? 'V5: extra field labels cannot be empty.' : 'V5：其他字段的文案不能为空')
+      message.error(en ? 'Extra field labels cannot be empty.' : '其他字段的文案不能为空')
       return false
     }
     if (!hasRequiredSceneContent(editing)) {
@@ -532,19 +532,12 @@ export default function LandingSkinManagement() {
           <Text type="secondary" className="skin-reg-lead">
             {en
               ? 'Same order as the page: phone register, third-party login, login-area layout and order, then title, button and background.'
-              : '按页面从上到下来配：手机号注册、三方登录、登录区样式和顺序，再写标题、定按钮、铺背景。手机号和三方互相独立，可以只开一边。'}
+              : '按页面从上到下来配：手机号注册、三方登录、登录区样式和顺序，再写标题、定按钮、铺背景。'}
           </Text>
-          <div className="skin-login-state">
-            <Tag color={loginState === 'R0' ? 'default' : loginState === 'R4' ? 'purple' : 'blue'}>{loginStateLabel(loginState, en)}</Tag>
-          </div>
-          {policy.reasonZh ? (
-            <Alert type="info" showIcon style={{ marginBottom: 12, maxWidth: 640 }} message={en ? policy.reasonEn : policy.reasonZh} />
-          ) : null}
           <div className="skin-reg-block">
             <div className="skin-reg-head">
               <em>1</em>
               <b>{en ? 'Phone register' : '手机号注册'}</b>
-              <span>{en ? 'On = phone form (+ OTP / extra fields) creates an account' : '开 = 展示手机号表单，提交后建账号；验证码和其他字段在这里配'}</span>
             </div>
           <div className="skin-form-row">
             <label>{en ? 'Phone register' : '手机号注册'}</label>
@@ -554,17 +547,6 @@ export default function LandingSkinManagement() {
                 checked={regMode === 'full'}
                 onChange={(on) => patchLogin({ registerMode: on ? 'full' : 'none' })}
               />
-              <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                {policy.phone === 'on'
-                  ? (en ? 'Locked on.' : '锁定开启。')
-                  : policy.phone === 'off'
-                  ? (en ? 'Locked off.' : '锁定关闭。')
-                  : pageType === 'pay'
-                  ? (en ? 'Can be off if at least one provider is ticked (V1).' : '可以关，但关了以后至少要勾一家三方（V1）。')
-                  : (en
-                    ? 'Off + no provider = no login area; Next interaction is greyed out.'
-                    : '关掉且三方一家不勾 = 无登录区，「后续交互页面」置灰（不进入后续交互页面）。')}
-              </Text>
             </div>
           </div>
           {regMode === 'full' ? (
@@ -655,7 +637,6 @@ export default function LandingSkinManagement() {
             <div className="skin-reg-head">
               <em>2</em>
               <b>{en ? 'Third-party login' : '三方登录'}</b>
-              <span>{en ? 'Independent of phone register' : '和手机号互相独立，不开手机号也可以只配三方'}</span>
             </div>
           <div className="skin-form-row">
             <label>{policy.phone === 'off' && policy.thirds === 'free' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
@@ -666,13 +647,6 @@ export default function LandingSkinManagement() {
                 options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
                 onChange={(vals) => patchLogin({ thirdPartyLogins: vals as ThirdPartyLogin[] })}
               />
-              <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                {policy.thirds === 'off'
-                  ? (en ? 'Not available on this page.' : '这类页面没有登录区，不能勾三方。')
-                  : (en
-                    ? 'Kakao is Korea-only and LINE is Japan-only (V6); switching line drops the one that is not available.'
-                    : 'Kakao 只在韩国可选，LINE 只在日本可选（V6）；切业务线后不可用的那家自动去掉、C 端不出现。')}
-              </Text>
             </div>
           </div>
           </div>
@@ -681,7 +655,6 @@ export default function LandingSkinManagement() {
               <div className="skin-reg-head">
                 <em>3</em>
                 <b>{en ? 'Login area layout & order' : '登录区样式和顺序'}</b>
-                <span>{en ? 'Display only; does not change the login result (V7)' : '只影响展示，不影响登录结果（V7）'}</span>
               </div>
               <div className="skin-form-row">
                 <label>{en ? 'Layout' : '登录区样式'}</label>
@@ -714,7 +687,6 @@ export default function LandingSkinManagement() {
                             <div className="dots"><i /><i /></div>
                           </div>
                         )}
-                        <span className="skin-layout-hint">{en ? x.hintEn : x.hintZh}</span>
                       </button>
                     ))}
                   </div>
@@ -749,15 +721,6 @@ export default function LandingSkinManagement() {
                       </li>
                     ))}
                   </ol>
-                  <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                    {twoZone
-                      ? (en
-                        ? 'Primary = big buttons in this order; Other ways = small circles under a divider. Phone is one of the buttons and opens the form when tapped. At least one primary (V4).'
-                        : '主区 = 按这个顺序的大按钮；其他方式 = 分隔线下面的小圆按钮。手机号是其中一颗按钮，点了才展开表单。主区至少放一种（V4）。')
-                      : (en
-                        ? 'Form first: the phone form always stays on top; this order sets the icon row under it.'
-                        : '表单优先：手机号表单固定在上面，这里的顺序决定下面那排三方图标的先后。')}
-                  </Text>
                 </div>
               </div>
             </div>

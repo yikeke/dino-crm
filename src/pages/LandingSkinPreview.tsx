@@ -810,7 +810,6 @@ function ConfigPanel({
 
       <section className="lpw-card">
         <h3>注册配置</h3>
-        <Row label="登录区展示态" slot="slot-register-card" onFocus={onFocus}>{loginStateLabel(loginState)}</Row>
         <Row label="手机号注册" slot={mode === 'full' ? 'slot-register-fields' : undefined} onFocus={onFocus} muted={mode !== 'full'}>{mode === 'full' ? '开' : '关'}</Row>
         <Row label="注册表单标题" slot={skin.registerTitle || skin.registerSubtitle ? 'slot-register-title' : undefined} onFocus={onFocus} muted={!skin.registerTitle && !skin.registerSubtitle}>
           {skin.registerTitle || skin.registerSubtitle ? (

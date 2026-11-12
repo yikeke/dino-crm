@@ -323,20 +323,16 @@ export const LANGUAGE_OPTIONS = [
   { value: 'en', label: '英语' },
 ]
 
-export const LOGIN_LAYOUT_OPTIONS: { value: LoginLayout; zh: string; en: string; hintZh: string; hintEn: string }[] = [
+export const LOGIN_LAYOUT_OPTIONS: { value: LoginLayout; zh: string; en: string }[] = [
   {
     value: 'form_first',
     zh: '表单优先',
     en: 'Form first',
-    hintZh: '现网样式。手机号表单在上，三方是表单下面一排小图标。',
-    hintEn: 'Current style. Phone form on top, third-party icons in a row below.',
   },
   {
     value: 'two_zone',
     zh: '主次两区',
     en: 'Two zones',
-    hintZh: '对齐 App：主区大按钮，下面「其他登录方式」放小圆按钮。全部放主区就是一列同样大小的按钮（韩国）。',
-    hintEn: 'Like the app: big buttons in the primary zone, small circles under “Other ways”. All primary = one column of equal buttons (Korea).',
   },
 ]
 
@@ -1640,7 +1636,7 @@ export function pageTypeLabel(type: LandingPageKind | string, en = false) {
 }
 
 export function loginStateLabel(state: LoginRenderState, en = false) {
-  return `${state} ${en ? LOGIN_STATE_INFO[state].en : LOGIN_STATE_INFO[state].zh}`
+  return en ? LOGIN_STATE_INFO[state].en : LOGIN_STATE_INFO[state].zh
 }
 
 /** 列表「登录区」列：展示态 + 按顺序的方式（两区时副区用括号）。 */
