@@ -2,7 +2,7 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v10'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v11'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
@@ -10,7 +10,7 @@ export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10',
   'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
 ]
 
@@ -504,7 +504,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     seedLink({ id: 'PL-DEP-VN', kind: 'deposit', validUntil: '2026-11-27', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
     seedLink({ id: 'PL-DEP-READY', kind: 'deposit', validUntil: day(6), audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
     seedLink({ id: 'PL-DEP-LATE', kind: 'deposit', validUntil: day(-2), audience: 'user', userId: '2060199610824356004', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: shift(-218).slice(0, 16), updatedAt: shift(-216).slice(0, 16) }),
-    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', validUntil: day(30), audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
+    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', validUntil: day(7), audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
     seedLink({ id: 'PL-FULL-BANK', kind: 'full', audience: 'user', userId: '2090031938694049794', ...linh, offers: vn, payable: 891000, amount: 0, methods: ['bank_transfer'], createdAt: '2026-10-28 13:05', updatedAt: '2026-10-28 13:22' }),
     seedLink({ id: 'PL-FULL-PAID', kind: 'full', audience: 'user', userId: '2060199610824355846', ...amy, offers: [kr[0]], payable: 89100, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20' }),
     seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
@@ -518,7 +518,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [ops, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
     'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '添加会员', '2060199610824356009 · 7 天体验']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
-    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至一个月后']] },
+    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 391,000 VND，有效期至 ${day(7)}`]] },
     'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Bank transfer']] },
     'PL-FULL-PAID': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Card、Kakao Pay']] },
     'PL-OPEN-KR': { by: lead, log: [[lead, '新建通用链接', 'Seoul Edu Expo 2026 · Booth B12，有效期至 2026-11-30'], [lead, '修改支付方式', '全款：Card、Kakao Pay', '2026-10-27 11:40']] },

@@ -264,7 +264,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience !== 'open' || ccManager)
   const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
-  const defaultValidity = (kind: 'full' | 'deposit') => (kind === 'deposit' ? dayjs().add(1, 'month').format('YYYY-MM-DD') : '')
+  const DEPOSIT_VALID_DAYS = 7
+  const defaultValidity = (kind: 'full' | 'deposit') => (kind === 'deposit' ? dayjs().add(DEPOSIT_VALID_DAYS, 'day').format('YYYY-MM-DD') : '')
 
   const resetCustomer = () => {
     setUserQuery('')
@@ -547,7 +548,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       content: stop
         ? (en ? 'Valid-until becomes yesterday and takes effect now. The customer page shows the link as expired. Paid orders stay as they are.' : '有效期改成昨天，马上生效：用户打开链接提示已过期，不能再付款。已支付的订单不变。')
         : editingRow.kind === 'deposit'
-          ? (en ? `Valid-until becomes ${next} (one month from today) and takes effect now.` : `有效期改成 ${next}（今天起一个月），马上生效，用户可以继续付款。`)
+          ? (en ? `Valid-until becomes ${next} (7 days from today) and takes effect now.` : `有效期改成 ${next}（今天起 7 天），马上生效，用户可以继续付款。`)
           : (en ? 'Valid-until is cleared (no end date) and takes effect now.' : '清空有效期（不限期），马上生效，用户可以继续付款。'),
       okText: stop ? (en ? 'Stop' : '停止收款') : (en ? 'Resume' : '恢复收款'),
       okButtonProps: stop ? { danger: true } : undefined,
@@ -564,7 +565,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const validityCard = (no: number, deposit: boolean) => (
     <Card size="small" title={step(no, en ? 'Link validity' : '链接有效期', deposit
-      ? (en ? 'Required for deposits, one month by default' : '定金必填，默认一个月')
+      ? (en ? 'Required for deposits, 7 days by default' : '定金必填，默认 7 天')
       : (en ? 'Leave empty for no end date' : '不填就不限期'))}>
       <div className="pl-validity">
         <div>
@@ -583,7 +584,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       <Typography.Text type="secondary" className="pl-field-hint">
         {editingRow
           ? (deposit
-            ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume sets it to one month from today; you can also pick another date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」改成今天起一个月。也可以直接选日期，保存后生效。')
+            ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume sets it to 7 days from today; you can also pick another date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」改成今天起 7 天。也可以直接选日期，保存后生效。')
             : (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。'))
           : deposit
             ? (en ? 'First payment and balance must both be paid by this date. After the first payment, the customer page shows the days left.' : '首款和尾款都要在有效期内付完。首款到账后，用户支付页提示还剩几天；过期后不能再付。')
@@ -605,6 +606,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     return (
       <div className="pl-form">
         <div className="pl-form__main">
+          {validityCard(++stepNo, mode === 'deposit')}
+
           <Card size="small" title={step(++stepNo, en ? 'Who pays' : '付款人', open ? (en ? 'Anyone who scans logs in first' : '扫码用户先登录再付款') : (en ? 'Phone number or User ID' : '手机号或 User ID'))}>
             {open ? (
               <div className="pl-field">
@@ -744,7 +747,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     type="button"
                     className={`pl-audience__item${mode === item.value ? ' is-on' : ''}`}
                     disabled={!!editingId && mode !== item.value}
-                    onClick={() => { setTab(item.value); setFirstAmount(null); if (!editingId) setValidUntil(defaultValidity(item.value)) }}
+                    onClick={() => {
+                      setTab(item.value)
+                      setFirstAmount(null)
+                      if (editingId) return
+                      if (item.value === 'deposit' && !validUntil) setValidUntil(defaultValidity('deposit'))
+                      if (item.value === 'full' && validUntil === defaultValidity('deposit')) setValidUntil('')
+                    }}
                   >
                     <span className="pl-audience__radio" />
                     <span>
@@ -826,7 +835,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             </div>
           </Card>
 
-          {validityCard(++stepNo, mode === 'deposit')}
         </div>
 
         <div className="pl-form__side">
