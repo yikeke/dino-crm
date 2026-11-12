@@ -1104,29 +1104,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       width: 210,
       render: (_: unknown, row: PaymentLink) => {
         const status = linkStatus(row)
+        const paid = collected(row).length
         return (
           <div className="pl-two-line">
             <span><Tag color={status.color} bordered={false}>{status.label}</Tag></span>
             {row.audience === 'open' && row.validUntil && <Typography.Text type="secondary">{en ? 'Until' : '至'} {row.validUntil}</Typography.Text>}
             {row.kind === 'deposit' && row.status === 'ACTIVE' && dueLine(row)}
-          </div>
-        )
-      },
-    },
-    {
-      title: en ? 'Collected' : '已收',
-      width: 170,
-      render: (_: unknown, row: PaymentLink) => {
-        const paid = collected(row)
-        if (!paid.length) return <Typography.Text type="secondary">{en ? 'Nothing yet' : '暂无'}</Typography.Text>
-        return (
-          <div className="pl-two-line">
-            <b>{formatMoney(paid.reduce((sum, txn) => sum + txn.amount, 0), row.currency || paid[0].currency)}</b>
-            <Typography.Text type="secondary">{en ? `${paid.length} successful transaction${paid.length > 1 ? 's' : ''}` : `${paid.length} 笔成功交易`}</Typography.Text>
-            {row.audience === 'open' && (() => {
-              const payers = new Set(paid.map((txn) => ordersOf(row.id).find((order) => order.orderNo === txn.orderNo)?.userId)).size
-              return <Typography.Text type="secondary">{en ? `${payers} payer${payers > 1 ? 's' : ''}` : `${payers} 位付款人`}</Typography.Text>
-            })()}
+            <Typography.Text type="secondary">{en ? `${paid} successful transaction${paid === 1 ? '' : 's'}` : `${paid} 笔成功交易`}</Typography.Text>
           </div>
         )
       },
