@@ -434,3 +434,24 @@
 /* RTL (Arabic): phone numbers and dial codes stay left-to-right. */
 .lp-field.lp-field-phone { direction: ltr; }
 .lp-skin[dir="rtl"] .lp-field select { direction: rtl; }
+
+/* 10.7 主次两区 */
+.lp-two-zone { margin: 4px 0 2px; }
+.lp-pills { display: flex; flex-direction: column; gap: 10px; }
+.lp-pill {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px;
+  border-radius: 24px; border: 1px solid #e5e7eb; background: #fff; color: #1f2329; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.lp-pill.is-kakao { background: #fee500; border-color: #fee500; color: #191919; }
+.lp-pill.is-line { background: #06c755; border-color: #06c755; color: #fff; }
+.lp-pill.is-apple { background: #111; border-color: #111; color: #fff; }
+.lp-pill.is-facebook { background: #1877f2; border-color: #1877f2; color: #fff; }
+.lp-pill.is-phone { background: #f3f4f6; }
+.lp-pill-icon { width: 20px; height: 20px; border-radius: 50%; background: center/16px no-repeat; flex: none; }
+.lp-pill-icon.google { background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234285F4' d='M21.35 11.1h-9.18v2.96h5.27c-.23 1.23-1.4 3.61-5.27 3.61-3.18 0-5.78-2.63-5.78-5.87s2.6-5.87 5.78-5.87c1.81 0 3.03.77 3.73 1.43l2.54-2.45C16.54 3.54 14.48 2.6 12.17 2.6 6.96 2.6 2.8 6.74 2.8 11.8s4.16 9.2 9.37 9.2c5.41 0 8.98-3.8 8.98-9.16 0-.62-.07-1.08-.16-1.74z'/%3E%3C/svg%3E"); }
+.lp-pill-icon.phone { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='2' width='12' height='20' rx='2.5' fill='none' stroke='%231f2329' stroke-width='2'/%3E%3Ccircle cx='12' cy='18' r='1.2' fill='%231f2329'/%3E%3C/svg%3E"); }
+.lp-pill-icon.kakao, .lp-pill-icon.line, .lp-pill-icon.apple, .lp-pill-icon.facebook { display: none; }
+.lp-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 0; color: #8a8f99; font-size: 12px; }
+.lp-divider::before, .lp-divider::after { content: ''; flex: 1; height: 1px; background: #e5e7eb; }
+.lp-thirds .phone { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='2' width='12' height='20' rx='2.5' fill='none' stroke='%231f2329' stroke-width='2'/%3E%3Ccircle cx='12' cy='18' r='1.2' fill='%231f2329'/%3E%3C/svg%3E"); }
+.lp-back-ways { border: 0; background: none; padding: 0; margin: 0 0 10px; color: #2672ff; font-size: 13px; cursor: pointer; }

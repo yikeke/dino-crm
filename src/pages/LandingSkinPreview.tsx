@@ -39,7 +39,9 @@ import {
   normalizeVideoPlayMode,
   pageTypeLabel,
   readPreviewDraft,
-  registerModeLabel,
+  loginRenderState,
+  loginStateLabel,
+  loginMethodLabel,
   stickyButtonLabel,
   stickyShowsButton,
   stickyShowsImage,
@@ -55,16 +57,16 @@ import {
 import './LandingSkinPreview.css'
 import '../landingButton.css'
 
-const labels: Record<string, { kicker: string; phone: string; otp: string; getCode: string; cta: string; pay: string; terms: string; agree: string }> = {
-  ko: { kicker: '우리 아이 첫 AI 영어 파트너, 다이노 AI', phone: '휴대폰 번호', otp: '인증번호', getCode: '인증', cta: '바로 시작하기', pay: '지금 구매', terms: '이용약관', agree: '이용약관 및 개인정보 처리방침에 동의합니다' },
-  vi: { kicker: 'Đối tác AI tiếng Anh đầu tiên của bé, Dino AI', phone: 'Số điện thoại', otp: 'Mã xác minh', getCode: 'Gửi mã', cta: 'Bắt đầu ngay', pay: 'Mua ngay', terms: 'Điều khoản', agree: 'Bạn đồng ý với' },
-  ar: { kicker: 'شريك طفلك الأول لتعلم الإنجليزية بالذكاء الاصطناعي', phone: 'رقم الجوال', otp: 'رمز التحقق', getCode: 'إرسال', cta: 'ابدأ الآن', pay: 'اشترِ الآن', terms: 'الشروط', agree: 'بالموافقة فإنك تقبل' },
-  ms: { kicker: 'Rakan AI bahasa Inggeris pertama anak anda, Dino AI', phone: 'Nombor telefon', otp: 'Kod SMS', getCode: 'Hantar', cta: 'Mula sekarang', pay: 'Beli sekarang', terms: 'Terma', agree: 'Anda bersetuju dengan' },
-  th: { kicker: 'เพื่อนคู่คิด AI ภาษาอังกฤษคนแรกของลูก Dino AI', phone: 'เบอร์โทรศัพท์', otp: 'รหัสยืนยัน', getCode: 'ส่งรหัส', cta: 'เริ่มเลย', pay: 'ซื้อเลย', terms: 'ข้อกำหนด', agree: 'คุณยอมรับ' },
-  id: { kicker: 'Teman AI bahasa Inggris pertama anak, Dino AI', phone: 'Nomor telepon', otp: 'Kode SMS', getCode: 'Kirim', cta: 'Mulai sekarang', pay: 'Beli sekarang', terms: 'Ketentuan', agree: 'Anda menyetujui' },
-  ja: { kicker: '子どもの最初のAI英語パートナー、Dino AI', phone: '電話番号', otp: '認証コード', getCode: '送信', cta: '今すぐ始める', pay: '購入する', terms: '利用規約', agree: 'に同意します' },
-  'zh-Hant': { kicker: '孩子的第一個 AI 英語夥伴，Dino AI', phone: '手機號碼', otp: '驗證碼', getCode: '取得驗證碼', cta: '立即開始', pay: '立即購買', terms: '使用條款', agree: '即表示你同意' },
-  en: { kicker: 'Your child’s first AI English partner, Dino AI', phone: 'Phone number', otp: 'SMS code', getCode: 'Get code', cta: 'Log in', pay: 'Buy now', terms: 'Terms of Use', agree: 'You agree to our' },
+const labels: Record<string, { kicker: string; phone: string; otp: string; getCode: string; cta: string; pay: string; terms: string; agree: string; phoneLogin: string; continueWith: string; more: string; otherWays: string }> = {
+  ko: { kicker: '우리 아이 첫 AI 영어 파트너, 다이노 AI', phone: '휴대폰 번호', otp: '인증번호', getCode: '인증', cta: '바로 시작하기', pay: '지금 구매', terms: '이용약관', agree: '이용약관 및 개인정보 처리방침에 동의합니다', phoneLogin: '휴대폰 번호로 시작하기', continueWith: '{name}로 시작하기', more: '다른 로그인 방법', otherWays: '다른 방법' },
+  vi: { kicker: 'Đối tác AI tiếng Anh đầu tiên của bé, Dino AI', phone: 'Số điện thoại', otp: 'Mã xác minh', getCode: 'Gửi mã', cta: 'Bắt đầu ngay', pay: 'Mua ngay', terms: 'Điều khoản', agree: 'Bạn đồng ý với', phoneLogin: 'Tiếp tục với số điện thoại', continueWith: 'Tiếp tục với {name}', more: 'Cách đăng nhập khác', otherWays: 'Cách khác' },
+  ar: { kicker: 'شريك طفلك الأول لتعلم الإنجليزية بالذكاء الاصطناعي', phone: 'رقم الجوال', otp: 'رمز التحقق', getCode: 'إرسال', cta: 'ابدأ الآن', pay: 'اشترِ الآن', terms: 'الشروط', agree: 'بالموافقة فإنك تقبل', phoneLogin: 'المتابعة برقم الجوال', continueWith: 'المتابعة عبر {name}', more: 'طرق تسجيل أخرى', otherWays: 'طرق أخرى' },
+  ms: { kicker: 'Rakan AI bahasa Inggeris pertama anak anda, Dino AI', phone: 'Nombor telefon', otp: 'Kod SMS', getCode: 'Hantar', cta: 'Mula sekarang', pay: 'Beli sekarang', terms: 'Terma', agree: 'Anda bersetuju dengan', phoneLogin: 'Teruskan dengan nombor telefon', continueWith: 'Teruskan dengan {name}', more: 'Cara log masuk lain', otherWays: 'Cara lain' },
+  th: { kicker: 'เพื่อนคู่คิด AI ภาษาอังกฤษคนแรกของลูก Dino AI', phone: 'เบอร์โทรศัพท์', otp: 'รหัสยืนยัน', getCode: 'ส่งรหัส', cta: 'เริ่มเลย', pay: 'ซื้อเลย', terms: 'ข้อกำหนด', agree: 'คุณยอมรับ', phoneLogin: 'ดำเนินการต่อด้วยเบอร์โทร', continueWith: 'ดำเนินการต่อด้วย {name}', more: 'วิธีเข้าสู่ระบบอื่น', otherWays: 'วิธีอื่น' },
+  id: { kicker: 'Teman AI bahasa Inggris pertama anak, Dino AI', phone: 'Nomor telepon', otp: 'Kode SMS', getCode: 'Kirim', cta: 'Mulai sekarang', pay: 'Beli sekarang', terms: 'Ketentuan', agree: 'Anda menyetujui', phoneLogin: 'Lanjutkan dengan nomor telepon', continueWith: 'Lanjutkan dengan {name}', more: 'Cara masuk lain', otherWays: 'Cara lain' },
+  ja: { kicker: '子どもの最初のAI英語パートナー、Dino AI', phone: '電話番号', otp: '認証コード', getCode: '送信', cta: '今すぐ始める', pay: '購入する', terms: '利用規約', agree: 'に同意します', phoneLogin: '電話番号で続ける', continueWith: '{name}で続ける', more: 'その他のログイン方法', otherWays: 'その他の方法' },
+  'zh-Hant': { kicker: '孩子的第一個 AI 英語夥伴，Dino AI', phone: '手機號碼', otp: '驗證碼', getCode: '取得驗證碼', cta: '立即開始', pay: '立即購買', terms: '使用條款', agree: '即表示你同意', phoneLogin: '使用手機號碼繼續', continueWith: '使用 {name} 繼續', more: '其他登入方式', otherWays: '其他方式' },
+  en: { kicker: 'Your child’s first AI English partner, Dino AI', phone: 'Phone number', otp: 'SMS code', getCode: 'Get code', cta: 'Log in', pay: 'Buy now', terms: 'Terms of Use', agree: 'You agree to our', phoneLogin: 'Continue with phone', continueWith: 'Continue with {name}', more: 'Other ways to log in', otherWays: 'Other ways' },
 }
 
 function copyFor(lang: string) {
@@ -205,17 +207,58 @@ function RegisterBlock({ skin, children }: { skin: LandingSkin; children: ReactN
 function LeadForm({ skin, onSubmit, onOauth }: { skin: LandingSkin; onSubmit: () => void; onOauth: () => void }) {
   const copy = copyFor(skin.language)
   const phone = LINE_PHONE[skin.line || ''] || LINE_PHONE.其他
-  const mode = normalizeRegisterMode(skin.registerMode)
-  const showForm = mode === 'full'
-  const oauthOnly = mode === 'oauth'
-  const thirds = skin.thirdPartyLogins.length ? (
-    <div className={`lp-thirds ${oauthOnly ? 'is-primary' : ''}`} data-slot="slot-register-thirds">
-      {skin.thirdPartyLogins.map((id) => (
+  const state = loginRenderState(skin)
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const order = (skin.loginOrder || []).filter((m): m is ThirdPartyLogin => m !== 'phone')
+  const secondary = new Set(skin.secondaryLogins || [])
+  const icons = (ids: ThirdPartyLogin[], cls = '') => (ids.length ? (
+    <div className={`lp-thirds ${cls}`} data-slot="slot-register-thirds">
+      {ids.map((id) => (
         <button type="button" className={id} key={id} aria-label={thirdLabel(id)} onClick={onOauth} />
       ))}
     </div>
-  ) : null
+  ) : null)
+  const showForm = state === 'R1' || state === 'R2' || (state === 'R4' && phoneOpen && skin.registerMode === 'full')
+  const showCta = state === 'R0' || showForm
   const titleColor = normalizeTitleColor(skin.registerTitleColor)
+  const twoZone = state === 'R4' && !phoneOpen ? (() => {
+    const all = skin.loginOrder || []
+    const primary = all.filter((m) => !secondary.has(m))
+    const rest = all.filter((m) => secondary.has(m))
+    return (
+      <div className="lp-two-zone" data-slot="slot-register-thirds">
+        <div className="lp-pills">
+          {primary.map((m) => (
+            <button
+              type="button"
+              key={m}
+              className={`lp-pill is-${m}`}
+              onClick={m === 'phone' ? () => setPhoneOpen(true) : onOauth}
+            >
+              <i className={`lp-pill-icon ${m}`} aria-hidden="true" />
+              {m === 'phone' ? copy.phoneLogin : copy.continueWith.replace('{name}로', m === 'facebook' ? '{name}으로' : '{name}로').replace('{name}', thirdLabel(m))}
+            </button>
+          ))}
+        </div>
+        {rest.length ? (
+          <>
+            <div className="lp-divider"><span>{copy.more}</span></div>
+            <div className="lp-thirds">
+              {rest.map((m) => (
+                <button
+                  type="button"
+                  key={m}
+                  className={m}
+                  aria-label={m === 'phone' ? copy.phoneLogin : thirdLabel(m)}
+                  onClick={m === 'phone' ? () => setPhoneOpen(true) : onOauth}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    )
+  })() : null
   return (
     <form className="lp-lead" onSubmit={(e) => { e.preventDefault(); onSubmit() }}>
       <img className="lp-logo" src={lpAsset('logo.svg')} alt="Dino AI" />
@@ -225,6 +268,11 @@ function LeadForm({ skin, onSubmit, onOauth }: { skin: LandingSkin; onSubmit: ()
           {skin.registerSubtitle ? <p>{skin.registerSubtitle}</p> : null}
         </div>
       ) : null}
+      {state === 'R4' && phoneOpen ? (
+        <button type="button" className="lp-back-ways" onClick={() => setPhoneOpen(false)}>← {copy.otherWays}</button>
+      ) : null}
+      {twoZone}
+      {state === 'R3' ? icons(order, 'is-primary') : null}
       {showForm ? (
         <>
           <div data-slot="slot-register-fields">
@@ -252,13 +300,13 @@ function LeadForm({ skin, onSubmit, onOauth }: { skin: LandingSkin; onSubmit: ()
           ) : null}
         </>
       ) : null}
-      {oauthOnly ? thirds : (
+      {showCta ? (
         <div data-slot="slot-register-cta">
           <button {...ctaProps(skin.ctaStyle)} type="submit">{skin.ctaText || copy.cta}</button>
         </div>
-      )}
+      ) : null}
       <p className="lp-terms">{copy.agree}</p>
-      {oauthOnly ? null : thirds}
+      {state === 'R1' ? icons(order) : null}
     </form>
   )
 }
@@ -712,7 +760,8 @@ function ConfigPanel({
 }) {
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
   const mode = normalizeRegisterMode(skin.registerMode)
-  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, mode)
+  const loginState = loginRenderState(skin)
+  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line)
   const areaKind = normalizeRegisterAreaBgKind(skin.registerAreaBgKind)
   const formKind = normalizeRegisterBgKind(skin.registerBgKind)
   const slots = useMemo(() => collectSkinAssets(skin), [skin])
@@ -755,13 +804,14 @@ function ConfigPanel({
         <Row label="落地页类型" onFocus={onFocus}>{pageTypeLabel(pageType)}</Row>
         <Row label="后续交互页面" onFocus={onFocus}>
           {followUpLabel(action)}
-          {mode !== 'none' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无注册，不进入后续交互</em>}
+          {loginState !== 'R0' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无登录区，不进入后续交互</em>}
         </Row>
       </section>
 
       <section className="lpw-card">
         <h3>注册配置</h3>
-        <Row label="注册类型" slot="slot-register-fields" onFocus={onFocus}>{registerModeLabel(mode, false, skin.line)}</Row>
+        <Row label="登录区展示态" slot="slot-register-card" onFocus={onFocus}>{loginStateLabel(loginState)}</Row>
+        <Row label="手机号注册" slot={mode === 'full' ? 'slot-register-fields' : undefined} onFocus={onFocus} muted={mode !== 'full'}>{mode === 'full' ? '开' : '关'}</Row>
         <Row label="注册表单标题" slot={skin.registerTitle || skin.registerSubtitle ? 'slot-register-title' : undefined} onFocus={onFocus} muted={!skin.registerTitle && !skin.registerSubtitle}>
           {skin.registerTitle || skin.registerSubtitle ? (
             <>
@@ -783,6 +833,11 @@ function ConfigPanel({
         <Row label="三方登录" slot={skin.thirdPartyLogins.length ? 'slot-register-thirds' : undefined} onFocus={onFocus} muted={!skin.thirdPartyLogins.length}>
           {skin.thirdPartyLogins.length ? skin.thirdPartyLogins.map(thirdLabel).join('、') : '未勾选'}
         </Row>
+        {(skin.loginOrder || []).length ? (
+          <Row label="样式和顺序" slot="slot-register-thirds" onFocus={onFocus}>
+            {skin.loginLayout === 'two_zone' ? '主次两区' : '表单优先'} · {(skin.loginOrder || []).map((m) => `${loginMethodLabel(m)}${(skin.secondaryLogins || []).includes(m) ? '（其他方式）' : ''}`).join(' → ')}
+          </Row>
+        ) : null}
         <Row label="注册按钮文案" slot="slot-register-cta" onFocus={onFocus}>{skin.ctaText || `${copyFor(skin.language).cta}（未填，用业务线默认）`}</Row>
         <Row label="注册按钮样式" slot="slot-register-cta" onFocus={onFocus}>{styleSummary(skin.ctaStyle)}</Row>
         <Row label="注册区域背景" slot="slot-register" onFocus={onFocus} muted={areaKind === 'none'}>
@@ -954,18 +1009,18 @@ export default function LandingSkinPreview() {
 
   const copy = copyFor(skin.language)
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
-  const mode = normalizeRegisterMode(skin.registerMode)
-  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line, mode)
+  const noLoginArea = loginRenderState(skin) === 'R0'
+  const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line)
   const openAfterRegister = () => {
-    if (mode === 'none' && action !== 'onelink') {
+    if (noLoginArea && action !== 'onelink') {
       focusLead()
       return
     }
     setFlow(startStep(action))
   }
-  // 配图叠按钮 / 吸底按钮：日本默认获客页（无注册 + OneLink）直接跳 OneLink，其余滚到注册区。
+  // 配图叠按钮 / 吸底按钮：日本 / 香港获客页（无登录区 + OneLink）直接跳 OneLink，其余滚到登录区。
   const onPageCta = () => {
-    if (mode === 'none' && action === 'onelink') {
+    if (noLoginArea && action === 'onelink') {
       setFlow('onelink')
       return
     }
@@ -992,7 +1047,7 @@ export default function LandingSkinPreview() {
           </Slot>
         ) : null))}
         <RegisterBlock skin={skin}>
-          <LeadForm skin={skin} onSubmit={openAfterRegister} onOauth={() => setFlow(startStep(action))} />
+          <LeadForm key={skin.id} skin={skin} onSubmit={openAfterRegister} onOauth={() => setFlow(startStep(action))} />
         </RegisterBlock>
         {skin.registerAfter.map((asset, i) => (asset.src ? (
           <Slot key={asset.id} id={`slot-after-${i}`} label={`后置配图 ${i + 1}`}>

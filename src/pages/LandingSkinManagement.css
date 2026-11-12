@@ -238,3 +238,10 @@
 .skin-guide-flow button:hover { border-color: #4c7cf3; color: #174ea6; }
 .skin-guide-flow em { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #4c7cf3; color: #fff; font-size: 10px; font-style: normal; font-weight: 600; }
 .skin-guide-essence { margin: 8px 0 0; font-size: 12px; line-height: 1.55; color: #646a73; max-width: 820px; }
+
+/* 10.7 登录区 */
+.skin-login-state { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
+.skin-login-order { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.skin-login-order li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
+.skin-login-order li b { flex: 1; font-weight: 500; }
+.skin-login-order-idx { width: 20px; height: 20px; border-radius: 50%; background: #e8efff; color: #2f54eb; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }

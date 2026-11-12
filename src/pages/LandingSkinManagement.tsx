@@ -10,10 +10,15 @@ import {
   followUpOptions,
   PAGE_TYPE_HINT,
   PAGE_TYPE_OPTIONS,
-  registerModeOptions,
+  LOGIN_LAYOUT_OPTIONS,
+  LOGIN_STATE_INFO,
+  loginPolicy,
+  loginRenderState,
+  loginMethodLabel,
+  loginStateLabel,
+  normalizeLoginConfig,
   SKIN_BUSINESS_LINES,
   thirdPartyOptionsForLine,
-  thirdPartyLoginsForLine,
   allocateTemplateCode,
   defaultLanguageForLine,
   imageAltPlaceholder,
@@ -46,11 +51,7 @@ import {
   normalizeRegisterBgKind,
   normalizeRegisterAreaBgColor,
   normalizeRegisterAreaBgKind,
-  normalizeRegisterMode,
-  registerModeForPage,
-  isLeadCollectAction,
   verifyEnabledForPage,
-  extraFieldsForPage,
   pageTypeLabel,
   previewHref,
   pushSkinHistory,
@@ -64,6 +65,8 @@ import {
   writePreviewDraft,
   type LandingSkin,
   type LandingPageKind,
+  type LoginLayout,
+  type LoginMethod,
   type RegisterAreaBgKind,
   type RegisterBgKind,
   type SkinAsset,
@@ -177,16 +180,22 @@ export default function LandingSkinManagement() {
     }
     // Full checks only on submit; temporary save only needs line + name.
     if (!publish) return true
-    if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'none') {
-      message.error(en ? 'Payment landings cannot use “No register”.' : '支付落地页不能选择无注册')
+    const login = normalizeLoginConfig(editing)
+    const methods = login.loginOrder || []
+    if (login.pageType === 'pay' && !methods.length) {
+      message.error(en ? 'V1: payment landings need at least one login method (phone or a provider).' : 'V1：支付落地页至少要有一种登录方式（手机号或任一家三方）')
       return false
     }
-    if (normalizeRegisterMode(editing.registerMode) === 'oauth' && !thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, 'oauth').length) {
-      message.error(en ? 'Social login only: pick at least one provider.' : '请至少选择一种三方登录')
+    if (login.pageType === 'pay' && login.registerMode === 'full' && !login.verifyEnabled) {
+      message.error(en ? 'V2: payment landings with phone must use OTP.' : 'V2：支付落地页开了手机号，必须有验证')
       return false
     }
-    if (normalizePageType(editing.pageType, editing.afterRegisterAction) === 'pay' && normalizeRegisterMode(editing.registerMode) === 'full' && !editing.verifyEnabled) {
-      message.error(en ? 'Payment landings must use OTP verification.' : '支付落地页必须开启有验证')
+    if (login.loginLayout === 'two_zone' && methods.length && methods.every((m) => (login.secondaryLogins || []).includes(m))) {
+      message.error(en ? 'V4: put at least one method in the primary zone.' : 'V4：主次两区时，主区至少放一种方式')
+      return false
+    }
+    if (login.registerMode === 'full' && login.extraFields.some((f) => !f.label.trim())) {
+      message.error(en ? 'V5: extra field labels cannot be empty.' : 'V5：其他字段的文案不能为空')
       return false
     }
     if (!hasRequiredSceneContent(editing)) {
@@ -274,7 +283,6 @@ export default function LandingSkinManagement() {
             normalizePageType(editing.pageType, editing.afterRegisterAction),
             editing.afterRegisterAction,
             editing.line,
-            editing.registerMode,
           ),
           language: editing.language || defaultLanguageForLine(editing.line),
         }
@@ -283,16 +291,10 @@ export default function LandingSkinManagement() {
     let record: LandingSkin = flattenSkinScenes({
       ...editing,
       ...(lockedBasics || {}),
-      registerMode: registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction),
-      verifyEnabled: verifyEnabledForPage(nextPageType, registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction), editing.verifyEnabled),
-      extraFields: registerModeForPage(nextPageType, editing.registerMode, editing.line, editing.afterRegisterAction) === 'oauth'
-        ? []
-        : extraFieldsForPage(nextPageType, editing.extraFields),
-      thirdPartyLogins: thirdPartyLoginsForLine(editing.line, editing.thirdPartyLogins, editing.registerMode),
       language: lockedBasics?.language ?? defaultLanguageForLine(editing.line),
       pageType: nextPageType,
       afterRegisterAction: lockedBasics?.afterRegisterAction
-        ?? followUpActionForPageType(nextPageType, editing.afterRegisterAction, editing.line, editing.registerMode),
+        ?? followUpActionForPageType(nextPageType, editing.afterRegisterAction, editing.line),
       registerBgKind: normalizeRegisterBgKind(editing.registerBgKind),
       registerBgColor: normalizeRegisterBgColor(editing.registerBgColor),
       registerAreaBgKind: normalizeRegisterAreaBgKind(editing.registerAreaBgKind),
@@ -370,7 +372,7 @@ export default function LandingSkinManagement() {
     { title: en ? 'Skin name' : '落地页皮肤名称', dataIndex: 'name', render: (v: string) => <b>{v}</b> },
     { title: en ? 'template_code' : '模板 ID', dataIndex: 'code', width: 140, render: (v: string) => <span className="skin-code">{v || '—'}</span> },
     { title: en ? 'Landing type' : '落地页类型', dataIndex: 'pageType', render: (v) => pageTypeLabel(v, en) },
-    { title: en ? 'Register' : '注册方式', render: (_, row) => registerSummary(row, en) },
+    { title: en ? 'Login area' : '登录区', render: (_, row) => registerSummary(row, en) },
     {
       title: en ? 'Status' : '状态',
       dataIndex: 'status',
@@ -398,13 +400,25 @@ export default function LandingSkinManagement() {
   if (editing) {
     const pageType = normalizePageType(editing.pageType, editing.afterRegisterAction)
     const basicsLocked = skinHasLiveVersion(editing)
-    const regMode = registerModeForPage(pageType, editing.registerMode, editing.line, editing.afterRegisterAction)
-    const noRegister = regMode === 'none'
-    const leadCollect = pageType === 'lead' && isLeadCollectAction(followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, regMode))
-    const oneLinkLock = pageType === 'lead' && (
-      editing.line === '香港'
-      || (noRegister && editing.line === '日本')
-    )
+    const login = normalizeLoginConfig(editing)
+    const regMode = login.registerMode
+    const loginState = loginRenderState(login)
+    const noRegister = loginState === 'R0'
+    const policy = loginPolicy(editing.line, pageType, login.afterRegisterAction)
+    const methods = login.loginOrder || []
+    const secondary = login.secondaryLogins || []
+    const twoZone = login.loginLayout === 'two_zone'
+    const oneLinkLock = pageType === 'lead' && (editing.line === '香港' || editing.line === '日本')
+    /** Every login edit goes through the same rules the save path uses. */
+    const patchLogin = (patch: Partial<LandingSkin>) => setEditing(normalizeLoginConfig({ ...editing, ...patch }))
+    const moveMethod = (method: LoginMethod, delta: number) => {
+      const next = methods.slice()
+      const i = next.indexOf(method)
+      const j = i + delta
+      if (i < 0 || j < 0 || j >= next.length) return
+      ;[next[i], next[j]] = [next[j], next[i]]
+      patchLogin({ loginOrder: next })
+    }
     const life = skinLifecycle(editing)
     const addAsset = (key: 'registerBefore' | 'registerAfter') =>
       setEditing({ ...editing, [key]: [...editing[key], emptySceneImage()] })
@@ -455,22 +469,11 @@ export default function LandingSkinManagement() {
               value={editing.line || undefined}
               style={{ width: 220 }}
               options={SKIN_BUSINESS_LINES.map((v) => ({ value: v, label: v }))}
-              onChange={(line) => {
-                const kind: LandingPageKind = pageType
-                const mode = registerModeForPage(kind, editing.registerMode, line, editing.afterRegisterAction)
-                setEditing({
-                  ...editing,
-                  line,
-                  pageType: kind,
-                  code: creating ? '' : editing.code,
-                  language: defaultLanguageForLine(line),
-                  registerMode: mode,
-                  verifyEnabled: verifyEnabledForPage(kind, mode, editing.verifyEnabled),
-                  thirdPartyLogins: thirdPartyLoginsForLine(line, editing.thirdPartyLogins, mode),
-                  extraFields: extraFieldsForPage(kind, editing.extraFields),
-                  afterRegisterAction: followUpActionForPageType(kind, editing.afterRegisterAction, line, mode),
-                })
-              }}
+              onChange={(line) => patchLogin({
+                line,
+                code: creating ? '' : editing.code,
+                language: defaultLanguageForLine(line),
+              })}
             />
           </div>
           <div className="skin-form-row">
@@ -492,17 +495,7 @@ export default function LandingSkinManagement() {
               <Radio.Group
                 disabled={basicsLocked || !editing.line}
                 value={pageType}
-                onChange={(e) => {
-                  const next = e.target.value as LandingPageKind
-                  setEditing({
-                    ...editing,
-                    pageType: next,
-                    afterRegisterAction: followUpActionForPageType(next, editing.afterRegisterAction, editing.line, registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction)),
-                    registerMode: registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction),
-                    verifyEnabled: verifyEnabledForPage(next, registerModeForPage(next, editing.registerMode, editing.line, editing.afterRegisterAction), editing.verifyEnabled),
-                    extraFields: extraFieldsForPage(next, editing.extraFields),
-                  })
-                }}
+                onChange={(e) => patchLogin({ pageType: e.target.value as LandingPageKind })}
                 options={PAGE_TYPE_OPTIONS.map((x) => ({
                   value: x.value,
                   label: en ? x.en : x.zh,
@@ -519,8 +512,8 @@ export default function LandingSkinManagement() {
               <Radio.Group
                 className="skin-radio-stack"
                 disabled={basicsLocked || !editing.line || noRegister || oneLinkLock}
-                value={followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, regMode)}
-                onChange={(e) => setEditing({ ...editing, afterRegisterAction: e.target.value })}
+                value={login.afterRegisterAction}
+                onChange={(e) => patchLogin({ afterRegisterAction: e.target.value })}
                 options={followUpOptions(pageType, editing.line).map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
               />
               {oneLinkLock ? (
@@ -529,7 +522,7 @@ export default function LandingSkinManagement() {
                 </Text>
               ) : noRegister ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No registration: the page does not go to a next interaction page.' : '无注册时不进入后续交互页面'}
+                  {en ? 'No login area (phone off, no provider): the page does not go to a next interaction page.' : '无登录区（手机号关、三方一家没勾）时不进入后续交互页面'}
                 </Text>
               ) : null}
             </div>
@@ -539,54 +532,40 @@ export default function LandingSkinManagement() {
         <Card id="skin-sec-register" className={`skin-card ${editing.line ? '' : 'skin-rest-locked'}`} title={en ? 'Register settings' : '注册配置'}>
           <Text type="secondary" className="skin-reg-lead">
             {en
-              ? 'Four steps, in the same order as the form: how people register, the title, the button, then the background.'
-              : '按表单从上到下，分四步来配：先定怎么注册，再写标题，再定按钮，最后铺背景。'}
+              ? 'Same order as the page: phone register, third-party login, login-area layout and order, then title, button and background.'
+              : '按页面从上到下来配：手机号注册、三方登录、登录区样式和顺序，再写标题、定按钮、铺背景。手机号和三方互相独立，可以只开一边。'}
           </Text>
+          <div className="skin-login-state">
+            <Tag color={loginState === 'R0' ? 'default' : loginState === 'R4' ? 'purple' : 'blue'}>{loginStateLabel(loginState, en)}</Tag>
+            <Text type="secondary">{en ? LOGIN_STATE_INFO[loginState].descEn : LOGIN_STATE_INFO[loginState].descZh}</Text>
+          </div>
+          {policy.reasonZh ? (
+            <Alert type="info" showIcon style={{ marginBottom: 12, maxWidth: 640 }} message={en ? policy.reasonEn : policy.reasonZh} />
+          ) : null}
           <div className="skin-reg-block">
             <div className="skin-reg-head">
               <em>1</em>
-              <b>{en ? 'How to register' : '注册方式'}</b>
-              <span>{en ? 'Whether there is a form, and what it collects' : '先决定有没有表单，再决定表单里收什么'}</span>
+              <b>{en ? 'Phone register' : '手机号注册'}</b>
+              <span>{en ? 'On = phone form (+ OTP / extra fields) creates an account' : '开 = 展示手机号表单，提交后建账号；验证码和其他字段在这里配'}</span>
             </div>
           <div className="skin-form-row">
-            <label><em>*</em>{en ? 'Register type' : '注册类型'}</label>
+            <label>{en ? 'Phone register' : '手机号注册'}</label>
             <div>
-              <Radio.Group
-                disabled={!editing.line || (pageType === 'lead' && editing.line === '香港')}
-                value={regMode}
-                onChange={(e) => {
-                  const mode = registerModeForPage(pageType, e.target.value, editing.line, editing.afterRegisterAction)
-                  setEditing({
-                    ...editing,
-                    registerMode: mode,
-                    verifyEnabled: verifyEnabledForPage(pageType, mode, mode === 'full' ? editing.verifyEnabled : false),
-                    thirdPartyLogins: mode === 'none' ? [] : editing.thirdPartyLogins,
-                    afterRegisterAction: basicsLocked
-                      ? editing.afterRegisterAction
-                      : followUpActionForPageType(pageType, editing.afterRegisterAction, editing.line, mode),
-                  })
-                }}
-                options={registerModeOptions(editing.line).map((x) => ({
-                  value: x.value,
-                  label: en ? x.en : x.zh,
-                  disabled: (pageType === 'pay' || leadCollect) && x.value === 'none',
-                }))}
+              <Switch
+                disabled={!editing.line || policy.phone !== 'free'}
+                checked={regMode === 'full'}
+                onChange={(on) => patchLogin({ registerMode: on ? 'full' : 'none' })}
               />
-              {editing.line === '日本' ? (
-                <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                  {en
-                    ? 'Three types: 1) No register — today’s default; no phone and no third-party; for pages whose buttons open OneLink. 2) Phone register as account — third-party optional. 3) Social login only — no register button below; icons sit where the form was.'
-                    : '三种注册类型：1）无注册：现状默认，不能配手机号也不能配三方，给页面上配按钮、点了跳 OneLink 的落地页用。2）手机号注册成账号：可以勾选三方。3）仅三方登录：没有下面的注册按钮，三方图标放在原表单位置。'}
-                </Text>
-              ) : null}
               <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                {pageType === 'pay'
-                  ? (en ? 'Payment pages cannot use "No registration".' : '支付落地页不能选择无注册。')
-                  : leadCollect
-                  ? (en ? 'Lead collection pages cannot use "No registration".' : '收集留资页面不能选择无注册。')
+                {policy.phone === 'on'
+                  ? (en ? 'Locked on.' : '锁定开启。')
+                  : policy.phone === 'off'
+                  ? (en ? 'Locked off.' : '锁定关闭。')
+                  : pageType === 'pay'
+                  ? (en ? 'Can be off if at least one provider is ticked (V1).' : '可以关，但关了以后至少要勾一家三方（V1）。')
                   : (en
-                    ? 'No register hides the form and greys out Next interaction (no next interaction page). Phone register always creates an account, with or without OTP. OTP and extra fields are configured below.'
-                    : '无注册则不展示表单，且「后续交互页面」置灰（无注册时不进入后续交互页面）。手机号注册成账号：无论有验证还是无验证，提交后都会创建账号。验证码和额外字段在这一步里配。')}
+                    ? 'Off + no provider = no login area; Next interaction is greyed out.'
+                    : '关掉且三方一家不勾 = 无登录区，「后续交互页面」置灰（不进入后续交互页面）。')}
               </Text>
             </div>
           </div>
@@ -673,40 +652,99 @@ export default function LandingSkinManagement() {
               </div>
             </div>
           ) : null}
-          {regMode === 'none' ? (
-            <div className="skin-form-row">
-              <label>{en ? 'Third-party login' : '三方登录'}</label>
-              <Text type="secondary">
-                {en
-                  ? 'Not available for this register type.'
-                  : '无注册不支持选择手机号，也不支持选择三方。用于按钮直接跳 OneLink 的落地页。'}
-              </Text>
-            </div>
-          ) : (
-          <div className="skin-form-row">
-            <label>{regMode === 'oauth' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
-            <div>
-              <Checkbox.Group
-                disabled={!editing.line || (pageType === 'lead' && editing.line === '香港')}
-                value={editing.thirdPartyLogins}
-                options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
-                onChange={(vals) => setEditing({ ...editing, thirdPartyLogins: thirdPartyLoginsForLine(editing.line, vals as ThirdPartyLogin[], regMode) })}
-              />
-              <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-                {regMode === 'oauth'
-                  ? (en ? 'Social login only: icons replace the form. Pick at least one.' : '仅三方登录：图标放在原表单位置，至少勾一家。')
-                  : (en ? 'Checked providers appear as icons under the register form.' : '勾选后展示在注册区域下方，作为快捷登录入口。')}
-                {editing.line === '日本'
-                  ? (en ? ' Japan order is fixed: LINE, Apple, Google, Facebook. LINE is Japan-only.' : ' 日本固定按 LINE、Apple、Google、Facebook 排序；LINE 仅日本可选。')
-                  : null}
-              </Text>
-            </div>
-          </div>
-          )}
           </div>
           <div className="skin-reg-block">
             <div className="skin-reg-head">
               <em>2</em>
+              <b>{en ? 'Third-party login' : '三方登录'}</b>
+              <span>{en ? 'Independent of phone register' : '和手机号互相独立，不开手机号也可以只配三方'}</span>
+            </div>
+          <div className="skin-form-row">
+            <label>{policy.phone === 'off' && policy.thirds === 'free' ? <em>*</em> : null}{en ? 'Third-party login' : '三方登录'}</label>
+            <div>
+              <Checkbox.Group
+                disabled={!editing.line || policy.thirds === 'off'}
+                value={login.thirdPartyLogins}
+                options={thirdPartyOptionsForLine(editing.line).map((x) => ({ value: x.value, label: x.zh }))}
+                onChange={(vals) => patchLogin({ thirdPartyLogins: vals as ThirdPartyLogin[] })}
+              />
+              <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                {policy.thirds === 'off'
+                  ? (en ? 'Not available on this page.' : '这类页面没有登录区，不能勾三方。')
+                  : (en
+                    ? 'Kakao is Korea-only and LINE is Japan-only (V6); switching line drops the one that is not available.'
+                    : 'Kakao 只在韩国可选，LINE 只在日本可选（V6）；切业务线后不可用的那家自动去掉、C 端不出现。')}
+              </Text>
+            </div>
+          </div>
+          </div>
+          {methods.length ? (
+            <div className="skin-reg-block">
+              <div className="skin-reg-head">
+                <em>3</em>
+                <b>{en ? 'Login area layout & order' : '登录区样式和顺序'}</b>
+                <span>{en ? 'Display only; does not change the login result (V7)' : '只影响展示，不影响登录结果（V7）'}</span>
+              </div>
+              <div className="skin-form-row">
+                <label>{en ? 'Layout' : '登录区样式'}</label>
+                <div>
+                  <Radio.Group
+                    className="skin-radio-stack"
+                    disabled={!editing.line}
+                    value={login.loginLayout}
+                    onChange={(e) => patchLogin({ loginLayout: e.target.value as LoginLayout })}
+                    options={LOGIN_LAYOUT_OPTIONS.map((x) => ({
+                      value: x.value,
+                      label: <span>{en ? x.en : x.zh}<Text type="secondary" style={{ marginLeft: 8 }}>{en ? x.hintEn : x.hintZh}</Text></span>,
+                    }))}
+                  />
+                </div>
+              </div>
+              <div className="skin-form-row">
+                <label>{en ? 'Order' : '方式顺序'}</label>
+                <div>
+                  <ol className="skin-login-order">
+                    {methods.map((m, i) => (
+                      <li key={m}>
+                        <span className="skin-login-order-idx">{i + 1}</span>
+                        <b>{loginMethodLabel(m, en)}</b>
+                        {twoZone ? (
+                          <Radio.Group
+                            size="small"
+                            optionType="button"
+                            value={secondary.includes(m) ? 'S' : 'P'}
+                            onChange={(e) => patchLogin({
+                              secondaryLogins: e.target.value === 'S' ? [...secondary, m] : secondary.filter((x) => x !== m),
+                            })}
+                            options={[
+                              { value: 'P', label: en ? 'Primary' : '主区' },
+                              { value: 'S', label: en ? 'Other ways' : '其他方式' },
+                            ]}
+                          />
+                        ) : null}
+                        <Space size={4}>
+                          <Button size="small" disabled={i === 0} onClick={() => moveMethod(m, -1)}>↑</Button>
+                          <Button size="small" disabled={i === methods.length - 1} onClick={() => moveMethod(m, 1)}>↓</Button>
+                        </Space>
+                      </li>
+                    ))}
+                  </ol>
+                  <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
+                    {twoZone
+                      ? (en
+                        ? 'Primary = big buttons in this order; Other ways = small circles under a divider. Phone is one of the buttons and opens the form when tapped. At least one primary (V4).'
+                        : '主区 = 按这个顺序的大按钮；其他方式 = 分隔线下面的小圆按钮。手机号是其中一颗按钮，点了才展开表单。主区至少放一种（V4）。')
+                      : (en
+                        ? 'Form first: the phone form always stays on top; this order sets the icon row under it.'
+                        : '表单优先：手机号表单固定在上面，这里的顺序决定下面那排三方图标的先后。')}
+                  </Text>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div className="skin-reg-block">
+            <div className="skin-reg-head">
+              <em>4</em>
               <b>{en ? 'Form title' : '表单标题'}</b>
               <span>{en ? 'Under the logo, above the fields' : 'Logo 下方、输入框上方'}</span>
             </div>
@@ -752,26 +790,28 @@ export default function LandingSkinManagement() {
               </div>
             </div>
           </div>
-          {regMode === 'oauth' ? (
+          {regMode === 'none' && !noRegister ? (
             <div className="skin-reg-block">
               <div className="skin-reg-head">
-                <em>3</em>
+                <em>5</em>
                 <b>{en ? 'Register button' : '注册按钮'}</b>
-                <span>{en ? 'Hidden on this register type' : '这种注册类型没有主按钮'}</span>
+                <span>{en ? 'Hidden without phone register' : '没开手机号就没有主按钮'}</span>
               </div>
               <Alert
                 type="info"
                 showIcon
                 style={{ maxWidth: 640 }}
-                message={en ? 'Social login only: the page has no register button, so copy and style are not used.' : '仅三方登录时页面没有注册按钮，文案和样式不出现。'}
+                message={en ? 'Phone register is off: the page has no register button, so copy and style are not used.' : '手机号关闭时页面没有注册按钮，文案和样式不出现。'}
               />
             </div>
           ) : (
           <div className="skin-reg-block">
             <div className="skin-reg-head">
-              <em>3</em>
+              <em>5</em>
               <b>{en ? 'Register button' : '注册按钮'}</b>
-              <span>{en ? 'The main button at the bottom of the form' : '表单底部的主按钮'}</span>
+              <span>{loginState === 'R4'
+                ? (en ? 'Submit button after the phone form opens' : '点「手机号」展开表单后的提交按钮')
+                : (en ? 'The main button at the bottom of the form' : '表单底部的主按钮')}</span>
             </div>
           <div className="skin-form-row">
             <label>{en ? 'CTA text' : '注册按钮文案'}</label>
@@ -790,7 +830,7 @@ export default function LandingSkinManagement() {
           )}
           <div className="skin-reg-block">
             <div className="skin-reg-head">
-              <em>4</em>
+              <em>6</em>
               <b>{en ? 'Background' : '背景'}</b>
               <span>{en ? 'The full-width area first, then the form card' : '先铺整段区域，再铺表单卡片'}</span>
             </div>
