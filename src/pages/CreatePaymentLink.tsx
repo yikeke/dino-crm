@@ -1290,11 +1290,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         title={() => (
           <div className="pl-detail-orders__head">
             <span>{en ? `${orders.length} orders · ${paidCount} paid` : `共 ${orders.length} 张订单 · 已支付 ${paidCount} 张`}</span>
-            {orders.length > 0 && (
-              <Button size="small" type="link" onClick={() => navigate(`/orders?payment_link_id=${encodeURIComponent(row.id)}`)}>
-                {en ? 'Open in the order center' : '在订单中心查看'}
-              </Button>
-            )}
           </div>
         )}
         columns={[
@@ -1304,7 +1299,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             width: 200,
             render: (value: string, order: WebOrder) => (
               <div className="pl-two-line">
-                <Button type="link" size="small" className="pl-order-no" onClick={() => openOrder(value)}>{value}</Button>
+                <Typography.Text className="pl-order-no" copyable>{value}</Typography.Text>
                 {order.origin === 'link' && <Typography.Text type="secondary">{en ? 'Created with the link (bank transfer)' : '创建链接时生成（银行转账）'}</Typography.Text>}
               </div>
             ),
@@ -1316,23 +1311,17 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {
             title: en ? 'Payment' : '支付方式',
             key: 'pay',
+            width: 140,
             render: (_: unknown, order: WebOrder) => {
               const pay = txns.find((txn) => txn.orderNo === order.orderNo)
-              if (!pay) return <Typography.Text type="secondary">{en ? 'Customer has not paid yet' : '用户还没付款'}</Typography.Text>
-              const ref = pay.providerRef || (pay.transferReference && `${en ? 'Transfer note' : '转账附言'} ${pay.transferReference}`)
-              return (
-                <div className="pl-two-line">
-                  <span>{methodName(row, pay.method)}{ref && <Typography.Text type="secondary"> · {ref}</Typography.Text>}</span>
-                  <Typography.Text type="secondary">
-                    {pay.status === 'SUCCESS'
-                      ? `${en ? 'Paid' : '支付'} ${(pay.paidAt || '').slice(0, 16)}`
-                      : pay.status === 'PENDING' && pay.declaredAt
-                        ? `${en ? 'Transfer declared' : '用户声明已转账'} ${pay.declaredAt.slice(0, 16)}`
-                        : `${en ? 'Started' : '发起'} ${pay.createdAt.slice(0, 16)}${pay.failReason ? ` · ${pay.failReason}` : ''}`}
-                  </Typography.Text>
-                </div>
-              )
+              return pay ? methodName(row, pay.method) : '—'
             },
+          },
+          {
+            title: en ? 'Paid at' : '支付时间',
+            key: 'paidAt',
+            width: 150,
+            render: (_: unknown, order: WebOrder) => orderState(order, linkTxns).paidAt?.slice(0, 16) || '—',
           },
         ]}
       />
@@ -1385,7 +1374,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {open
               ? detailField(en ? 'Payer' : '付款人', en ? 'Bound to the account that logs in' : '扫码登录后绑定')
               : detailField('User ID', <Typography.Text copyable={!!row.userId}>{row.userId || '—'}</Typography.Text>)}
-            {detailField(en ? 'Channel' : '渠道', `${enValue(row.line)} · ${row.channelName || '—'}`)}
+            {detailField(en ? 'Business line' : '业务线', enValue(row.line))}
+            {detailField(en ? 'Channel' : '渠道', row.channelName || '—')}
             {detailField('SKU', (row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName)}
             {detailField(en ? 'Promo' : '优惠', promo)}
             {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
