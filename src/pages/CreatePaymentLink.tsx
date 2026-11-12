@@ -1060,14 +1060,14 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     {
       title: en ? 'Type' : '类型',
       key: 'kind',
-      width: 96,
+      width: 72,
       render: (_: unknown, row: PaymentLink) => (
         row.kind === 'full' ? <Tag color="green">{en ? 'Full' : '全款'}</Tag> : <Tag color="orange">{en ? 'Deposit' : '定金'}</Tag>
       ),
     },
     {
       title: openPage ? (en ? 'Event / Link' : '活动 / 物料 · 链接') : (en ? 'Link / User ID' : '链接 / User ID'),
-      width: 240,
+      width: 210,
       render: (_: unknown, row: PaymentLink) => (
         <div className="pl-two-line">
           {row.audience === 'open' && <a className="pl-link-title" onClick={() => openDetail(row.id)}>{row.eventName || '—'}</a>}
@@ -1089,7 +1089,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     },
     {
       title: en ? 'Channel / SKU' : '渠道 / SKU',
-      width: 230,
+      width: 200,
       render: (_: unknown, row: PaymentLink) => (
         <div className="pl-two-line">
           <span>{row.channelName || '—'}</span>
@@ -1099,7 +1099,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     },
     {
       title: en ? 'Status' : '状态',
-      width: 210,
+      width: 180,
       render: (_: unknown, row: PaymentLink) => {
         const status = linkStatus(row)
         const paid = collected(row).length
@@ -1116,12 +1116,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     },
     {
       title: en ? 'Creator' : '创建人',
-      width: 150,
+      width: 190,
       render: (_: unknown, row: PaymentLink) => row.createdBy || '—',
     },
     {
       title: en ? 'Created / Updated' : '创建 / 更新',
-      width: 150,
+      width: 140,
       render: (_: unknown, row: PaymentLink) => {
         const latest = [row.updatedAt, ...txnsOf(row.id).map((txn) => (txn.paidAt || txn.declaredAt || txn.createdAt).slice(0, 16))].sort().pop()
         return (
@@ -1135,7 +1135,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     {
       title: en ? 'Actions' : '操作',
       key: 'actions',
-      width: 230,
+      width: 210,
       fixed: 'right' as const,
       render: (_: unknown, row: PaymentLink) => (
         <Space direction="vertical" size={4}>
@@ -1565,11 +1565,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       <Table
         className="pl-table"
         rowKey="id"
-        size="middle"
+        size="small"
         columns={openPage ? columns.filter((column) => column.key !== 'kind') : columns}
         dataSource={rows}
         pagination={false}
-        scroll={{ x: 1850 }}
+        scroll={{ x: openPage ? 1130 : 1202 }}
         rowClassName={(row: PaymentLink) => (row.status === 'VOID' ? 'pl-row--void' : '')}
         locale={{ emptyText: openPage ? (en ? 'No open payment links yet' : '还没有通用支付链接') : (en ? 'No personal payment links yet' : '还没有专属支付链接') }}
       />
