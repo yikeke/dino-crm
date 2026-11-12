@@ -848,7 +848,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                   trigger={['click']}
                   menu={{
                     items: [
-                      { key: 'paymentLink', icon: <LinkOutlined />, label: text('创建专属支付链接', 'Create personal payment link'), onClick: () => navigate(`/marketing-center-v5/payment-links?user_id=${encodeURIComponent(r.studentId)}`) },
+                      { key: 'paymentLink', icon: <LinkOutlined />, label: text('创建专属支付链接', 'Create personal payment link'), onClick: () => navigate(`/marketing-center-v5/personal-links?user_id=${encodeURIComponent(r.studentId)}`) },
                       ...(canEdit ? [{ key: 'follow', icon: <EditOutlined />, label: t('sales.update'), onClick: () => openFollow(r) }] : []),
                       ...(canReassign ? [{ key: 'reassign', icon: <SwapOutlined />, label: t('sales.reassign.title'), onClick: () => openReassign(r) }] : []),
                       ...(canViewReport && latestTrialReport(lessons, r.studentId)

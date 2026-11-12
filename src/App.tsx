@@ -1,4 +1,4 @@
-import { Navigate, Route, HashRouter, Routes } from 'react-router-dom'
+import { Navigate, Route, HashRouter, Routes, useLocation } from 'react-router-dom'
 import { useSession } from './auth'
 import { useEffect } from 'react'
 import { setIdentity, useIdentityId, usePerm } from './perm'
@@ -90,6 +90,11 @@ function HomeRedirect() {
   return <Navigate to={firstAllowedPath(can)} replace />
 }
 
+function LegacyPersonalLinks() {
+  const { search } = useLocation()
+  return <Navigate replace to={`/marketing-center-v5/personal-links${search}`} />
+}
+
 export default function App() {
   const session = useSession()
   return (
@@ -132,7 +137,8 @@ export default function App() {
           <Route path="marketing-center-v5/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
           <Route path="marketing-center-v5/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
           <Route path="marketing-center-v5/skins" element={<Guard module="marketingV2_landing"><LandingSkinManagement /></Guard>} />
-          <Route path="marketing-center-v5/payment-links" element={<PaymentLinkGuard><CreatePaymentLink /></PaymentLinkGuard>} />
+          <Route path="marketing-center-v5/personal-links" element={<PaymentLinkGuard><CreatePaymentLink /></PaymentLinkGuard>} />
+          <Route path="marketing-center-v5/payment-links" element={<LegacyPersonalLinks />} />
           <Route path="marketing-center-v5/open-links" element={<PaymentLinkGuard><CreatePaymentLink key="open" scope="open" /></PaymentLinkGuard>} />
           <Route path="marketing-center-v6/skins" element={<SkinGuard><LandingSkinManagement /></SkinGuard>} />
           <Route path="marketing-center/skins" element={<Navigate to="/marketing-center-v6/skins" replace />} />
