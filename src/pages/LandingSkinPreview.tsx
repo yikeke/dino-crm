@@ -289,7 +289,7 @@ const HK_PAY_METHODS = [
   { id: 'alipayhk', name: 'AlipayHK', note: '電腦出動態收款碼，手機拉起 AlipayHK App' },
 ]
 
-type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_sa' | 'lead_done' | 'onelink' | null
+type FlowStep = 'sku' | 'promo' | 'pay' | 'download' | 'lead_my' | 'lead_vn' | 'lead_sa' | 'lead_th' | 'lead_done' | 'onelink' | null
 
 const ONELINK_SAMPLE = 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_JP-KOL-SDKD4K&c=JP-KOL-SDKD4K&lp_id=LP-E57YSUCTP7'
 
@@ -503,6 +503,81 @@ function SaudiLeadExtra({ onContinue }: { onContinue: () => void }) {
   )
 }
 
+const TH_GOAL: Record<string, string> = {
+  speak_with_confidence: 'พูดภาษาอังกฤษได้อย่างมั่นใจ',
+  improve_for_school: 'พัฒนาภาษาอังกฤษเพื่อการเรียน',
+  strong_foundation: 'สร้างพื้นฐานภาษาอังกฤษที่แข็งแรง',
+  everyday_situations: 'ใช้ภาษาอังกฤษในชีวิตประจำวัน',
+  consistent_habit: 'สร้างนิสัยการเรียนอย่างสม่ำเสมอ',
+}
+
+/** 可约时段待泰国销售组确认；原型先按越南现网每天 09:00–21:00、30 分钟一档。 */
+const TH_CALL_TIMES = Array.from({ length: 25 }, (_, i) => {
+  const minutes = 9 * 60 + i * 30
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+})
+
+type LeadBooking = { date: string; time: string }
+
+function bangkokToday() {
+  return new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)
+}
+
+/** Same two questions and option ids as Vietnam; Thai copy, Thailand GMT+7 for the callback. */
+function ThaiLeadExtra({ onContinue }: { onContinue: (booking: LeadBooking | null) => void }) {
+  const [age, setAge] = useState('')
+  const [goal, setGoal] = useState('')
+  const [callPref, setCallPref] = useState('yes')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const booked = callPref === 'yes' && !!date && !!time
+  return (
+    <div className="lp-pay">
+      <h2>ขอบคุณ!</h2>
+      <p className="lp-overlay-copy">เราได้รับข้อมูลของคุณแล้ว ที่ปรึกษาด้านการศึกษาจะติดต่อคุณเร็วๆ นี้</p>
+      <p className="lp-lead-optional">เล่าเกี่ยวกับลูกของคุณ (ไม่บังคับ)</p>
+      <LeadSelect label="ตอนนี้ลูกของคุณอายุเท่าไร" value={age} placeholder="เลือกอายุ" options={CHILD_AGES.map((id) => ({ id, label: id }))} onChange={setAge} />
+      <LeadSelect
+        label="คุณอยากให้ลูกพัฒนาด้านใดมากที่สุด"
+        value={goal}
+        placeholder="เลือกเป้าหมาย"
+        options={LEARNING_GOALS.map((x) => ({ id: x.id, label: TH_GOAL[x.id] ?? x.label }))}
+        onChange={setGoal}
+      />
+      <p className="lp-lead-optional">เลือกเวลาให้เราโทรหา</p>
+      <LeadSelect
+        label="ต้องการให้ที่ปรึกษาด้านการศึกษาโทรหาในเวลาที่กำหนดหรือไม่"
+        value={callPref}
+        placeholder="เลือก"
+        options={[
+          { id: 'yes', label: 'ใช่ เลือกเวลา' },
+          { id: 'no', label: 'ไม่ระบุ' },
+        ]}
+        onChange={setCallPref}
+      />
+      {callPref === 'yes' ? (
+        <>
+          <label className="lp-select-wrap">
+            <span>เลือกวันที่</span>
+            <div className="lp-field">
+              <input type="date" min={bangkokToday()} value={date} aria-label="เลือกวันที่" onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </label>
+          <LeadSelect label="เลือกเวลา" value={time} placeholder="เลือกเวลา" options={TH_CALL_TIMES.map((id) => ({ id, label: id }))} onChange={setTime} />
+          <p className="lp-overlay-copy">ประเทศไทย (GMT+7)</p>
+        </>
+      ) : null}
+      {booked ? (
+        <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onContinue({ date, time })}>ยืนยันเวลาโทร</button>
+      ) : (
+        <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onContinue(null)}>
+          {callPref === 'yes' ? 'ดำเนินการต่อโดยไม่เลือกเวลา' : 'ดำเนินการต่อ'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   sku: '后续交互 1 / 4 · SKU 列表',
   promo: '后续交互 2 / 4 · 输入 promo code',
@@ -511,15 +586,18 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   lead_my: '后续交互 Page 2 · 马来补充资料（四项选填 + 预约）',
   lead_vn: '后续交互 Page 2 · 越南补充资料（两项选填 + 预约）',
   lead_sa: '后续交互 Page 2 · 沙特补充资料（阿语，四项选填，不展示预约时间）',
+  lead_th: '后续交互 Page 2 · 泰国补充资料（泰语，两项选填 + 预约，GMT+7；可约时段待确认，原型暂按每天 09:00–21:00）',
   lead_done: '后续交互 Page 3 · 完成 → 下一步出下载 App',
   onelink: '打开 OneLink（原型模拟）',
 }
 
 function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: FlowStep; onStep: (next: FlowStep) => void; onClose: () => void; annotate: boolean; line?: string }) {
+  const [thBooking, setThBooking] = useState<LeadBooking | null>(null)
   if (!step) return null
   const jp = line === '日本'
   const hk = line === '香港'
   const sa = line === '沙特'
+  const th = line === '泰国'
   const skus = jp ? JP_SKUS : hk ? HK_SKUS : SKUS
   const onelinkUrl = hk
     ? 'https://dinoenglish.onelink.me/JlzH?pid=LandingPage&af_channel=LP_HK-KOL-DEMO&c=HK-KOL-DEMO&lp_id=LP-HKDEMO01'
@@ -594,7 +672,26 @@ function AfterRegisterLayer({ step, onStep, onClose, annotate, line }: { step: F
         {step === 'lead_my' ? <MalaysiaLeadExtra onContinue={() => onStep('lead_done')} /> : null}
         {step === 'lead_vn' ? <VietnamLeadExtra onContinue={() => onStep('lead_done')} /> : null}
         {step === 'lead_sa' ? <SaudiLeadExtra onContinue={() => onStep('lead_done')} /> : null}
-        {step === 'lead_done' && sa ? (
+        {step === 'lead_th' ? (
+          <ThaiLeadExtra
+            onContinue={(booking) => {
+              setThBooking(booking)
+              onStep('lead_done')
+            }}
+          />
+        ) : null}
+        {step === 'lead_done' && th ? (
+          <div className="lp-pay">
+            <h2>เรียบร้อยแล้ว!</h2>
+            <p className="lp-overlay-copy">บันทึกข้อมูลของคุณแล้ว ที่ปรึกษาด้านการศึกษาจะติดต่อคุณเร็วๆ นี้</p>
+            {thBooking ? (
+              <p className="lp-overlay-copy">
+                วันที่ {thBooking.date} · เวลา {thBooking.time} · เขตเวลา ประเทศไทย (GMT+7)
+              </p>
+            ) : null}
+            <button type="button" {...ctaProps(undefined, 'lp-cta')} onClick={() => onStep('download')}>ดาวน์โหลดแอปเลย</button>
+          </div>
+        ) : step === 'lead_done' && sa ? (
           <div className="lp-pay">
             <h2>تم بنجاح!</h2>
             <p className="lp-overlay-copy">تم حفظ معلوماتك. سيتواصل معك مستشارنا التعليمي قريبًا.</p>
@@ -618,6 +715,7 @@ function startStep(action: AfterRegisterAction): FlowStep {
   if (action === 'lead_my') return 'lead_my'
   if (action === 'lead_vn') return 'lead_vn'
   if (action === 'lead_sa') return 'lead_sa'
+  if (action === 'lead_th') return 'lead_th'
   return 'sku'
 }
 

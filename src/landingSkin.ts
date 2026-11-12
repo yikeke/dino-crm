@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v16'
+export const LANDING_SKIN_STORAGE_KEY = 'dinoai_landing_skins_v17'
 export const LANDING_SKIN_DRAFT_KEY = 'dinoai_landing_skin_preview_draft'
 export const LANDING_SKIN_ASSET_DB = 'dino-lp-skin-assets'
 export const DEFAULT_VIDEO_HOLE = { left: 12, top: 22, width: 76, height: 39 }
@@ -11,7 +11,7 @@ export const DEFAULT_STICKY_CTA_RECT = { left: 8, top: 30, width: 84, height: 48
 export type RegisterMode = 'none' | 'full' | 'oauth'
 export type RegisterBgKind = 'color' | 'image'
 export type RegisterAreaBgKind = 'none' | 'color' | 'image'
-export type AfterRegisterAction = 'sku_promo_pay' | 'onelink' | 'download_app' | 'lead_my' | 'lead_vn' | 'lead_sa'
+export type AfterRegisterAction = 'sku_promo_pay' | 'onelink' | 'download_app' | 'lead_my' | 'lead_vn' | 'lead_sa' | 'lead_th'
 export type ThirdPartyLogin = 'line' | 'google' | 'apple' | 'facebook' | 'kakao'
 /** Two kinds, aligned with 落地页管理: payment vs acquisition (CC lead + KOL web-to-app). */
 export type LandingPageKind = 'pay' | 'lead'
@@ -333,9 +333,10 @@ export const AFTER_REGISTER_ACTION_OPTIONS: { value: AfterRegisterAction; zh: st
   { value: 'lead_my', zh: '出收集四个留资页面（马来版）-> 出下载 App 弹窗', en: 'Four lead pages (Malaysia) → download-app popup' },
   { value: 'lead_vn', zh: '出收集两个留资页面（越南版）-> 出下载 App 弹窗', en: 'Two lead pages (Vietnam) → download-app popup' },
   { value: 'lead_sa', zh: '出收集四个留资页面（沙特阿语版）-> 出下载 App 弹窗', en: 'Four lead pages (Saudi, Arabic) → download-app popup' },
+  { value: 'lead_th', zh: '出收集两个留资页面（泰国版）-> 出下载 App 弹窗', en: 'Two lead pages (Thailand) → download-app popup' },
 ]
 
-/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，沙特是下载弹窗或四项留资（阿语），其余业务线只有下载弹窗。 */
+/** 获客落地页后续交互：越南只有两项留资，马来只有四项留资，沙特是下载弹窗或四项留资（阿语），泰国是下载弹窗或两项留资（泰语），其余业务线只有下载弹窗。 */
 export function followUpOptions(pageType: LandingPageKind, line?: string) {
   if (pageType === 'pay') return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => x.value === 'sku_promo_pay')
   return AFTER_REGISTER_ACTION_OPTIONS.filter((x) => {
@@ -344,6 +345,7 @@ export function followUpOptions(pageType: LandingPageKind, line?: string) {
     if (x.value === 'lead_my') return line === '马来'
     if (x.value === 'lead_vn') return line === '越南'
     if (x.value === 'lead_sa') return line === '沙特'
+    if (x.value === 'lead_th') return line === '泰国'
     return false
   })
 }
@@ -560,7 +562,7 @@ export function normalizeRegisterMode(mode?: string): RegisterMode {
 
 /** Follow-ups that collect leads: the lead must land on a phone number. */
 export function isLeadCollectAction(action?: string) {
-  return action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa'
+  return action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa' || action === 'lead_th'
 }
 
 /**
@@ -737,7 +739,7 @@ export function collectSkinAssets(skin: LandingSkin): SkinSlot[] {
 }
 
 export function normalizeAfterRegisterAction(action?: string): AfterRegisterAction {
-  if (action === 'onelink' || action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa' || action === 'sku_promo_pay') return action
+  if (action === 'onelink' || action === 'download_app' || action === 'lead_my' || action === 'lead_vn' || action === 'lead_sa' || action === 'lead_th' || action === 'sku_promo_pay') return action
   return 'sku_promo_pay'
 }
 
@@ -1342,6 +1344,37 @@ export function seedLandingSkins(): LandingSkinStore {
         updatedBy: 'admin@dinoai.ai',
         history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID SA_SKIN_A'),
       },
+      {
+        id: 'SKIN_TH01',
+        code: 'TH_SKIN_A',
+        name: '泰国线索页 · 两项留资',
+        line: '泰国',
+        pageType: 'lead',
+        language: 'th',
+        registerTitle: 'รับคลาสภาษาอังกฤษ AI ฟรี ใน 30 วินาที',
+        registerSubtitle: 'ไม่ต้องชำระเงิน',
+        registerMode: 'full',
+        verifyEnabled: false,
+        extraFields: [],
+        thirdPartyLogins: [],
+        afterRegisterAction: 'lead_th' as const,
+        ctaText: 'เริ่มประเมินฟรี',
+        ctaStyle: applyButtonPreset('chunky', true),
+        stickyCtaStyle: applyButtonPreset('sunset', false),
+        stickyBarCta: 'รับคลาสฟรี',
+        stickyButtonEnabled: true,
+        hero: asset('hero-th', lpAsset('family.png'), 'family.png'),
+        registerBefore: [],
+        registerAfter: [asset('after-th', AFTER, 'after-th.png')],
+        effects: [],
+        status: 'published',
+        revision: 1,
+        lastPublishedRevision: 1,
+        createdAt: t,
+        updatedAt: t,
+        updatedBy: 'admin@dinoai.ai',
+        history: seedHistory('admin@dinoai.ai', t, '提交发布', '首次发布，生成模板 ID TH_SKIN_A'),
+      },
     ].map((skin) => flattenSkinScenes(skin as unknown as LandingSkin)),
   }
 }
@@ -1350,6 +1383,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
   try {
     const raw = JSON.parse(
       localStorage.getItem(LANDING_SKIN_STORAGE_KEY)
+        ?? localStorage.getItem('dinoai_landing_skins_v16')
         ?? localStorage.getItem('dinoai_landing_skins_v15')
         ?? localStorage.getItem('dinoai_landing_skins_v14')
         ?? localStorage.getItem('dinoai_landing_skins_v13')
@@ -1371,7 +1405,7 @@ export function loadLandingSkinStore(): LandingSkinStore {
       const skins: LandingSkin[] = []
       // 升级时补入日本 / 香港示例皮肤。
       if (!localStorage.getItem(LANDING_SKIN_STORAGE_KEY)) {
-        const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港' || x.line === '沙特')
+        const seeds = seedLandingSkins().skins.filter((x) => x.line === '日本' || x.line === '香港' || x.line === '沙特' || x.line === '泰国')
         const seedCodes = new Set(seeds.map((x) => x.code))
         raw.skins = [...seeds, ...raw.skins.filter((x) => !seedCodes.has(x.code) && x.id !== 'SKIN_JP01' && x.code !== 'HK_SKIN_C' && !String(x.id || '').startsWith('SKIN_HK'))]
       }
