@@ -1146,15 +1146,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <Space direction="vertical" size={4}>
           <Button size="small" type="link" icon={<RightOutlined />} className="pl-history-btn" onClick={() => openDetail(row.id)}>{en ? 'Details' : '查看详情'}</Button>
           {linkActions(row)}
-          <Button size="small" type="link" icon={<HistoryOutlined />} className="pl-history-btn" onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
-          {row.status === 'ACTIVE' && (
-            <Space size={4}>
-              {editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
-              {row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
-                <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
-              )}
-            </Space>
-          )}
+          <Space size={4} wrap>
+            {row.status === 'ACTIVE' && editable(row) && <Button size="small" type="link" icon={<EditOutlined />} onClick={() => startEdit(row)}>{en ? 'Edit' : '编辑'}</Button>}
+            <Button size="small" type="link" icon={<HistoryOutlined />} className="pl-history-btn" onClick={() => setHistoryOf(row)}>{en ? 'History' : '操作记录'}</Button>
+            {row.status === 'ACTIVE' && row.audience !== 'open' && (currentStage(row, txnsOf(row.id)) || balanceOverdue(row, txnsOf(row.id))) && (
+              <Button size="small" type="link" danger icon={<StopOutlined />} onClick={() => voidLink(row)}>{en ? 'Void' : '作废'}</Button>
+            )}
+          </Space>
         </Space>
       ),
     },
