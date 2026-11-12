@@ -11,7 +11,6 @@ import {
   PAGE_TYPE_HINT,
   PAGE_TYPE_OPTIONS,
   LOGIN_LAYOUT_OPTIONS,
-  LOGIN_STATE_INFO,
   loginPolicy,
   loginRenderState,
   loginMethodLabel,
@@ -537,7 +536,6 @@ export default function LandingSkinManagement() {
           </Text>
           <div className="skin-login-state">
             <Tag color={loginState === 'R0' ? 'default' : loginState === 'R4' ? 'purple' : 'blue'}>{loginStateLabel(loginState, en)}</Tag>
-            <Text type="secondary">{en ? LOGIN_STATE_INFO[loginState].descEn : LOGIN_STATE_INFO[loginState].descZh}</Text>
           </div>
           {policy.reasonZh ? (
             <Alert type="info" showIcon style={{ marginBottom: 12, maxWidth: 640 }} message={en ? policy.reasonEn : policy.reasonZh} />

@@ -340,12 +340,12 @@ export const LOGIN_LAYOUT_OPTIONS: { value: LoginLayout; zh: string; en: string;
   },
 ]
 
-export const LOGIN_STATE_INFO: Record<LoginRenderState, { zh: string; en: string; descZh: string; descEn: string }> = {
-  R0: { zh: '无登录区', en: 'No login area', descZh: '不出表单、不出三方。', descEn: 'No form, no third-party.' },
-  R1: { zh: '表单 + 图标行', en: 'Form + icons', descZh: '手机号表单 + 主按钮；三方按顺序成一排小图标放在表单下面。', descEn: 'Phone form + main button; third-party icons in order below.' },
-  R2: { zh: '仅表单', en: 'Form only', descZh: '只有手机号表单 + 主按钮。', descEn: 'Phone form + main button only.' },
-  R3: { zh: '仅图标行', en: 'Icons only', descZh: '没有手机号表单、没有主按钮；三方小图标放在原表单位置。', descEn: 'No phone form or main button; icons sit where the form was.' },
-  R4: { zh: '主次两区', en: 'Two zones', descZh: '主区大按钮按顺序；「其他登录方式」下面一排小圆按钮。手机号是其中一颗按钮，点了才展开表单。', descEn: 'Big buttons in order; small circles under “Other ways”. Phone is one button that opens the form.' },
+export const LOGIN_STATE_INFO: Record<LoginRenderState, { zh: string; en: string }> = {
+  R0: { zh: '无登录区', en: 'No login area' },
+  R1: { zh: '表单 + 图标行', en: 'Form + icons' },
+  R2: { zh: '仅表单', en: 'Form only' },
+  R3: { zh: '仅图标行', en: 'Icons only' },
+  R4: { zh: '主次两区', en: 'Two zones' },
 }
 
 /**
