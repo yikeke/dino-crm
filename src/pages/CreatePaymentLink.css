@@ -859,3 +859,20 @@
   align-self: flex-start;
   padding-inline: 0;
 }
+
+.pl-field .pl-field-hint {
+  display: block;
+  margin-top: 4px;
+}
+
+.pl-validity {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pl-validity + .pl-field-hint {
+  display: block;
+  margin-top: 6px;
+}

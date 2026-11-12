@@ -20,7 +20,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, CrownOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import QRCode from 'qrcode'
 import { useI18n } from '../i18n'
 import {
@@ -540,14 +540,54 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     </span>
   )
 
-  const validField = (
-    <div>
-      <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
-      <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
-      <Typography.Text type="secondary" className="pl-field-hint">{editingId
-        ? (en ? 'To stop taking payments now, set it to yesterday or earlier. Move it forward again to reopen.' : '要马上停止收款，改到昨天或更早；改回以后的日期就恢复收款。')
-        : (en ? 'Optional. After this date the link shows as expired and cannot be paid.' : '可不填。过期后打开链接会提示已失效，不能再付款。')}</Typography.Text>
-    </div>
+  const editingRow = editingId ? links.find((item) => item.id === editingId) : undefined
+  const today = dayjs().format('YYYY-MM-DD')
+  const stopped = !!validUntil && validUntil < today
+
+  const setCollecting = (stop: boolean) => {
+    if (!editingRow) return
+    const next = stop ? dayjs().subtract(1, 'day').format('YYYY-MM-DD') : undefined
+    Modal.confirm({
+      title: stop ? (en ? 'Stop taking payments?' : '停止收款？') : (en ? 'Resume taking payments?' : '恢复收款？'),
+      content: stop
+        ? (en ? 'Valid-until becomes yesterday and takes effect now. The customer page shows the link as expired. Paid orders stay as they are.' : '有效期改成昨天，马上生效：用户打开链接提示已过期，不能再付款。已支付的订单不变。')
+        : (en ? 'Valid-until is cleared (no end date) and takes effect now.' : '清空有效期（不限期），马上生效，用户可以继续付款。'),
+      okText: stop ? (en ? 'Stop' : '停止收款') : (en ? 'Resume' : '恢复收款'),
+      okButtonProps: stop ? { danger: true } : undefined,
+      cancelText: en ? 'Cancel' : '取消',
+      onOk: () => {
+        persist(links.map((item) => (item.id === editingRow.id ? { ...item, validUntil: next, updatedAt: nowText() } : item)))
+        logAction(editingRow.id, stop ? '停止收款' : '恢复收款', `有效期 ${editingRow.validUntil || '不限'} → ${next || '不限'}`)
+        reload()
+        setValidUntil(next || '')
+        message.success(stop ? (en ? 'Payments stopped' : '已停止收款') : (en ? 'Payments resumed' : '已恢复收款'))
+      },
+    })
+  }
+
+  const validityCard = (no: number, deposit: boolean) => (
+    <Card size="small" title={step(no, en ? 'Link validity' : '链接有效期', en ? 'Leave empty for no end date' : '不填就不限期')}>
+      <div className="pl-validity">
+        <div>
+          <div className="pl-label">{en ? 'Valid until' : '有效期至'}</div>
+          <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} style={{ width: 220 }} />
+        </div>
+        {editingRow && (stopped ? (
+          <>
+            <Tag bordered={false}>{en ? 'Payments stopped' : '已停止收款'}</Tag>
+            <Button onClick={() => setCollecting(false)}>{en ? 'Resume payments' : '恢复收款'}</Button>
+          </>
+        ) : (
+          <Button danger icon={<StopOutlined />} onClick={() => setCollecting(true)}>{en ? 'Stop payments now' : '一键停止收款'}</Button>
+        ))}
+      </div>
+      <Typography.Text type="secondary" className="pl-field-hint">
+        {editingRow
+          ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。')
+          : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
+        {deposit && (en ? ' The balance also has its own deadline; whichever comes first applies.' : '定金的尾款另有尾款支付期限，两个时间以先到的为准。')}
+      </Typography.Text>
+    </Card>
   )
 
   const formCard = (mode: 'full' | 'deposit') => {
@@ -565,7 +605,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-form__main">
           <Card size="small" title={step(++stepNo, en ? 'Who pays' : '付款人', open ? (en ? 'Anyone who scans logs in first' : '扫码用户先登录再付款') : (en ? 'Phone number or User ID' : '手机号或 User ID'))}>
             {open ? (
-              <div className="pl-grid-2 pl-grid-2--wide">
+              <div className="pl-field">
                 <div>
                   <div className="pl-label">{en ? 'Event / material name' : '活动 / 物料名称'} <span className="pl-required">*</span></div>
                   <Input
@@ -577,10 +617,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   />
                   <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Shown at the top of the customer page; also used to attribute orders.' : '显示在用户页面顶部，同时用于统计订单来源。'}</Typography.Text>
                 </div>
-                {validField}
               </div>
             ) : (
-              <div className="pl-grid-2 pl-grid-2--wide">
+              <div className="pl-field">
               <div>
                 <div className="pl-label">{en ? 'User' : '用户'} <span className="pl-required">*</span></div>
             <AutoComplete
@@ -621,7 +660,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </Typography.Text>
             ) : null}
               </div>
-                {validField}
               </div>
             )}
           </Card>
@@ -823,6 +861,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               })}
             </div>
           </Card>
+
+          {validityCard(++stepNo, mode === 'deposit')}
         </div>
 
         <div className="pl-form__side">
