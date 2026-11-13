@@ -436,6 +436,34 @@ export function thirdPartyOptionsForLine(line?: string) {
   return THIRD_PARTY_OPTIONS.filter((x) => x.value !== 'line' && (x.value !== 'kakao' || line === '韩国'))
 }
 
+const LOGIN_LAYOUT_MEMO_KEY = 'dinoai_login_layout_memo_v1'
+
+export type LoginLayoutMemoEntry = { loginOrder: LoginMethod[]; secondaryLogins: LoginMethod[] }
+type LoginLayoutMemo = Record<string, Partial<Record<LoginLayout, LoginLayoutMemoEntry>>>
+
+function readLayoutMemo(): LoginLayoutMemo {
+  try {
+    return JSON.parse(localStorage.getItem(LOGIN_LAYOUT_MEMO_KEY) || '{}') as LoginLayoutMemo
+  } catch {
+    return {}
+  }
+}
+
+/** Last order / zones the editor used for this skin under one layout, so switching layouts does not lose edits. */
+export function loadLoginLayoutMemo(skinId: string, layout: LoginLayout): LoginLayoutMemoEntry | undefined {
+  return readLayoutMemo()[skinId]?.[layout]
+}
+
+export function saveLoginLayoutMemo(skinId: string, layout: LoginLayout, entry: LoginLayoutMemoEntry) {
+  const memo = readLayoutMemo()
+  memo[skinId] = { ...memo[skinId], [layout]: entry }
+  try {
+    localStorage.setItem(LOGIN_LAYOUT_MEMO_KEY, JSON.stringify(memo))
+  } catch {
+    // Storage full or disabled: switching layouts just falls back to the shared order.
+  }
+}
+
 /** Lines where third-party login is not live yet: the options show greyed out and nothing is kept. */
 export const NO_THIRD_PARTY_LINES = ['马来', '越南', '泰国', '印尼']
 

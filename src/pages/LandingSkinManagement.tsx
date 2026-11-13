@@ -12,6 +12,8 @@ import {
   PAGE_TYPE_OPTIONS,
   LOGIN_LAYOUT_OPTIONS,
   lineHasNoThirdParty,
+  loadLoginLayoutMemo,
+  saveLoginLayoutMemo,
   loginPolicy,
   loginRenderState,
   loginMethodLabel,
@@ -471,7 +473,25 @@ export default function LandingSkinManagement() {
     const iconMethods = methods.filter((m) => m !== 'phone')
     const oneLinkLock = pageType === 'lead' && (editing.line === '香港' || editing.line === '日本')
     /** Every login edit goes through the same rules the save path uses. */
-    const patchLogin = (patch: Partial<LandingSkin>) => setEditing(normalizeLoginConfig({ ...editing, ...patch }))
+    const patchLogin = (patch: Partial<LandingSkin>) => {
+      let merged: LandingSkin = { ...editing, ...patch }
+      if (patch.loginLayout && patch.loginLayout !== login.loginLayout && login.loginLayout) {
+        saveLoginLayoutMemo(editing.id, login.loginLayout, {
+          loginOrder: login.loginOrder || [],
+          secondaryLogins: login.secondaryLogins || [],
+        })
+        const memo = loadLoginLayoutMemo(editing.id, patch.loginLayout)
+        if (memo) merged = { ...merged, ...memo }
+      }
+      const next = normalizeLoginConfig(merged)
+      if (next.loginLayout) {
+        saveLoginLayoutMemo(editing.id, next.loginLayout, {
+          loginOrder: next.loginOrder || [],
+          secondaryLogins: next.secondaryLogins || [],
+        })
+      }
+      setEditing(next)
+    }
     const life = skinLifecycle(editing)
     const addAsset = (key: 'registerBefore' | 'registerAfter') =>
       setEditing({ ...editing, [key]: [...editing[key], emptySceneImage()] })
