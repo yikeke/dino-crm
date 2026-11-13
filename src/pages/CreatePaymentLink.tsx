@@ -606,15 +606,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           ? (en ? `Ends at ${validEnd(validUntil).slice(0, 16)} (${tzText}, business line time zone)` : `失效时间 ${validEnd(validUntil).slice(0, 16)}（${tzText}，按业务线时区）`)
           : (en ? `A date ends at 23:59:59 that day (${tzText}, business line time zone).` : `选的日期当天 23:59:59 失效（${tzText}，按业务线时区）`)}
       </Typography.Text>
-      <Typography.Text type="secondary" className="pl-field-hint">
-        {editingRow
-          ? (deposit
-            ? (en ? '"Stop payments now" sets valid-until to this moment and takes effect immediately. Resume sets it to 7 days from today; you can also pick another date and save.' : '「一键停止收款」把有效期改成现在这一刻，马上生效；「恢复收款」改成今天起 7 天。也可以直接选日期，保存后生效。')
-            : (en ? '"Stop payments now" sets valid-until to this moment and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成现在这一刻，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。'))
-          : deposit
+      {!editingRow && (
+        <Typography.Text type="secondary" className="pl-field-hint">
+          {deposit
             ? (en ? 'First payment and balance must both be paid by this date. After the first payment, the customer page shows the days left.' : '首款和尾款都要在有效期内付完。首款到账后，用户支付页提示还剩几天；过期后不能再付。')
             : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
-      </Typography.Text>
+        </Typography.Text>
+      )}
     </Card>
   )
 
