@@ -601,13 +601,10 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           <Button danger icon={<StopOutlined />} onClick={() => setCollecting(true)}>{en ? 'Stop payments now' : '一键停止收款'}</Button>
         ))}
       </div>
-      {validUntil && (
-        <Typography.Text type="secondary" className="pl-field-hint">
-          {en ? `Ends at ${validEnd(validUntil).slice(0, 16)} (${tzText})` : `失效时间 ${validEnd(validUntil).slice(0, 16)}（${tzText}）`}
-        </Typography.Text>
-      )}
       <Typography.Text type="secondary" className="pl-field-hint">
-        {en ? `Valid-until follows the business line's time zone: a date ends at 23:59:59 that day, ${tzText}.` : `有效期按业务线时区算：选的日期当天 23:59:59 失效（${tzText}）。`}
+        {validUntil
+          ? (en ? `Ends at ${validEnd(validUntil).slice(0, 16)} (${tzText}, business line time zone)` : `失效时间 ${validEnd(validUntil).slice(0, 16)}（${tzText}，按业务线时区）`)
+          : (en ? `A date ends at 23:59:59 that day (${tzText}, business line time zone).` : `选的日期当天 23:59:59 失效（${tzText}，按业务线时区）`)}
       </Typography.Text>
       <Typography.Text type="secondary" className="pl-field-hint">
         {editingRow
