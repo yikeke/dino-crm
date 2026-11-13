@@ -1,10 +1,10 @@
 import * as XLSX from 'xlsx'
 
-export function downloadXlsx(filename: string, headers: string[], rows: unknown[][]) {
+export function downloadXlsx(filename: string, headers: string[], rows: unknown[][], sheetName = '当前筛选结果') {
   const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
   sheet['!cols'] = headers.map(() => ({ wch: 24 }))
   const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, sheet, '当前筛选结果')
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
   XLSX.writeFile(workbook, filename)
 }
 

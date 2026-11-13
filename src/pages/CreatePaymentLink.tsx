@@ -19,7 +19,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, ClockCircleOutlined, CopyOutlined, DownloadOutlined, EditOutlined, EyeOutlined, HistoryOutlined, LinkOutlined, QrcodeOutlined, RightOutlined, StopOutlined } from '@ant-design/icons'
 import { useI18n } from '../i18n'
 import {
   channelsOnLine,
@@ -30,6 +30,7 @@ import {
   type LinkOffer,
 } from '../paymentLinkCatalog'
 import dayjs from 'dayjs'
+import { downloadXlsx } from '../export'
 import { useStore } from '../store'
 import { useCurrentAccount, usePerm } from '../perm'
 import { useSession } from '../auth'
@@ -1020,7 +1021,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     return <Tag color="processing" bordered={false}>PENDING</Tag>
   }
 
-  const orderStateTag = (order: WebOrder) => {
+  const orderStateLabel = (order: WebOrder) => {
     const { state } = orderState(order, linkTxns)
     const label: Record<string, [string, string, string]> = {
       COMPLETED: ['success', 'Paid', '已支付'],
@@ -1029,7 +1030,40 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       PENDING: ['processing', 'Unpaid', '待支付'],
     }
     const [color, enText, zhText] = label[state]
-    return <Tag color={color} bordered={false}>{en ? enText : zhText}</Tag>
+    return { color, text: en ? enText : zhText }
+  }
+
+  const orderStateTag = (order: WebOrder) => {
+    const { color, text } = orderStateLabel(order)
+    return <Tag color={color} bordered={false}>{text}</Tag>
+  }
+
+  const exportOrders = (row: PaymentLink) => {
+    const txns = txnsOf(row.id)
+    const orders = [...ordersOf(row.id)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    if (!orders.length) {
+      message.info(en ? 'No orders to export' : '还没有订单可以导出')
+      return
+    }
+    const headers = en
+      ? ['Order no.', 'User ID', 'SKU', 'Payable', 'Currency', 'Order status', 'Payment', 'Created at', 'Paid at']
+      : ['订单号', 'User ID', 'SKU', '应付', '币种', '订单状态', '支付方式', '创建时间', '支付时间']
+    const rows = orders.map((order) => {
+      const pay = txns.find((txn) => txn.orderNo === order.orderNo)
+      return [
+        order.orderNo,
+        order.userId || '',
+        order.skuName || '',
+        order.payable,
+        order.currency,
+        orderStateLabel(order).text,
+        pay ? methodName(row, pay.method) : '',
+        order.createdAt.slice(0, 16),
+        orderState(order, linkTxns).paidAt?.slice(0, 16) || '',
+      ]
+    })
+    downloadXlsx(`${row.eventName || row.id}-${row.id}-${en ? 'orders' : '订单'}-${dayjs().format('YYYYMMDD-HHmmss')}.xlsx`, headers, rows, en ? 'Orders' : '订单')
+    message.success(en ? `Exported ${orders.length} orders` : `已导出 ${orders.length} 张订单`)
   }
 
   const txnLine = (row: PaymentLink, txn: LinkTxn) => (
@@ -1354,7 +1388,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {detailField(en ? 'Link URL' : '链接地址', <Typography.Text copyable className="pl-detail-url">{row.url}</Typography.Text>)}
           </div>
         </Card>
-        <Card size="small" title={single ? (en ? 'Orders' : '订单') : (en ? 'Order and transactions' : '订单与交易')} className="pl-detail-orders">
+        <Card
+          size="small"
+          title={single ? (en ? 'Orders' : '订单') : (en ? 'Order and transactions' : '订单与交易')}
+          extra={open && <Button size="small" icon={<DownloadOutlined />} onClick={() => exportOrders(row)}>{en ? 'Export' : '导出'}</Button>}
+          className="pl-detail-orders"
+        >
           {open ? openOrders(row) : single ? fullOrders(row) : stageRows(row)}
         </Card>
       </div>
