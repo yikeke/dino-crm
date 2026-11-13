@@ -1240,9 +1240,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 {live ? txnLine(row, live) : (
                   <div className="pl-order-line is-none">
                     <Tag bordered={false}>{waiting ? (en ? 'After first payment' : '首款付清后可付') : (en ? 'No transaction yet' : '暂无交易')}</Tag>
-                    <Typography.Text type="secondary">
-                      {en ? 'A transaction is created each time the customer reaches the payment step' : '用户每次进入支付页（三方页或转账面板）生成一笔交易'}
-                    </Typography.Text>
                   </div>
                 )}
                 {stage === 'DEPOSIT_BALANCE' && firstPaid && !paid && row.status === 'ACTIVE' && dueLine(row)}
