@@ -196,6 +196,7 @@ function providerRef(method: string) {
 
 const LINE_TZ: Record<string, string> = {
   Korea: 'Asia/Seoul',
+  'Hong Kong': 'Asia/Hong_Kong',
   Vietnam: 'Asia/Ho_Chi_Minh',
   Thailand: 'Asia/Bangkok',
   Malaysia: 'Asia/Kuala_Lumpur',

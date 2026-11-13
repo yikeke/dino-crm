@@ -64,6 +64,7 @@ export function lineLabel(s: { businessLine: string; country?: string }): string
 
 const EN_VALUE: Record<string, string> = {
   韩国: 'Korea',
+  香港: 'Hong Kong',
   越南: 'Vietnam',
   马来: 'Malaysia',
   印尼: 'Indonesia',

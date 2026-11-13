@@ -211,7 +211,7 @@ function withPaymentLinkDemo(state: AppState): AppState {
     ...state,
     accounts: state.accounts.map((account) => {
       if (ccEmails.includes(account.email) && account.isCc === undefined) return { ...account, isCc: true }
-      if (account.email === 'sales.lead@dinoai.ai') return { ...account, businessLines: Array.from(new Set([...account.businessLines, '越南', '泰国'])) }
+      if (account.email === 'sales.lead@dinoai.ai') return { ...account, businessLines: Array.from(new Set([...account.businessLines, '越南', '泰国', '香港'])) }
       return account
     }),
     roles: migrateOpsOpenLinkReadOnly(state.roles),

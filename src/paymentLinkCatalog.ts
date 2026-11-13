@@ -59,6 +59,9 @@ const SEED_SKUS: CatalogSku[] = [
   { id: 'VN-MY-2026', productCode: 'web-vn-max-1y', name: 'Max Yearly', line: 'Vietnam', price: '3,990,000 VND', memberLevel: 'MAX', valid: '365 days after purchase', status: 'Active' },
   { id: 'TH-Q-2026', productCode: 'web-th-pro-1q', name: 'Pro Quarterly', line: 'Thailand', price: '9,900 THB', memberLevel: 'PRO', valid: '90 days after purchase', status: 'Active' },
   { id: 'MY-Y-2026', productCode: 'web-my-pro-1y', name: 'Pro Yearly', line: 'Malaysia', price: '388 MYR', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
+  { id: 'HK-Q-2026', productCode: 'web-hk-pro-1q', name: 'Pro Quarterly', line: 'Hong Kong', price: '590 HKD', memberLevel: 'PRO', valid: '90 days after purchase', status: 'Active' },
+  { id: 'HK-Y-2026', productCode: 'web-hk-pro-1y', name: 'Pro Yearly', line: 'Hong Kong', price: '1,790 HKD', memberLevel: 'PRO', valid: '365 days after purchase', status: 'Active' },
+  { id: 'HK-MY-2026', productCode: 'web-hk-max-1y', name: 'Max Yearly', line: 'Hong Kong', price: '2,390 HKD', memberLevel: 'MAX', valid: '365 days after purchase', status: 'Active' },
 ]
 
 const SEED_CHANNELS: CatalogChannel[] = [
@@ -69,6 +72,7 @@ const SEED_CHANNELS: CatalogChannel[] = [
   { id: 'ad_vn_meta', name: 'Vietnam Meta Mid-Autumn', line: 'Vietnam', channelCode: 'CH-VN-0007', type: 'Ads', enabled: true },
   { id: 'th_ground', name: 'Bangkok Ground Team', line: 'Thailand', channelCode: 'CH-TH-0001', type: 'Sales', enabled: true },
   { id: 'sales_my_kl', name: 'Kuala Lumpur Sales', line: 'Malaysia', channelCode: 'CH-MY-0001', type: 'Sales', enabled: true },
+  { id: 'hk_expo', name: 'Hong Kong Offline Expo', line: 'Hong Kong', channelCode: 'CH-HK-EXPO', type: 'Offline', enabled: true },
 ]
 
 const SEED_PLANS: CatalogPlan[] = [
@@ -79,6 +83,7 @@ const SEED_PLANS: CatalogPlan[] = [
   { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: 'Active', rules: [{ skuId: 'VN-Y-2026', mode: 'Amount off', value: '500000' }, { skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }] },
   { id: 'CSP-TH', channelId: 'th_ground', promoCode: '', status: 'Active', rules: [{ skuId: 'TH-Q-2026', mode: 'List price', value: '' }] },
   { id: 'CSP-MY', channelId: 'sales_my_kl', promoCode: '', status: 'Active', rules: [{ skuId: 'MY-Y-2026', mode: 'List price', value: '' }] },
+  { id: 'CSP-HK-EXPO', channelId: 'hk_expo', promoCode: '', status: 'Active', rules: [{ skuId: 'HK-Q-2026', mode: 'List price', value: '' }, { skuId: 'HK-Y-2026', mode: 'List price', value: '' }, { skuId: 'HK-MY-2026', mode: 'List price', value: '' }] },
 ]
 
 export const PAY_HOST: Record<string, string> = {

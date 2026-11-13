@@ -76,8 +76,8 @@ import './CreatePaymentLink.css'
 
 type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
 
-const OPEN_LINK_LINES = ['Korea']
-const LINE_ZH: Record<string, string> = { Korea: '韩国', Vietnam: '越南', Thailand: '泰国', Malaysia: '马来' }
+const OPEN_LINK_LINES = ['Korea', 'Hong Kong']
+const LINE_ZH: Record<string, string> = { Korea: '韩国', 'Hong Kong': '香港', Vietnam: '越南', Thailand: '泰国', Malaysia: '马来' }
 const PERSONAL_LINK_LINES = ['Malaysia', 'Thailand', 'Vietnam', 'Korea']
 
 function depositFloor(line: string, payable: number) {
@@ -728,7 +728,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   {scopeLocked
                     ? (en ? 'Business line and channel cannot be changed after the link is created.' : '链接生成后，业务线和渠道不能改。')
                     : openPage
-                      ? (en ? 'Open links are Korea only in this release.' : '通用链接本期只开放韩国。')
+                      ? (en ? 'Open links are open to Korea and Hong Kong in this release.' : '通用链接本期开放韩国、香港。')
                       : (en ? 'Personal links are open to Malaysia, Thailand, Vietnam and Korea in this release.' : '专属链接本期开放马来西亚、泰国、越南、韩国。')}
                 </Typography.Text>
               </div>
