@@ -560,7 +560,7 @@ export default function LandingSkinManagement() {
             <div>
               <Radio.Group
                 className="skin-radio-stack"
-                disabled={basicsLocked || !editing.line || noRegister || oneLinkLock}
+                disabled={basicsLocked || !editing.line || oneLinkLock}
                 value={login.afterRegisterAction}
                 onChange={(e) => patchLogin({ afterRegisterAction: e.target.value })}
                 options={followUpOptions(pageType, editing.line).map((x) => ({ value: x.value, label: en ? x.en : x.zh }))}
@@ -568,10 +568,6 @@ export default function LandingSkinManagement() {
               {oneLinkLock ? (
                 <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
                   {en ? 'No register: every button on the page opens OneLink directly.' : '无注册时，页面上的按钮直接跳转 OneLink'}
-                </Text>
-              ) : noRegister ? (
-                <Text type="warning" style={{ display: 'block', marginTop: 4 }}>
-                  {en ? 'No login area (phone off, no provider): the page does not go to a next interaction page.' : '无登录区（手机号关、三方一家没勾）时不进入后续交互页面'}
                 </Text>
               ) : null}
             </div>

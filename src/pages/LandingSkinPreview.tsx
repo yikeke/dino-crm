@@ -804,7 +804,7 @@ function ConfigPanel({
         <Row label="落地页类型" onFocus={onFocus}>{pageTypeLabel(pageType)}</Row>
         <Row label="后续交互页面" onFocus={onFocus}>
           {followUpLabel(action)}
-          {loginState !== 'R0' || action === 'onelink' ? <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button> : <em className="lpw-note">无登录区，不进入后续交互</em>}
+          <button type="button" className="lpw-link" onClick={onDemoFlow}>演示</button>
         </Row>
       </section>
 
@@ -1010,17 +1010,11 @@ export default function LandingSkinPreview() {
   const pageType = normalizePageType(skin.pageType, skin.afterRegisterAction)
   const noLoginArea = loginRenderState(skin) === 'R0'
   const action = followUpActionForPageType(pageType, skin.afterRegisterAction, skin.line)
-  const openAfterRegister = () => {
-    if (noLoginArea && action !== 'onelink') {
-      focusLead()
-      return
-    }
-    setFlow(startStep(action))
-  }
-  // 配图叠按钮 / 吸底按钮：日本 / 香港获客页（无登录区 + OneLink）直接跳 OneLink，其余滚到登录区。
+  const openAfterRegister = () => setFlow(startStep(action))
+  // 配图叠按钮 / 吸底按钮：没有登录区时直接进后续交互（日本 / 香港获客页即 OneLink），其余滚到登录区。
   const onPageCta = () => {
-    if (noLoginArea && action === 'onelink') {
-      setFlow('onelink')
+    if (noLoginArea) {
+      openAfterRegister()
       return
     }
     focusLead()
