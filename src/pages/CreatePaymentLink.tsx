@@ -46,6 +46,8 @@ import {
   ensurePaymentLinkData,
   isExpired,
   isStopped,
+  linkTransferNote,
+  needsUpfrontOrder,
   now,
   orderState,
   paidTxn,
@@ -457,6 +459,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-confirm-modal">
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
           <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
+          <p>{en ? 'Transfer note' : '转账附言'}：<b>{linkTransferNote(row.id)}</b></p>
           <p>{stageName(stage)}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
           <p>{first
             ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
@@ -1083,6 +1086,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     </div>
   )
 
+  const transferNote = (row: PaymentLink) => (
+    <Typography.Text type="secondary">
+      {en ? 'Transfer note' : '转账附言'} <Typography.Text copyable>{linkTransferNote(row.id)}</Typography.Text>
+    </Typography.Text>
+  )
+
   const confirmButton = (row: PaymentLink, stage: PayStage) => (
     <Button size="small" type="primary" onClick={() => askConfirm(row, stage)}>
       {stage === 'DEPOSIT_FIRST'
@@ -1204,6 +1213,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 {order.skuName || (en ? 'SKU picked by customer' : '用户付款时选 SKU')}
                 {order.payable ? ` · ${en ? 'Payable' : '应付'} ${formatMoney(order.payable, order.currency)} · ${en ? 'Paid' : '已付'} ${formatMoney(paidSum, order.currency)}` : ''}
               </Typography.Text>
+              {needsUpfrontOrder(row) && transferNote(row)}
             </>
           ) : (
             <>
@@ -1259,7 +1269,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const canConfirm = canConfirmBank && row.status === 'ACTIVE' && collecting && row.methods.includes('bank_transfer')
     return (
       <>
-        {canConfirm && <div className="pl-detail-orders__bar">{confirmButton(row, 'FULL')}</div>}
+        {row.methods.includes('bank_transfer') && (
+          <div className="pl-detail-orders__bar">
+            {transferNote(row)}
+            {canConfirm && confirmButton(row, 'FULL')}
+          </div>
+        )}
         {openOrders(row)}
       </>
     )

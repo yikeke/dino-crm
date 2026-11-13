@@ -2,16 +2,16 @@ import { setState } from './store'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v16'
-export const LINK_ORDER_KEY = 'dino-cc-link-orders-v4'
-export const LINK_TXN_KEY = 'dino-cc-link-txns-v3'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v17'
+export const LINK_ORDER_KEY = 'dino-cc-link-orders-v5'
+export const LINK_TXN_KEY = 'dino-cc-link-txns-v4'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13', 'dino-cc-payment-links-v14', 'dino-cc-payment-links-v15',
-  'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13', 'dino-cc-payment-links-v14', 'dino-cc-payment-links-v15', 'dino-cc-payment-links-v16',
+  'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-orders-v4', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2', 'dino-cc-link-txns-v3',
 ]
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
@@ -184,8 +184,9 @@ function newTxnId() {
   return `TXN-${dayCode()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
 }
 
-export function transferReference(txnId: string) {
-  return `DINO${txnId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`
+/** One transfer note per link, fixed when the link is created; a deposit's first payment and balance share it. */
+export function linkTransferNote(linkId: string) {
+  return `DINO${linkId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`
 }
 
 function providerRef(method: string) {
@@ -299,9 +300,10 @@ export function stageMethods(link: PaymentLink, stage: PayStage) {
 }
 
 /**
- * The customer pressed pay (or picked bank transfer). Deposit links find or create their one order, then a
- * transaction; an open attempt with the same method is reused. Full links work like the landing page: every
- * third-party press is a new order with exactly one payment; bank transfer uses the order created with the link.
+ * The customer pressed pay on a third-party method, or a manager confirmed a bank transfer. Deposit links find or
+ * create their one order, then a transaction; an open attempt with the same method is reused. Full links work like the
+ * landing page: every third-party press is a new order with exactly one payment; bank transfer uses the order created
+ * with the link.
  * Amount comes from the link, not the page.
  */
 export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?: string; method: string; userId?: string }) {
@@ -342,7 +344,7 @@ export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?:
     amount: stageAmount(link, detail.stage, offer, linkTxns),
     currency: order.currency || offer?.currency || link.currency,
     method: detail.method,
-    transferReference: detail.method === 'bank_transfer' ? transferReference(txnId) : undefined,
+    transferReference: detail.method === 'bank_transfer' ? linkTransferNote(linkId) : undefined,
     status: 'PENDING',
     createdAt: now(),
   }
@@ -392,11 +394,8 @@ export function failTxn(txnId: string, reason = '支付失败') {
 }
 
 /**
- * CC manager confirms a bank transfer for the payment the link is collecting. Uses the customer's pending
- * bank transaction when there is one; otherwise records a bank transaction on the order directly.
- */
-/**
- * A manager confirms the bank transfer for `expected` (the payment shown on their screen). If that payment already
+ * A manager confirms the bank transfer for `expected` (the payment shown on their screen). The customer page records
+ * nothing for bank transfer, so this is where the bank payment is written, already paid. If that payment already
  * succeeded through a third-party method in the meantime, nothing new is recorded and it simply reads as received.
  */
 export function confirmBankPayment(linkId: string, skuId?: string, expected?: PayStage): { txn: LinkTxn; already: boolean } | undefined {
@@ -409,11 +408,8 @@ export function confirmBankPayment(linkId: string, skuId?: string, expected?: Pa
   }
   const stage = currentStage(link, linkTxns)
   if (!stage || (expected && stage !== expected)) return undefined
-  const target = linkTxns.find((txn) => txn.payStage === stage && txn.status === 'PENDING' && txn.method === 'bank_transfer')
-  const done = target ? completeTxn(target.txnId) : (() => {
-    const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
-    return started ? completeTxn(started.txn.txnId) : undefined
-  })()
+  const started = startCheckout(linkId, { stage, skuId, method: 'bank_transfer' })
+  const done = started ? completeTxn(started.txn.txnId) : undefined
   return done ? { txn: done, already: false } : undefined
 }
 
@@ -563,11 +559,10 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const txns: LinkTxn[] = [
     t({ txnId: 'TXN-261028-TB02', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_BALANCE', amount: 8910, method: 'KPLUS', status: 'PENDING', createdAt: '2026-10-28 15:42:10' }),
     t({ txnId: 'TXN-261028-TF01', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', amount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
-    t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: 'DINO261028VB02', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
+    t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: linkTransferNote('PL-DEP-VN'), createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
     t({ txnId: 'TXN-261027-VF01', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
     t({ txnId: 'TXN-261028-RF01', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
     t({ txnId: 'TXN-261020-LF01', orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
-    t({ txnId: 'TXN-261028-BK01', orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', payStage: 'FULL', amount: 891000, method: 'bank_transfer', transferReference: 'DINO261028BK01', status: 'PENDING', createdAt: '2026-10-28 13:12:00' }),
     t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),
     t({ txnId: 'TXN-261027-KP01', orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'card', providerRef: 'CARD-27162011KR', createdAt: '2026-10-27 16:18:00', paidAt: '2026-10-27 16:20:00' }),
     t({ txnId: 'TXN-261028-EX03', orderNo: 'WEB-261028-EX03', paymentLinkId: 'PL-OPEN-KR', payStage: 'FULL', amount: 178000, method: 'card', status: 'PENDING', createdAt: '2026-10-28 10:05:00' }),

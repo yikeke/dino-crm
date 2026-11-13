@@ -18,7 +18,7 @@ import {
   stageAmount,
   stageMethods,
   startCheckout,
-  transferReference,
+  linkTransferNote,
   txnsOfLink,
   type LinkTxn,
   type PayStage,
@@ -231,27 +231,12 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const showBank = activeMethod?.kind === 'manual'
   const [host, setHost] = useState<{ method: PayMethod; orderNo?: string; txn?: LinkTxn } | null>(null)
   const [copied, setCopied] = useState('')
-  const [bankOrderNo, setBankOrderNo] = useState('')
   const bankRef = useRef<HTMLElement>(null)
-  const payerId = open ? account?.userId : link?.userId
   const collecting = !!stage && !doneTxn
-  const bankTxn = showBank && collecting && payerId
-    ? txns.find((txn) => txn.status === 'PENDING' && txn.payStage === stage && txn.method === activeMethod?.code
-      && (!open || txn.orderNo === bankOrderNo))
-    : undefined
 
   useEffect(() => {
     if (showBank) bankRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [showBank])
-
-  useEffect(() => {
-    if (!showBank || !collecting || preview || bankTxn || !stage || !activeMethod || !payerId) return
-    const started = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payerId })
-    if (started) {
-      setBankOrderNo(started.order.orderNo)
-      refresh()
-    }
-  }, [showBank, collecting, preview, bankTxn, stage, activeMethod, payerId, linkId, picked?.skuId])
 
   const copyValue = async (key: string, value: string) => {
     try {
@@ -378,7 +363,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const settledTxn = !stage && !open && !blockedLink && !overdue
     ? txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
     : undefined
-  const note = bankTxn?.transferReference || transferReference(preview ? 'TXN-PREVIEW' : linkId)
+  const note = linkTransferNote(linkId)
 
   return (
     <div className="pay-link-page" dir={copy.dir}>
