@@ -1,4 +1,6 @@
+import dayjs from 'dayjs'
 import { setState } from './store'
+import './time'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
@@ -46,8 +48,6 @@ export type PaymentLink = {
   eventName?: string
   validUntil?: string
   status: 'ACTIVE' | 'VOID'
-  /** Payments stopped by hand. Kept apart from validUntil: stopping or resuming never touches the dates. */
-  stopped?: boolean
   url: string
   createdAt: string
   updatedAt: string
@@ -194,12 +194,42 @@ function providerRef(method: string) {
   return `${prefix}-${Date.now().toString().slice(-8)}${Math.random().toString(36).slice(2, 5).toUpperCase()}`
 }
 
-export function isStopped(link: PaymentLink) {
-  return !!link.stopped
+const LINE_TZ: Record<string, string> = {
+  Korea: 'Asia/Seoul',
+  Vietnam: 'Asia/Ho_Chi_Minh',
+  Thailand: 'Asia/Bangkok',
+  Malaysia: 'Asia/Kuala_Lumpur',
 }
 
-export function isExpired(link: PaymentLink) {
-  return !!link.validUntil && link.validUntil < now().slice(0, 10)
+/** Valid-until is wall-clock time in the business line's time zone. */
+export function lineTimeZone(line?: string) {
+  return LINE_TZ[line || ''] || 'UTC'
+}
+
+export function lineTzLabel(line?: string) {
+  const hours = dayjs().tz(lineTimeZone(line)).utcOffset() / 60
+  return `UTC${hours >= 0 ? '+' : ''}${hours}`
+}
+
+export function lineNow(line?: string) {
+  return dayjs().tz(lineTimeZone(line)).format('YYYY-MM-DD HH:mm:ss')
+}
+
+export function lineToday(line?: string, plusDays = 0) {
+  return dayjs().tz(lineTimeZone(line)).add(plusDays, 'day').format('YYYY-MM-DD')
+}
+
+/** A date alone means the end of that day; "Stop payments now" stores the exact moment. */
+export function validEnd(validUntil: string) {
+  return validUntil.length <= 10 ? `${validUntil} 23:59:59` : validUntil
+}
+
+export function validEndMs(validUntil: string, line?: string) {
+  return dayjs.tz(validEnd(validUntil), lineTimeZone(line)).valueOf()
+}
+
+export function isExpired(link: Pick<PaymentLink, 'validUntil' | 'line'>) {
+  return !!link.validUntil && validEndMs(link.validUntil, link.line) <= Date.now()
 }
 
 function stamp(d: Date) {
@@ -267,21 +297,21 @@ export function syncUpfrontOrder(link: PaymentLink) {
   }
 }
 
-/** Deposit: the balance must be paid before the link expires. Null until the first payment lands, and once the balance is paid. */
-export function balanceDeadline(link: PaymentLink, txns: LinkTxn[]): string | null {
+/** Deposit: the balance must be paid before the link expires (epoch ms). Null until the first payment lands, and once the balance is paid. */
+export function balanceDeadline(link: PaymentLink, txns: LinkTxn[]): number | null {
   if (link.kind !== 'deposit' || !link.validUntil) return null
   if (!paidTxn(txns, 'DEPOSIT_FIRST') || paidTxn(txns, 'DEPOSIT_BALANCE')) return null
-  return `${link.validUntil} 23:59:59`
+  return validEndMs(link.validUntil, link.line)
 }
 
 /** Deposit with the first payment in, balance unpaid, and the link expired. */
 export function balanceOverdue(link: PaymentLink, txns: LinkTxn[]) {
-  return !!balanceDeadline(link, txns) && isExpired(link) && !isStopped(link)
+  return !!balanceDeadline(link, txns) && isExpired(link)
 }
 
 /** Which payment the link is collecting now; null when nothing more can be paid. */
 export function currentStage(link: PaymentLink, txns: LinkTxn[]): PayStage | null {
-  if (link.status === 'VOID' || isStopped(link) || isExpired(link)) return null
+  if (link.status === 'VOID' || isExpired(link)) return null
   if (link.audience === 'open') return 'FULL'
   if (link.kind === 'full') return paidTxn(txns, 'FULL') ? null : 'FULL'
   if (!paidTxn(txns, 'DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'

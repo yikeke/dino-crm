@@ -12,9 +12,7 @@ import {
   failTxn,
   findPaymentLink,
   isExpired,
-  isStopped,
   paidTxn,
-  parseTime,
   stageAmount,
   stageMethods,
   startCheckout,
@@ -213,8 +211,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const doneTxn = null as LinkTxn | null
   const [acked, setAcked] = useState(false)
   const stage = link ? currentStage(link, txns) : null
-  const stoppedLink = !!link && isStopped(link)
-  const blockedLink = !!link && (link.status === 'VOID' || stoppedLink || isExpired(link))
+  const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
   const offers = link?.offers || []
   const [pickedId, setPickedId] = useState('')
   const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
@@ -265,10 +262,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
       return
     }
     const started = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payer?.userId })
-    if (!started) {
-      refresh()
-      return
-    }
+    if (!started) return
     setHost({ method: activeMethod, orderNo: started.order.orderNo, txn: started.txn })
     refresh()
   }
@@ -358,7 +352,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const dueNote = overdue
     ? copy.overdue
     : stage === 'DEPOSIT_BALANCE' && dueAt
-        ? daysText(copy.dueLeft, Math.max(1, Math.ceil((parseTime(dueAt) - Date.now()) / 86_400_000)))
+        ? daysText(copy.dueLeft, Math.max(1, Math.ceil((dueAt - Date.now()) / 86_400_000)))
         : ''
   const settledTxn = !stage && !open && !blockedLink && !overdue
     ? txns.filter((txn) => txn.status === 'SUCCESS').sort((a, b) => (b.paidAt || '').localeCompare(a.paidAt || ''))[0]
@@ -412,7 +406,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </section>
         )}
 
-        {blockedLink && !overdue && <section className="pay-card pay-expired">{stoppedLink ? copy.stopped : copy.expired}</section>}
+        {blockedLink && !overdue && <section className="pay-card pay-expired">{copy.expired}</section>}
 
         {offers.length > 1 && shownStage === 'FULL' && (
           <section className="pay-card">
