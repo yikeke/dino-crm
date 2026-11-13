@@ -44,6 +44,7 @@ import {
   logLinkAction,
   ensurePaymentLinkData,
   isExpired,
+  isStopped,
   now,
   orderState,
   paidTxn,
@@ -67,7 +68,7 @@ import { enValue } from '../channel'
 import { methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
-type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
+type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'stopped' | 'expired'
 
 const OPEN_LINK_LINES = ['Korea']
 const LINE_ZH: Record<string, string> = { Korea: '韩国', Vietnam: '越南', Thailand: '泰国', Malaysia: '马来' }
@@ -329,6 +330,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       eventName: open ? eventName.trim() : undefined,
       validUntil: validUntil || undefined,
       status: 'ACTIVE',
+      stopped: previous?.stopped,
       url: payLinkUrl(id),
       createdAt: previous?.createdAt || nowText(),
       updatedAt: nowText(),
@@ -546,27 +548,26 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   )
 
   const editingRow = editingId ? links.find((item) => item.id === editingId) : undefined
-  const today = dayjs().format('YYYY-MM-DD')
-  const stopped = !!validUntil && validUntil < today
+  const editingSettled = !!editingRow && editingRow.audience !== 'open'
+    && !!paidTxn(txnsOf(editingRow.id), editingRow.kind === 'full' ? 'FULL' : 'DEPOSIT_BALANCE')
 
   const setCollecting = (stop: boolean) => {
     if (!editingRow) return
-    const next = stop ? dayjs().subtract(1, 'day').format('YYYY-MM-DD') : defaultValidity(editingRow.kind) || undefined
+    const expiredNow = isExpired(editingRow)
     Modal.confirm({
       title: stop ? (en ? 'Stop taking payments?' : '停止收款？') : (en ? 'Resume taking payments?' : '恢复收款？'),
       content: stop
-        ? (en ? 'Valid-until becomes yesterday and takes effect now. The customer page shows the link as expired. Paid orders stay as they are.' : '有效期改成昨天，马上生效：用户打开链接提示已过期，不能再付款。已支付的订单不变。')
-        : editingRow.kind === 'deposit'
-          ? (en ? `Valid-until becomes ${next} (7 days from today) and takes effect now.` : `有效期改成 ${next}（今天起 7 天），马上生效，用户可以继续付款。`)
-          : (en ? 'Valid-until is cleared (no end date) and takes effect now.' : '清空有效期（不限期），马上生效，用户可以继续付款。'),
+        ? (en ? 'Takes effect now: the customer page says the link has stopped taking payments. Valid-until and paid orders stay as they are. You can resume any time.' : '马上生效：用户打开链接提示已停止收款，不能再付款。有效期不变，已支付的订单不变，随时可以恢复。')
+        : expiredNow
+          ? (en ? 'Takes effect now, but the link is past its valid-until date, so the customer still cannot pay. To keep collecting, also move valid-until to a later date and save.' : '马上生效。但这条链接已过有效期，恢复后用户仍不能付款；要继续收款，请再把有效期改到以后并保存。')
+          : (en ? 'Takes effect now. The customer can pay again. Valid-until stays as it is.' : '马上生效，用户可以继续付款。有效期不变。'),
       okText: stop ? (en ? 'Stop' : '停止收款') : (en ? 'Resume' : '恢复收款'),
       okButtonProps: stop ? { danger: true } : undefined,
       cancelText: en ? 'Cancel' : '取消',
       onOk: () => {
-        persist(links.map((item) => (item.id === editingRow.id ? { ...item, validUntil: next, updatedAt: nowText() } : item)))
-        logAction(editingRow.id, stop ? '停止收款' : '恢复收款', `有效期 ${editingRow.validUntil || '不限'} → ${next || '不限'}`)
+        persist(links.map((item) => (item.id === editingRow.id ? { ...item, stopped: stop, updatedAt: nowText() } : item)))
+        logAction(editingRow.id, stop ? '停止收款' : '恢复收款', stop ? '收款状态 收款中 → 已停止收款' : '收款状态 已停止收款 → 收款中')
         reload()
-        setValidUntil(next || '')
         message.success(stop ? (en ? 'Payments stopped' : '已停止收款') : (en ? 'Payments resumed' : '已恢复收款'))
       },
     })
@@ -581,23 +582,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           <div className="pl-label">{deposit && <span className="pl-required">*</span>}{en ? 'Valid until' : '有效期至'}</div>
           <Input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} style={{ width: 220 }} />
         </div>
-        {editingRow && (stopped ? (
-          <>
-            <Tag bordered={false}>{en ? 'Payments stopped' : '已停止收款'}</Tag>
-            <Button onClick={() => setCollecting(false)}>{en ? 'Resume payments' : '恢复收款'}</Button>
-          </>
-        ) : (
-          <Button danger icon={<StopOutlined />} onClick={() => setCollecting(true)}>{en ? 'Stop payments now' : '一键停止收款'}</Button>
-        ))}
       </div>
       <Typography.Text type="secondary" className="pl-field-hint">
-        {editingRow
-          ? (deposit
-            ? (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume sets it to 7 days from today; you can also pick another date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」改成今天起 7 天。也可以直接选日期，保存后生效。')
-            : (en ? '"Stop payments now" sets valid-until to yesterday and takes effect immediately. Resume clears it; you can also pick a later date and save.' : '「一键停止收款」把有效期改成昨天，马上生效；「恢复收款」清空有效期。也可以直接选日期，保存后生效。'))
-          : deposit
-            ? (en ? 'First payment and balance must both be paid by this date. After the first payment, the customer page shows the days left.' : '首款和尾款都要在有效期内付完。首款到账后，用户支付页提示还剩几天；过期后不能再付。')
-            : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
+        {deposit
+          ? (en ? 'First payment and balance must both be paid by this date. After the first payment, the customer page shows the days left.' : '首款和尾款都要在有效期内付完。首款到账后，用户支付页提示还剩几天；过期后不能再付。')
+          : (en ? 'Optional. After this date the customer page shows the link as expired and it cannot be paid.' : '可不填。过了有效期，用户打开链接提示已失效，不能再付款。')}
       </Typography.Text>
     </Card>
   )
@@ -914,6 +903,21 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             <Button block icon={<EyeOutlined />} style={{ marginTop: 8 }} disabled={!activeChannel?.plan || !shown.length} onClick={() => previewDraft(mode)}>
               {en ? 'Preview customer page' : '预览用户页面'}
             </Button>
+            {editingRow && !editingSettled && (
+              <div className="pl-stop">
+                {editingRow.stopped ? (
+                  <>
+                    <Tag color="warning" bordered={false}>{en ? 'Payments stopped' : '已停止收款'}</Tag>
+                    <Button block onClick={() => setCollecting(false)}>{en ? 'Resume payments' : '恢复收款'}</Button>
+                  </>
+                ) : (
+                  <Button block danger icon={<StopOutlined />} onClick={() => setCollecting(true)}>{en ? 'Stop payments now' : '一键停止收款'}</Button>
+                )}
+                <Typography.Text type="secondary" className="pl-stop__hint">
+                  {en ? 'Takes effect right away, no need to save. Valid-until is not changed.' : '马上生效，不用点保存；不改有效期。'}
+                </Typography.Text>
+              </div>
+            )}
             {!ready && (
               <Typography.Text type="secondary" className="pl-summary__todo">
                 {open && !eventName.trim()
@@ -974,7 +978,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
 
   const dueLine = (row: PaymentLink) => {
     const orders = txnsOf(row.id)
-    if (paidOf(orders, 'DEPOSIT_BALANCE') || isExpired(row)) return null
+    if (paidOf(orders, 'DEPOSIT_BALANCE') || isExpired(row) || isStopped(row)) return null
     const due = balanceDeadline(row, orders)
     if (!due) return null
     const left = parseTime(due) - Date.now()
@@ -990,13 +994,16 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const linkStatus = (row: PaymentLink): { label: string; color: string } => {
     const orders = txnsOf(row.id)
     const expired = { label: en ? 'Expired' : '已过期', color: 'default' }
-    if (row.audience === 'open') return isExpired(row) ? expired : { label: en ? 'Collecting' : '收款中', color: 'cyan' }
+    const stopped = { label: en ? 'Payments stopped' : '已停止收款', color: 'warning' }
+    if (row.audience === 'open') return isStopped(row) ? stopped : isExpired(row) ? expired : { label: en ? 'Collecting' : '收款中', color: 'cyan' }
     if (row.kind === 'full') {
       if (paidOf(orders, 'FULL')) return { label: en ? 'Paid' : '已支付', color: 'success' }
+      if (isStopped(row)) return stopped
       if (isExpired(row)) return expired
       return { label: en ? 'Awaiting payment' : '待支付', color: 'processing' }
     }
     if (paidOf(orders, 'DEPOSIT_BALANCE')) return { label: en ? 'Fully paid' : '已付清', color: 'success' }
+    if (isStopped(row)) return paidOf(orders, 'DEPOSIT_FIRST') ? { label: en ? 'Payments stopped · first payment paid' : '已停止收款 · 已付首款', color: 'warning' } : stopped
     if (balanceOverdue(row, orders)) return { label: en ? 'Expired · first payment paid' : '已过期 · 已付首款', color: 'error' }
     if (isExpired(row)) return expired
     if (paidOf(orders, 'DEPOSIT_FIRST')) {
@@ -1367,8 +1374,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     if (value === 'full_wait') return row.kind === 'full' && row.audience !== 'open' && stage === 'FULL'
     const settled = !!paidOf(orders, row.kind === 'full' ? 'FULL' : 'DEPOSIT_BALANCE')
     if (value === 'done') return row.audience !== 'open' && settled
-    if (value === 'collecting') return !isExpired(row)
-    if (value === 'expired') return isExpired(row) && (row.audience === 'open' || !settled)
+    if (value === 'collecting') return !isExpired(row) && !isStopped(row)
+    if (value === 'stopped') return isStopped(row) && (row.audience === 'open' || !settled)
+    if (value === 'expired') return isExpired(row) && !isStopped(row) && (row.audience === 'open' || !settled)
     return true
   }
   const baseRows = links.filter((row) => {
@@ -1383,6 +1391,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const sceneOptions: { value: Scene; label: string }[] = openPage ? [
     { value: 'all', label: en ? 'All' : '全部' },
     { value: 'collecting', label: en ? 'Collecting' : '收款中' },
+    { value: 'stopped', label: en ? 'Payments stopped' : '已停止收款' },
     { value: 'expired', label: en ? 'Expired' : '已过期' },
   ] : [
     { value: 'all', label: en ? 'All' : '全部' },
@@ -1390,6 +1399,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     { value: 'balance', label: en ? 'Balance due' : '待付尾款' },
     { value: 'full_wait', label: en ? 'Full payment due' : '全款待支付' },
     { value: 'done', label: en ? 'Completed' : '已完成' },
+    { value: 'stopped', label: en ? 'Payments stopped' : '已停止收款' },
     { value: 'expired', label: en ? 'Expired' : '已过期' },
   ]
   const scopedLinks = links.filter((row) => (row.audience === 'open') === openPage && visible(row))

@@ -46,6 +46,8 @@ export type PaymentLink = {
   eventName?: string
   validUntil?: string
   status: 'ACTIVE' | 'VOID'
+  /** Payments stopped by hand. Kept apart from validUntil: stopping or resuming never touches the dates. */
+  stopped?: boolean
   url: string
   createdAt: string
   updatedAt: string
@@ -191,6 +193,10 @@ function providerRef(method: string) {
   return `${prefix}-${Date.now().toString().slice(-8)}${Math.random().toString(36).slice(2, 5).toUpperCase()}`
 }
 
+export function isStopped(link: PaymentLink) {
+  return !!link.stopped
+}
+
 export function isExpired(link: PaymentLink) {
   return !!link.validUntil && link.validUntil < now().slice(0, 10)
 }
@@ -269,12 +275,12 @@ export function balanceDeadline(link: PaymentLink, txns: LinkTxn[]): string | nu
 
 /** Deposit with the first payment in, balance unpaid, and the link expired. */
 export function balanceOverdue(link: PaymentLink, txns: LinkTxn[]) {
-  return !!balanceDeadline(link, txns) && isExpired(link)
+  return !!balanceDeadline(link, txns) && isExpired(link) && !isStopped(link)
 }
 
 /** Which payment the link is collecting now; null when nothing more can be paid. */
 export function currentStage(link: PaymentLink, txns: LinkTxn[]): PayStage | null {
-  if (link.status === 'VOID' || isExpired(link)) return null
+  if (link.status === 'VOID' || isStopped(link) || isExpired(link)) return null
   if (link.audience === 'open') return 'FULL'
   if (link.kind === 'full') return paidTxn(txns, 'FULL') ? null : 'FULL'
   if (!paidTxn(txns, 'DEPOSIT_FIRST')) return 'DEPOSIT_FIRST'

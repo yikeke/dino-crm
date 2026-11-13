@@ -12,6 +12,7 @@ import {
   failTxn,
   findPaymentLink,
   isExpired,
+  isStopped,
   paidTxn,
   parseTime,
   stageAmount,
@@ -212,7 +213,8 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const doneTxn = null as LinkTxn | null
   const [acked, setAcked] = useState(false)
   const stage = link ? currentStage(link, txns) : null
-  const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
+  const stoppedLink = !!link && isStopped(link)
+  const blockedLink = !!link && (link.status === 'VOID' || stoppedLink || isExpired(link))
   const offers = link?.offers || []
   const [pickedId, setPickedId] = useState('')
   const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
@@ -278,7 +280,10 @@ function PayLinkView({ linkId }: { linkId: string }) {
       return
     }
     const started = startCheckout(linkId, { stage, skuId: picked?.skuId, method: activeMethod.code, userId: payer?.userId })
-    if (!started) return
+    if (!started) {
+      refresh()
+      return
+    }
     setHost({ method: activeMethod, orderNo: started.order.orderNo, txn: started.txn })
     refresh()
   }
@@ -422,7 +427,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </section>
         )}
 
-        {blockedLink && !overdue && <section className="pay-card pay-expired">{copy.expired}</section>}
+        {blockedLink && !overdue && <section className="pay-card pay-expired">{stoppedLink ? copy.stopped : copy.expired}</section>}
 
         {offers.length > 1 && shownStage === 'FULL' && (
           <section className="pay-card">
