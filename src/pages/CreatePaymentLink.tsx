@@ -1016,9 +1016,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const collected = (row: PaymentLink) => txnsOf(row.id).filter((txn) => txn.status === 'SUCCESS')
 
   const txnStatusTag = (txn: LinkTxn) => {
-    if (txn.status === 'SUCCESS') return <Tag color="success" bordered={false}>SUCCESS</Tag>
-    if (txn.status === 'FAILED') return <Tag color="error" bordered={false}>FAILED</Tag>
-    return <Tag color="processing" bordered={false}>PENDING</Tag>
+    if (txn.status === 'SUCCESS') return <Tag color="success" bordered={false}>{en ? 'Paid' : '已支付'}</Tag>
+    if (txn.status === 'FAILED') return <Tag color="error" bordered={false}>{en ? 'Failed' : '失败'}</Tag>
+    return <Tag color="processing" bordered={false}>{en ? 'Unpaid' : '待支付'}</Tag>
   }
 
   const orderStateLabel = (order: WebOrder) => {
@@ -1197,24 +1197,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-order-head">
           {order ? (
             <>
-              <span className="pl-order-head__label">Web Order</span>
+              <span className="pl-order-head__label">{en ? 'Order' : '订单'}</span>
               <Typography.Text className="pl-order-no" copyable>{order.orderNo}</Typography.Text>
               {orderStateTag(order)}
               <Typography.Text type="secondary">
                 {order.skuName || (en ? 'SKU picked by customer' : '用户付款时选 SKU')}
                 {order.payable ? ` · ${en ? 'Payable' : '应付'} ${formatMoney(order.payable, order.currency)} · ${en ? 'Paid' : '已付'} ${formatMoney(paidSum, order.currency)}` : ''}
               </Typography.Text>
-              <Typography.Text type="secondary" className="pl-leg__relation">
-                {order.origin === 'link'
-                  ? (en ? 'Created with the link (manual bank transfer offered)' : '链接含手动银行转账，创建链接时已生成')
-                  : (en ? 'Created when the customer reached the payment page' : '用户进入三方支付页时生成')}
-              </Typography.Text>
             </>
           ) : (
             <>
-              <span className="pl-order-head__label">Web Order</span>
+              <span className="pl-order-head__label">{en ? 'Order' : '订单'}</span>
               <Tag bordered={false}>{en ? 'Not created yet' : '未创建'}</Tag>
-              <Typography.Text type="secondary">{en ? 'Third-party methods only: the order is created when the customer reaches the payment page.' : '只挂三方支付：用户进入三方支付页时才创建订单。'}</Typography.Text>
             </>
           )}
         </div>
@@ -1233,7 +1227,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </div>
               <div className="pl-leg__name">
                 <b>{stageName(stage)}</b>
-                <Typography.Text type="secondary" className="pl-leg__relation">pay_stage = {stage}</Typography.Text>
               </div>
               <div className="pl-leg__amount">{amount ? formatMoney(amount, row.currency) : (en ? 'Customer picks SKU' : '用户选 SKU 后定')}</div>
               <div className="pl-leg__status">
@@ -1257,11 +1250,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             </div>
           )
         })}
-        <div className="pl-legs__note">
-          {en
-            ? 'Payment link → one web order → two successful transactions (first payment, balance). Membership opens when the order is fully paid.'
-            : '支付链接 → 一张 Web Order → 两笔成功交易（首款、尾款）。订单付清后开通会员。'}
-        </div>
       </div>
     )
   }
@@ -1271,10 +1259,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const canConfirm = canConfirmBank && row.status === 'ACTIVE' && collecting && row.methods.includes('bank_transfer')
     return (
       <>
-        <div className="pl-detail-orders__bar">
-          {methodsCell(row, row.methods)}
-          {canConfirm && confirmButton(row, 'FULL')}
-        </div>
+        {canConfirm && <div className="pl-detail-orders__bar">{confirmButton(row, 'FULL')}</div>}
         {openOrders(row)}
       </>
     )
@@ -1302,11 +1287,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             title: en ? 'Order no.' : '订单号',
             dataIndex: 'orderNo',
             width: 200,
-            render: (value: string, order: WebOrder) => (
-              <div className="pl-two-line">
-                <Typography.Text className="pl-order-no" copyable>{value}</Typography.Text>
-                {order.origin === 'link' && <Typography.Text type="secondary">{en ? 'Created with the link (manual bank transfer)' : '创建链接时生成（手动银行转账）'}</Typography.Text>}
-              </div>
+            render: (value: string) => (
+              <Typography.Text className="pl-order-no" copyable>{value}</Typography.Text>
             ),
           },
           ...(open ? [{ title: 'User ID', dataIndex: 'userId', width: 200, render: (value?: string) => <Typography.Text copyable={!!value}>{value || '—'}</Typography.Text> }] : []),
@@ -1356,9 +1338,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               <Tag color={status.color} bordered={false} style={{ marginLeft: 8 }}>{status.label}</Tag>
               {!open && (row.kind === 'full' ? <Tag color="green">{en ? 'Full' : '全款'}</Tag> : <Tag color="orange">{en ? 'Deposit' : '定金'}</Tag>)}
             </Typography.Title>
-            <Typography.Text type="secondary">
-              {open ? `${row.id} · ${en ? 'Open payment link' : '通用支付链接'}` : `${en ? 'Personal payment link' : '专属支付链接'} · User ID ${row.userId || '—'}`}
-            </Typography.Text>
+            {open && <Typography.Text type="secondary">{`${row.id} · ${en ? 'Open payment link' : '通用支付链接'}`}</Typography.Text>}
           </div>
           <Space wrap className="pl-detail__actions">
             {linkActions(row)}
