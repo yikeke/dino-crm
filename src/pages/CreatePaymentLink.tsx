@@ -1532,7 +1532,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         dataSource={rows}
         pagination={false}
         scroll={{ x: openPage ? 1130 : 1202 }}
-        rowClassName={(row: PaymentLink) => (linkStatus(row).label === (en ? 'Expired' : '已过期') ? 'pl-row--void' : '')}
         locale={{ emptyText: openPage ? (en ? 'No open payment links yet' : '还没有通用支付链接') : (en ? 'No personal payment links yet' : '还没有专属支付链接') }}
       />
       </>

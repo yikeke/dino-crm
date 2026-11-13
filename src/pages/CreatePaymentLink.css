@@ -778,10 +778,6 @@
   gap: 12px;
 }
 
-.pl-row--void > td {
-  opacity: 0.55;
-}
-
 .pl-due-line {
   display: inline-flex;
   flex-wrap: wrap;
