@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Alert, Button, Card, Checkbox, Drawer, Empty, Input, Modal, Radio, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
-import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, HolderOutlined, PlusOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, EyeOutlined, HolderOutlined, LockOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
@@ -114,10 +114,12 @@ function SkinCreateGuide({ en }: { en: boolean }) {
   )
 }
 
-function LoginOrderList({ methods, en, disabled, onReorder, renderExtra }: {
+function LoginOrderList({ methods, en, disabled, pinned, onReorder, renderExtra }: {
   methods: LoginMethod[]
   en: boolean
   disabled?: boolean
+  /** Fixed first row that is not part of the sortable list. */
+  pinned?: ReactNode
   onReorder: (next: LoginMethod[]) => void
   renderExtra: (m: LoginMethod) => ReactNode
 }) {
@@ -138,6 +140,7 @@ function LoginOrderList({ methods, en, disabled, onReorder, renderExtra }: {
     <ol className={`skin-login-order${dragging ? ' is-dragging' : ''}`} onDragLeave={(e) => {
       if (!e.currentTarget.contains(e.relatedTarget as Node)) setSlot(null)
     }}>
+      {pinned ? <li className="is-pinned" draggable={false}>{pinned}</li> : null}
       {methods.map((m, i) => (
         <li
           key={m}
@@ -465,6 +468,7 @@ export default function LandingSkinManagement() {
     const methods = login.loginOrder || []
     const secondary = login.secondaryLogins || []
     const twoZone = login.loginLayout === 'two_zone'
+    const iconMethods = methods.filter((m) => m !== 'phone')
     const oneLinkLock = pageType === 'lead' && (editing.line === '香港' || editing.line === '日本')
     /** Every login edit goes through the same rules the save path uses. */
     const patchLogin = (patch: Partial<LandingSkin>) => setEditing(normalizeLoginConfig({ ...editing, ...patch }))
@@ -743,14 +747,29 @@ export default function LandingSkinManagement() {
                   </div>
                 </div>
               </div>
+              {twoZone || iconMethods.length ? (
               <div className="skin-form-row">
-                <label>{en ? 'Order' : '方式顺序'}</label>
+                <label>{twoZone ? (en ? 'Order' : '方式顺序') : (en ? 'Icon order' : '图标顺序')}</label>
                 <div>
                   <LoginOrderList
-                    methods={methods}
+                    methods={twoZone ? methods : iconMethods}
                     en={en}
                     disabled={!editing.line}
-                    onReorder={(loginOrder) => patchLogin({ loginOrder })}
+                    pinned={!twoZone && regMode === 'full' ? (
+                      <>
+                        <LockOutlined className="skin-login-order-handle" />
+                        <b>{en ? 'Phone form' : '手机号表单'}</b>
+                        <span className="skin-login-order-note">{en ? 'Always on top' : '固定在最上面'}</span>
+                      </>
+                    ) : undefined}
+                    onReorder={(next) => {
+                      if (twoZone) {
+                        patchLogin({ loginOrder: next })
+                        return
+                      }
+                      let k = 0
+                      patchLogin({ loginOrder: methods.map((m) => (m === 'phone' ? m : next[k++])) })
+                    }}
                     renderExtra={(m) => (twoZone ? (
                       <Radio.Group
                         size="small"
@@ -768,6 +787,7 @@ export default function LandingSkinManagement() {
                   />
                 </div>
               </div>
+              ) : null}
             </div>
           ) : null}
           <div className="skin-reg-block">

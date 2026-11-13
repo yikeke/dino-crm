@@ -266,5 +266,9 @@
 .skin-login-order li.drop-after::after { bottom: -5px; }
 .skin-login-order.is-dragging li { cursor: grabbing; }
 .skin-login-order-handle { color: #8f959e; }
+.skin-login-order li.is-pinned { cursor: default; background: #f2f3f5; border-style: dashed; color: #646a73; }
+.skin-login-order li.is-pinned:hover { border-color: #e5e7eb; background: #f2f3f5; }
+.skin-login-order li.is-pinned b { flex: 0 0 auto; }
+.skin-login-order-note { color: #8f959e; font-size: 12px; }
 .skin-login-order li b { flex: 1; font-weight: 500; }
 .skin-login-order-idx { width: 20px; height: 20px; border-radius: 50%; background: #e8efff; color: #2f54eb; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
