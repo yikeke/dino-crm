@@ -815,6 +815,10 @@
   margin-top: 4px;
 }
 
+.pl-stopped-alert {
+  margin-bottom: 12px;
+}
+
 .pl-validity {
   display: flex;
   align-items: flex-end;

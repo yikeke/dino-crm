@@ -578,7 +578,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         logAction(editingRow.id, stop ? '停止收款' : '恢复收款', `有效期 ${editingRow.validUntil || '不限'} → ${next || '不限'}`)
         reload()
         setValidUntil(next || '')
-        message.success(stop ? (en ? 'Payments stopped' : '已停止收款') : (en ? 'Payments resumed' : '已恢复收款'))
+        message.success(stop ? (en ? 'Expired · payments stopped' : '已过期并停止收款') : (en ? 'Payments resumed' : '已恢复收款'))
       },
     })
   }
@@ -587,25 +587,33 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     <Card size="small" title={step(no, en ? 'Link validity' : '链接有效期', deposit
       ? (en ? 'Required for deposits, 7 days by default' : '定金必填，默认 7 天')
       : (en ? 'Leave empty for no end date' : '不填就不限期'))}>
+      {stopped && !editingSettled && (
+        <Alert
+          type="error"
+          showIcon
+          icon={<StopOutlined />}
+          className="pl-stopped-alert"
+          message={en ? 'Expired · payments stopped' : '已过期并停止收款'}
+          description={en
+            ? `Ended at ${validEnd(validUntil).slice(0, 16)} (${tzText}). Customers see the link as expired and cannot pay; paid orders are not affected.`
+            : `失效时间 ${validEnd(validUntil).slice(0, 16)}（${tzText}）。用户打开链接会提示已过期，不能付款；已支付的订单不受影响。`}
+          action={<Button onClick={() => setCollecting(false)}>{en ? 'Resume payments' : '恢复收款'}</Button>}
+        />
+      )}
       <div className="pl-validity">
         <div>
           <div className="pl-label">{deposit && <span className="pl-required">*</span>}{en ? 'Valid until' : '有效期至'}</div>
           <Input type="date" value={validUntil.slice(0, 10)} onChange={(event) => setValidUntil(event.target.value)} style={{ width: 220 }} />
         </div>
-        {editingRow && !editingSettled && (stopped ? (
-          <>
-            <Tag bordered={false}>{en ? 'Payments stopped' : '已停止收款'}</Tag>
-            <Button onClick={() => setCollecting(false)}>{en ? 'Resume payments' : '恢复收款'}</Button>
-          </>
-        ) : (
+        {editingRow && !editingSettled && !stopped && (
           <Button danger icon={<StopOutlined />} onClick={() => setCollecting(true)}>{en ? 'Stop payments now' : '一键停止收款'}</Button>
-        ))}
+        )}
       </div>
-      <Typography.Text type="secondary" className="pl-field-hint">
+      {!(stopped && !editingSettled) && <Typography.Text type="secondary" className="pl-field-hint">
         {validUntil
           ? (en ? `Ends at ${validEnd(validUntil).slice(0, 16)} (${tzText}, business line time zone)` : `失效时间 ${validEnd(validUntil).slice(0, 16)}（${tzText}，按业务线时区）`)
           : (en ? `A date ends at 23:59:59 that day (${tzText}, business line time zone).` : `选的日期当天 23:59:59 失效（${tzText}，按业务线时区）`)}
-      </Typography.Text>
+      </Typography.Text>}
       {!editingRow && (
         <Typography.Text type="secondary" className="pl-field-hint">
           {deposit
