@@ -511,9 +511,9 @@ const TH_GOAL: Record<string, string> = {
   consistent_habit: 'สร้างนิสัยการเรียนอย่างสม่ำเสมอ',
 }
 
-/** 可约时段待泰国销售组确认；原型先按越南现网每天 09:00–21:00、30 分钟一档。 */
-const TH_CALL_TIMES = Array.from({ length: 25 }, (_, i) => {
-  const minutes = 9 * 60 + i * 30
+/** 泰国销售组：除周三外每天 12:00–21:00（GMT+7），30 分钟一档，含 12:00 与 21:00。 */
+const TH_CALL_TIMES = Array.from({ length: 19 }, (_, i) => {
+  const minutes = 12 * 60 + i * 30
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 })
 
@@ -521,6 +521,11 @@ type LeadBooking = { date: string; time: string }
 
 function bangkokToday() {
   return new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)
+}
+
+/** YYYY-MM-DD in Asia/Bangkok; Wednesday is not bookable. */
+function isBangkokWednesday(date: string) {
+  return new Date(`${date}T12:00:00+07:00`).getUTCDay() === 3
 }
 
 /** Same two questions and option ids as Vietnam; Thai copy, Thailand GMT+7 for the callback. */
@@ -560,7 +565,20 @@ function ThaiLeadExtra({ onContinue }: { onContinue: (booking: LeadBooking | nul
           <label className="lp-select-wrap">
             <span>เลือกวันที่</span>
             <div className="lp-field">
-              <input type="date" min={bangkokToday()} value={date} aria-label="เลือกวันที่" onChange={(e) => setDate(e.target.value)} />
+              <input
+                type="date"
+                min={bangkokToday()}
+                value={date}
+                aria-label="เลือกวันที่"
+                onChange={(e) => {
+                  const next = e.target.value
+                  if (next && isBangkokWednesday(next)) {
+                    setDate('')
+                    return
+                  }
+                  setDate(next)
+                }}
+              />
             </div>
           </label>
           <LeadSelect label="เลือกเวลา" value={time} placeholder="เลือกเวลา" options={TH_CALL_TIMES.map((id) => ({ id, label: id }))} onChange={setTime} />
@@ -586,7 +604,7 @@ const STEP_NOTE: Record<Exclude<FlowStep, null>, string> = {
   lead_my: '后续交互 Page 2 · 马来补充资料（四项选填 + 预约）',
   lead_vn: '后续交互 Page 2 · 越南补充资料（两项选填 + 预约）',
   lead_sa: '后续交互 Page 2 · 沙特补充资料（阿语，四项选填，不展示预约时间）',
-  lead_th: '后续交互 Page 2 · 泰国补充资料（泰语，两项选填 + 预约，GMT+7；可约时段待确认，原型暂按每天 09:00–21:00）',
+  lead_th: '后续交互 Page 2 · 泰国补充资料（泰语，两项选填 + 预约，GMT+7；除周三外每天 12:00–21:00）',
   lead_done: '后续交互 Page 3 · 完成 → 下一步出下载 App',
   onelink: '打开 OneLink（原型模拟）',
 }
