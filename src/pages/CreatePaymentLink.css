@@ -815,6 +815,26 @@
   margin-bottom: 12px;
 }
 
+.pl-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pl-snapshot-diff {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.pl-snapshot-diff__title {
+  margin-top: 6px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
 .pl-validity {
   display: flex;
   align-items: flex-end;

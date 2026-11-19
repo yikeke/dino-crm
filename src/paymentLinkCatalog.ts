@@ -68,6 +68,7 @@ const SEED_CHANNELS: CatalogChannel[] = [
   { id: 'sales_amy_zhang', name: 'Amy Zhang', line: 'Korea', channelCode: 'CH-KR-0001', type: 'Sales', enabled: true },
   { id: 'kol_jisu_mom', name: '@jisu_mom', line: 'Korea', channelCode: 'CH-KR-0002', type: 'KOL', enabled: true },
   { id: 'ad_kr_meta', name: 'Korea Meta Back to School', line: 'Korea', channelCode: 'CH-KR-0003', type: 'Ads', enabled: true },
+  { id: 'kr_expo', name: 'Korea Offline Expo', line: 'Korea', channelCode: 'CH-KR-EXPO', type: 'Offline', enabled: true },
   { id: 'sales_linh_nguyen', name: 'Linh Nguyen', line: 'Vietnam', channelCode: 'CH-VN-0005', type: 'Sales', enabled: true },
   { id: 'ad_vn_meta', name: 'Vietnam Meta Mid-Autumn', line: 'Vietnam', channelCode: 'CH-VN-0007', type: 'Ads', enabled: true },
   { id: 'th_ground', name: 'Bangkok Ground Team', line: 'Thailand', channelCode: 'CH-TH-0001', type: 'Sales', enabled: true },
@@ -80,6 +81,7 @@ const SEED_PLANS: CatalogPlan[] = [
   { id: 'CSP-JISU', channelId: 'kol_jisu_mom', promoCode: 'CSP-JISU-PROMO', status: 'Active', rules: [{ skuId: 'KR-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'KR-H-2026', mode: 'Percent off', value: '15' }] },
   { id: 'CSP-KR-META', channelId: 'ad_kr_meta', promoCode: 'CSP-KR-META-PROMO', status: 'Active', rules: [{ skuId: 'KR-Y-2026', mode: 'Amount off', value: '59600' }, { skuId: 'KR-H-2026', mode: 'Percent off', value: '10' }] },
   { id: 'CSP-LINH', channelId: 'sales_linh_nguyen', promoCode: 'CSP-LINH-PROMO', status: 'Active', rules: [{ skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'VN-H-2026', mode: 'List price', value: '' }, { skuId: 'VN-Y-2026', mode: 'Percent off', value: '15' }, { skuId: 'VN-MY-2026', mode: 'Amount off', value: '500000' }] },
+  { id: 'CSP-KR-EXPO', channelId: 'kr_expo', promoCode: 'CSP-KR-EXPO-PROMO', status: 'Active', rules: [{ skuId: 'KR-Q-2026', mode: 'Percent off', value: '10' }, { skuId: 'KR-H-2026', mode: 'List price', value: '' }, { skuId: 'KR-MY-2026', mode: 'Percent off', value: '15' }] },
   { id: 'CSP-VN-META', channelId: 'ad_vn_meta', promoCode: 'CSP-VN-META-PROMO', status: 'Active', rules: [{ skuId: 'VN-Y-2026', mode: 'Amount off', value: '500000' }, { skuId: 'VN-Q-2026', mode: 'Percent off', value: '10' }] },
   { id: 'CSP-TH', channelId: 'th_ground', promoCode: '', status: 'Active', rules: [{ skuId: 'TH-Q-2026', mode: 'List price', value: '' }] },
   { id: 'CSP-MY', channelId: 'sales_my_kl', promoCode: '', status: 'Active', rules: [{ skuId: 'MY-Y-2026', mode: 'List price', value: '' }] },
@@ -136,7 +138,7 @@ export function loadMarketingCatalog(): { skus: CatalogSku[]; channels: CatalogC
     : SEED_SKUS
   const savedChannels = Array.isArray(saved?.distributors) && saved.distributors.length ? saved.distributors : []
   const channels = savedChannels.length
-    ? [...savedChannels, ...SEED_CHANNELS.filter((channel) => !savedChannels.some((item) => item.line === channel.line))]
+    ? [...savedChannels, ...SEED_CHANNELS.filter((channel) => !savedChannels.some((item) => item.line === channel.line) || channel.type === 'Offline')]
     : SEED_CHANNELS
   const savedPlans = Array.isArray(saved?.channelSkuPlans) ? saved.channelSkuPlans : []
   const savedHasMax = savedPlans.some((plan) => (plan.rules || []).some((rule) => memberTier(skus.find((sku) => sku.id === rule.skuId)?.memberLevel) === 'Max'))
@@ -186,6 +188,27 @@ export type LinkOffer = {
   payable: number
   currency: string
   ruleLabel: string
+}
+
+/** What saving would change: the channel's current plan prices against the link's saved snapshot. */
+export function snapshotChanges(saved: LinkOffer[], latest: LinkOffer[]): string[] {
+  const changes: string[] = []
+  latest.forEach((item) => {
+    const before = saved.find((offer) => offer.skuId === item.skuId)
+    if (!before) {
+      changes.push(`新增 ${item.skuName}`)
+      return
+    }
+    const parts = [
+      before.listPrice !== item.listPrice && `划线价 ${formatMoney(before.listPrice, item.currency)} → ${formatMoney(item.listPrice, item.currency)}`,
+      before.payable !== item.payable && `应付 ${formatMoney(before.payable, item.currency)} → ${formatMoney(item.payable, item.currency)}`,
+    ].filter(Boolean)
+    if (parts.length) changes.push(`${item.skuName} ${parts.join('，')}`)
+  })
+  saved.forEach((item) => {
+    if (!latest.some((offer) => offer.skuId === item.skuId)) changes.push(`去掉 ${item.skuName}`)
+  })
+  return changes
 }
 
 export function memberTier(level?: string): 'Pro' | 'Max' {

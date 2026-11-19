@@ -8,6 +8,7 @@ import {
   Input,
   InputNumber,
   Checkbox,
+  ConfigProvider,
   Drawer,
   Empty,
   Modal,
@@ -27,6 +28,7 @@ import {
   linesInCatalog,
   loadMarketingCatalog,
   offersOnPlan,
+  snapshotChanges,
   type LinkOffer,
 } from '../paymentLinkCatalog'
 import dayjs from 'dayjs'
@@ -200,9 +202,23 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const activeChannel = lineChannels.find((item) => item.channel.id === channelId) || lineChannels.find((item) => item.plan) || lineChannels[0]
   const planOffers = offersOnPlan(activeChannel?.plan, catalog.skus)
   const hasDiscount = !!activeChannel?.plan?.promoCode && planOffers.some((offer) => offer.ruleLabel !== 'List price')
-  const shown = planOffers.map((offer) => (
-    usePromo && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }
+  const priced = (promoOn: boolean) => planOffers.map((offer) => (
+    promoOn && hasDiscount ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }
   ))
+  const editingRow = editingId ? links.find((item) => item.id === editingId) : undefined
+  const firstLocked = !!editingId && !!paidTxn(linkTxns.filter((txn) => txn.paymentLinkId === editingId), 'DEPOSIT_FIRST')
+  const liveShown = priced(usePromo)
+  const savedDeposit = editingRow?.kind === 'deposit' ? editingRow.offers[0] : undefined
+  const latestDeposit = savedDeposit && liveShown.find((offer) => offer.skuId === savedDeposit.skuId)
+  // A deposit keeps its saved price once the first payment lands, or when its SKU is no longer on the plan.
+  const keepDepositSnapshot = !!savedDeposit && (firstLocked || !latestDeposit)
+  const shown = savedDeposit ? [keepDepositSnapshot || !latestDeposit ? savedDeposit : latestDeposit] : liveShown
+  const savedPlanOffers = priced(!!editingRow?.promoCode)
+  const planChanges = !editingRow
+    ? []
+    : savedDeposit
+      ? snapshotChanges([savedDeposit], savedPlanOffers.filter((offer) => offer.skuId === savedDeposit.skuId))
+      : snapshotChanges(editingRow.offers, savedPlanOffers)
   const chosenDeposit = shown.find((offer) => offer.skuId === depositSkuId) || shown[0]
   const planKey = shown.map((offer) => offer.skuId).join(',')
 
@@ -254,7 +270,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const ordersOf = (id: string) => ordersBy.get(id) || []
   const txnsOf = (id: string) => txnsBy.get(id) || []
   const editable = (row: PaymentLink) => row.status === 'ACTIVE' && (row.audience === 'open' ? ccManager : canEditPersonal && (row.createdBy === myEmail || teamView))
-  const firstLocked = !!editingId && !!paidTxn(txnsOf(editingId), 'DEPOSIT_FIRST')
 
   const DEPOSIT_VALID_DAYS = 7
   const validText = (value: string) => (value.length > 10 ? value.slice(0, 16) : value)
@@ -329,7 +344,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       skuName: picked.map((item) => item.skuName).join(' / '),
       currency: offer?.currency || '',
       listPrice: offer?.listPrice || 0,
-      promoCode: promo,
+      promoCode: keepDepositSnapshot && previous ? previous.promoCode : promo,
       payable: picked.length === 1 ? (offer?.payable || 0) : 0,
       amount,
       methods,
@@ -338,6 +353,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       validUntil: validUntil || undefined,
       status: 'ACTIVE',
       url: payLinkUrl(id),
+      snapshotAt: keepDepositSnapshot && previous ? previous.snapshotAt || previous.createdAt : nowText(),
       createdAt: previous?.createdAt || nowText(),
       updatedAt: nowText(),
       createdBy: previous ? previous.createdBy : myEmail,
@@ -354,6 +370,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           (previous.validUntil || '') !== (row.validUntil || '') && `有效期 ${previous.validUntil || '不限'} → ${row.validUntil || '不限'}`,
           previous.methods.join() !== row.methods.join() && `支付方式 ${previous.methods.map((code) => methodName(previous, code)).join('、')} → ${methodText}`,
           (previous.promoCode || '') !== (row.promoCode || '') && `优惠 ${previous.promoCode || '全部原价'} → ${row.promoCode || '全部原价'}`,
+          !keepDepositSnapshot && planChanges.length > 0 && `价格方案 ${planChanges.join('、')}`,
           row.kind === 'deposit' && previous.amount !== row.amount && `首款 ${formatMoney(previous.amount, row.currency)} → ${formatMoney(row.amount, row.currency)}`,
         ].filter(Boolean).join('；') || '未改动'
       : ''
@@ -554,7 +571,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     </span>
   )
 
-  const editingRow = editingId ? links.find((item) => item.id === editingId) : undefined
   const editingSettled = !!editingRow && editingRow.audience !== 'open'
     && !!paidTxn(txnsOf(editingRow.id), editingRow.kind === 'full' ? 'FULL' : 'DEPOSIT_BALANCE')
   const stopped = !!editingRow && !!validUntil && validEndMs(validUntil, activeLine) <= Date.now()
@@ -624,6 +640,64 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     </Card>
   )
 
+  const snapshotNotice = () => {
+    if (!editingRow) return null
+    const list = planChanges.length > 0 && (
+      <ul className="pl-snapshot-diff">{planChanges.map((item) => <li key={item}>{item}</li>)}</ul>
+    )
+    if (editingSettled) {
+      return (
+        <Alert
+          type="info"
+          showIcon
+          className="pl-snapshot-alert"
+          message={en ? 'Fully paid · read only' : '已收完款，编辑页只读'}
+          description={en ? 'Every field is locked. The paid order keeps its own price snapshot.' : '所有字段都不能再改；已付订单按自己的订单快照，不受渠道价格方案影响。'}
+        />
+      )
+    }
+    if (savedDeposit && firstLocked) {
+      return (
+        <Alert
+          type="info"
+          showIcon
+          className="pl-snapshot-alert"
+          message={en ? 'First payment received · price frozen' : '首款已到账，价格已冻结'}
+          description={<>
+            {en
+              ? `SKU, price, promo and first payment stay as saved; balance = ${formatMoney(savedDeposit.payable, savedDeposit.currency)} − first payment. Saving only updates methods and validity.`
+              : `SKU、价格、优惠、首款都按原快照，尾款 = ${formatMoney(savedDeposit.payable, savedDeposit.currency)} − 已付首款。保存只更新支付方式和有效期。`}
+            {list && <><div className="pl-snapshot-diff__title">{en ? 'The channel plan has changed since, and this link does not follow:' : '渠道价格方案之后改过，本链接不跟着变：'}</div>{list}</>}
+          </>}
+        />
+      )
+    }
+    if (savedDeposit && !latestDeposit) {
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          className="pl-snapshot-alert"
+          message={en ? 'This SKU is no longer on the plan' : '该 SKU 已不在渠道价格方案里'}
+          description={en ? 'The link keeps selling it at the saved price. Saving does not change the price.' : '链接继续按原快照售卖，保存也不改价格；不想卖了可以一键停止收款。'}
+        />
+      )
+    }
+    if (!planChanges.length) return null
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        className="pl-snapshot-alert"
+        message={en ? 'The channel price plan has changed. After saving, the link sells at the latest plan.' : '渠道价格方案有更新，保存后链接按最新方案售卖'}
+        description={<>
+          {list}
+          <div className="pl-snapshot-diff__title">{en ? 'Until you save, customers still pay the saved prices.' : '不保存的话，用户仍按链接原快照付款。'}</div>
+        </>}
+      />
+    )
+  }
+
   const formCard = (mode: 'full' | 'deposit') => {
     const methodList = methodsFor(mode)
     const open = mode === 'full' && audience === 'open'
@@ -637,6 +711,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     return (
       <div className="pl-form">
         <div className="pl-form__main">
+          {snapshotNotice()}
+          <ConfigProvider componentDisabled={editingSettled}>
+          <fieldset className="pl-fieldset" disabled={editingSettled}>
           {validityCard(++stepNo, mode === 'deposit')}
 
           {open && (
@@ -754,7 +831,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                   <Select
                     style={{ width: 360 }}
                     value={hasDiscount && usePromo ? 'yes' : 'no'}
-                    disabled={!hasDiscount || firstLocked}
+                    disabled={!hasDiscount || keepDepositSnapshot}
                     onChange={(value) => { setUsePromo(value === 'yes'); setFirstAmount(null) }}
                     options={[
                       ...(hasDiscount ? [{ value: 'yes', label: `${en ? 'Use promo' : '使用优惠'} - ${activeChannel.plan.promoCode}` }] : []),
@@ -877,7 +954,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               })}
             </div>
           </Card>
-
+          </fieldset>
+          </ConfigProvider>
         </div>
 
         <div className="pl-form__side">
@@ -928,15 +1006,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 ? (en ? 'The order is created when the customer picks a method and starts paying. Membership opens when it is paid.' : '用户选好支付方式开始付款时才生成订单；付款成功后开通会员。')
                 : (en ? 'One link and one order for both payments, with two transactions under the order. Membership opens after the balance.' : '首款、尾款用同一条链接、同一张订单，订单下两笔交易；尾款到账后开通会员。')}
             </Typography.Paragraph>
-            <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDeposit}>
+            {!editingSettled && <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDeposit}>
               {editingId
                 ? (en ? 'Save changes' : '保存修改')
                 : open ? (en ? 'Create open link' : '生成通用支付链接') : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create deposit link' : '生成定金链接')}
-            </Button>
+            </Button>}
             <Button block icon={<EyeOutlined />} style={{ marginTop: 8 }} disabled={!activeChannel?.plan || !shown.length} onClick={() => previewDraft(mode)}>
               {en ? 'Preview customer page' : '预览用户页面'}
             </Button>
-            {!ready && (
+            {!ready && !editingSettled && (
               <Typography.Text type="secondary" className="pl-summary__todo">
                 {open && !eventName.trim()
                   ? (en ? 'Enter the event or material name.' : '请填写活动 / 物料名称。')
@@ -1354,6 +1432,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const open = row.audience === 'open'
     const single = singlePayment(row)
     const promo = row.promoCode ? `${en ? 'Use' : '使用'} ${row.promoCode}` : (en ? 'List price' : '全部原价')
+    const snapshotTime = (row.snapshotAt || row.createdAt).slice(0, 16)
+    const frozen = row.kind === 'deposit' && !!paidTxn(txnsOf(row.id), 'DEPOSIT_FIRST')
     return (
       <div className="pl-detail">
         <div className="pl-form-head">
@@ -1381,6 +1461,9 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {detailField(en ? 'Channel' : '渠道', row.channelName || '—')}
             {detailField('SKU', (row.offers || []).map((item) => item.skuName).join(' / ') || row.skuName)}
             {detailField(en ? 'Promo' : '优惠', promo)}
+            {detailField(en ? 'Price snapshot' : '价格快照', frozen
+              ? (en ? `Saved ${snapshotTime} · frozen after the first payment` : `${snapshotTime} 保存 · 首款已到账，价格已冻结`)
+              : (en ? `Saved ${snapshotTime} · sells at this snapshot; plan changes apply only after an edit is saved` : `${snapshotTime} 保存 · 按这份快照售卖，渠道改价不影响，编辑保存后才更新`))}
             {detailField(en ? 'Payment methods' : '支付方式', methodsCell(row, row.methods || []))}
             {detailField(en ? 'Valid until' : '有效期', row.validUntil ? (en ? `${validEnd(row.validUntil).slice(0, 16)} (${enValue(row.line)} time ${lineTzLabel(row.line)})` : `${validEnd(row.validUntil).slice(0, 16)}（${LINE_ZH[row.line] || row.line}时间 ${lineTzLabel(row.line)}）`) : (en ? 'No end date' : '不限'))}
             {detailField(en ? 'Collected' : '已收', paid.length

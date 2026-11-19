@@ -4,16 +4,16 @@ import './time'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
 import type { LinkOffer } from './paymentLinkCatalog'
 
-export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v17'
-export const LINK_ORDER_KEY = 'dino-cc-link-orders-v5'
+export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v18'
+export const LINK_ORDER_KEY = 'dino-cc-link-orders-v6'
 export const LINK_TXN_KEY = 'dino-cc-link-txns-v4'
 export const PREVIEW_LINK_KEY = 'dino-cc-payment-link-preview'
 export const PREVIEW_LINK_ID = 'PL-PREVIEW'
 const LEGACY_KEYS = [
   'dino-cc-payment-links-v1', 'dino-cc-payment-links-v2', 'dino-cc-payment-links-v3', 'dino-cc-payment-links-v4',
   'dino-cc-payment-links-v5', 'dino-cc-payment-links-v6', 'dino-cc-payment-links-v7', 'dino-cc-payment-links-v8',
-  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13', 'dino-cc-payment-links-v14', 'dino-cc-payment-links-v15', 'dino-cc-payment-links-v16',
-  'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-orders-v4', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2', 'dino-cc-link-txns-v3',
+  'dino-cc-payment-links-v9', 'dino-cc-payment-links-v10', 'dino-cc-payment-links-v11', 'dino-cc-payment-links-v12', 'dino-cc-payment-links-v13', 'dino-cc-payment-links-v14', 'dino-cc-payment-links-v15', 'dino-cc-payment-links-v16', 'dino-cc-payment-links-v17',
+  'dino-cc-link-orders-v1', 'dino-cc-link-orders-v2', 'dino-cc-link-orders-v3', 'dino-cc-link-orders-v4', 'dino-cc-link-orders-v5', 'dino-cc-link-txns-v1', 'dino-cc-link-txns-v2', 'dino-cc-link-txns-v3',
 ]
 
 export type PayStage = 'FULL' | 'DEPOSIT_FIRST' | 'DEPOSIT_BALANCE'
@@ -49,6 +49,8 @@ export type PaymentLink = {
   validUntil?: string
   status: 'ACTIVE' | 'VOID'
   url: string
+  /** When offers, prices and promo were last copied from the channel plan. Only a CC save refreshes them. */
+  snapshotAt?: string
   createdAt: string
   updatedAt: string
   createdBy?: string
@@ -514,6 +516,7 @@ function seedLink(row: Omit<PaymentLink, 'url' | 'status' | 'skuId' | 'skuName' 
     currency: row.offers[0]?.currency || '',
     listPrice: row.offers[0]?.listPrice || 0,
     url: payLinkUrl(row.id),
+    snapshotAt: row.snapshotAt || row.createdAt,
   }
 }
 
@@ -527,6 +530,9 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     offer('KR-MY-2026', 'Max Yearly', 'Max', 398000, 338300, 'KRW', '15% off'),
   ]
   const vn = [offer('VN-Q-2026', 'Pro Quarterly', 'Pro', 990000, 891000, 'VND', '10% off')]
+  // Saved before the channel plan was repriced; the edit page shows what a save would change.
+  const vnOld = [offer('VN-Q-2026', 'Pro Quarterly', 'Pro', 1090000, 981000, 'VND', '10% off')]
+  const krOld = [kr[0], kr[1], offer('KR-Y-2026', 'Pro Yearly', 'Pro', 298000, 268200, 'KRW', '10% off')]
   const th = [offer('TH-Q-2026', 'Pro Quarterly', 'Pro', 9900, 9900, 'THB', 'List price')]
   const amy = { line: 'Korea', channelId: 'sales_amy_zhang', channelName: 'Amy Zhang', channelCode: 'CH-KR-0001', planId: 'CSP-AMY', promoCode: 'CSP-AMY-PROMO' }
   const linh = { line: 'Vietnam', channelId: 'sales_linh_nguyen', channelName: 'Linh Nguyen', channelCode: 'CH-VN-0005', planId: 'CSP-LINH', promoCode: 'CSP-LINH-PROMO' }
@@ -534,26 +540,26 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const links: PaymentLink[] = [
     seedLink({ id: 'PL-DEP-TH', kind: 'deposit', validUntil: '2026-11-27', audience: 'user', userId: '2060199610824355848', ...bkk, offers: th, payable: 9900, amount: 990, methods: ['KPLUS'], createdAt: '2026-10-28 11:05', updatedAt: '2026-10-28 15:40' }),
     seedLink({ id: 'PL-DEP-VN', kind: 'deposit', validUntil: '2026-11-27', audience: 'user', userId: '2090031938694049793', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-27 18:30', updatedAt: '2026-10-28 16:05' }),
-    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', validUntil: day(6), audience: 'user', userId: '2060199610824356009', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
+    seedLink({ id: 'PL-DEP-READY', kind: 'deposit', validUntil: day(6), audience: 'user', userId: '2060199610824356009', ...linh, offers: vnOld, payable: 981000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: '2026-10-28 09:15', updatedAt: '2026-10-28 09:40' }),
     seedLink({ id: 'PL-DEP-LATE', kind: 'deposit', validUntil: day(-2), audience: 'user', userId: '2060199610824356004', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['vietqr', 'bank_transfer'], createdAt: shift(-218).slice(0, 16), updatedAt: shift(-216).slice(0, 16) }),
-    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', validUntil: day(7), audience: 'user', userId: '2060199610824355844', ...linh, offers: vn, payable: 891000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
+    seedLink({ id: 'PL-DEP-NEW', kind: 'deposit', validUntil: day(7), audience: 'user', userId: '2060199610824355844', ...linh, offers: vnOld, payable: 981000, amount: 500000, methods: ['bank_transfer'], createdAt: '2026-10-28 16:20', updatedAt: '2026-10-28 16:20' }),
     seedLink({ id: 'PL-FULL-BANK', kind: 'full', audience: 'user', userId: '2090031938694049794', ...linh, offers: vn, payable: 891000, amount: 0, methods: ['bank_transfer'], createdAt: '2026-10-28 13:05', updatedAt: '2026-10-28 13:22' }),
     seedLink({ id: 'PL-FULL-PAID', kind: 'full', audience: 'user', userId: '2060199610824355846', ...amy, offers: [kr[0]], payable: 89100, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-27 16:00', updatedAt: '2026-10-27 16:20' }),
-    seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
-    seedLink({ id: 'PL-FULL-WAIT', kind: 'full', audience: 'user', userId: '2060199610824355842', ...amy, offers: kr, payable: 0, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-28 10:12', updatedAt: '2026-10-28 10:12' }),
+    seedLink({ id: 'PL-OPEN-KR', kind: 'full', audience: 'open', ...amy, channelId: 'kr_expo', channelName: 'Korea Offline Expo', channelCode: 'CH-KR-EXPO', planId: 'CSP-KR-EXPO', promoCode: 'CSP-KR-EXPO-PROMO', offers: kr.slice(0, 2), payable: 0, amount: 0, methods: ['card', 'kakaopay'], eventName: 'Seoul Edu Expo 2026 · Booth B12', validUntil: '2026-11-30', createdAt: '2026-10-25 09:00', updatedAt: '2026-10-27 11:40' }),
+    seedLink({ id: 'PL-FULL-WAIT', kind: 'full', audience: 'user', userId: '2060199610824355842', ...amy, offers: krOld, payable: 0, amount: 0, methods: ['card', 'kakaopay'], createdAt: '2026-10-28 10:12', updatedAt: '2026-10-28 10:12' }),
   ]
   const lead = 'sales.lead@dinoai.ai'
   const cc = 'sales.kr@dinoai.ai'
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
     'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，有效期至 2026-11-27 · KPLUS']] },
     'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND，开通会员', '2026-10-28 16:05']] },
-    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
+    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 481,000 VND，有效期至 2026-11-27']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
-    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 391,000 VND，有效期至 ${day(7)}`]] },
+    'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 481,000 VND，有效期至 ${day(7)}`]] },
     'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · 手动银行转账']] },
     'PL-FULL-PAID': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · Card、Kakao Pay']] },
     'PL-OPEN-KR': { by: lead, log: [[lead, '新建通用链接', 'Seoul Edu Expo 2026 · Booth B12，有效期至 2026-11-30'], [lead, '编辑链接', '支付方式 Card → Card、Kakao Pay', '2026-10-27 11:40']] },
-    'PL-FULL-WAIT': { by: cc, log: [[cc, '新建全款链接', '4 个 SKU · Card、Kakao Pay']] },
+    'PL-FULL-WAIT': { by: cc, log: [[cc, '新建全款链接', '3 个 SKU · Card、Kakao Pay']] },
   }
   links.forEach((link, index) => {
     const meta = audit[link.id]
@@ -566,14 +572,15 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   })
   const thSku = { userId: '2060199610824355848', skuId: 'TH-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 9900, currency: 'THB' }
   const vnSku = { skuId: 'VN-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 891000, currency: 'VND' }
+  const vnOldSku = { ...vnSku, payable: 981000 }
   const krQ = { skuId: 'KR-Q-2026', skuName: 'Pro · Pro Quarterly', payable: 89100, currency: 'KRW' }
   const krH = { skuId: 'KR-H-2026', skuName: 'Max · Max 6 Months', payable: 178000, currency: 'KRW' }
   const orders: WebOrder[] = [
     { orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', ...thSku, origin: 'checkout', createdAt: '2026-10-28 11:18:40' },
     { orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', userId: '2090031938694049793', ...vnSku, origin: 'link', createdAt: '2026-10-27 18:30:00' },
-    { orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', userId: '2060199610824356009', ...vnSku, origin: 'link', createdAt: '2026-10-28 09:15:00' },
+    { orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', userId: '2060199610824356009', ...vnOldSku, origin: 'link', createdAt: '2026-10-28 09:15:00' },
     { orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', userId: '2060199610824356004', ...vnSku, origin: 'link', createdAt: `${shift(-218).slice(0, 16)}:00` },
-    { orderNo: 'WEB-261028-NW01', paymentLinkId: 'PL-DEP-NEW', userId: '2060199610824355844', ...vnSku, origin: 'link', createdAt: '2026-10-28 16:20:00' },
+    { orderNo: 'WEB-261028-NW01', paymentLinkId: 'PL-DEP-NEW', userId: '2060199610824355844', ...vnOldSku, origin: 'link', createdAt: '2026-10-28 16:20:00' },
     { orderNo: 'WEB-261028-BK01', paymentLinkId: 'PL-FULL-BANK', userId: '2090031938694049794', ...vnSku, origin: 'link', createdAt: '2026-10-28 13:05:00' },
     { orderNo: 'WEB-261027-KP01', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:18:00' },
     { orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', userId: '2060199610824355846', ...krQ, origin: 'checkout', createdAt: '2026-10-27 16:15:00', cancelled: true },
