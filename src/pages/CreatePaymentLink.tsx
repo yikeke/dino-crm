@@ -41,6 +41,7 @@ import {
   PREVIEW_LINK_KEY,
   balanceDeadline,
   balanceOverdue,
+  bankSerialUsed,
   confirmBankPayment,
   currentStage,
   historyEntry,
@@ -60,6 +61,7 @@ import {
   payLinkUrl,
   readLinkOrders,
   readLinkTxns,
+  txnsOfLink,
   readPaymentLinks,
   singlePayment,
   stageAmount,
@@ -143,6 +145,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const [channelFilter, setChannelFilter] = useState<string | undefined>()
   const [historyOf, setHistoryOf] = useState<PaymentLink | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<{ link: PaymentLink; skuId: string; stage: PayStage } | null>(null)
+  const [bankConfirm, setBankConfirm] = useState<{ link: PaymentLink; stage: PayStage; skuId?: string } | null>(null)
+  const [bankSerial, setBankSerial] = useState('')
   const holdLineReset = useRef(false)
   const navigate = useNavigate()
   const { account, role } = useCurrentAccount()
@@ -455,41 +459,100 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setScreen('form')
   }
 
-  const confirmTransfer = (row: PaymentLink, stage: PayStage, skuId?: string) => {
-    const result = confirmBankPayment(row.id, skuId, stage)
-    if (!result || result.txn.status !== 'SUCCESS') return
-    const { txn, already } = result
-    if (!already) logAction(row.id, txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账',
-      `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)}${txn.payStage === 'DEPOSIT_FIRST' ? '' : '，开通会员'}`)
-    reload()
-    setConfirmTarget(null)
-    message.success(txn.payStage === 'DEPOSIT_FIRST'
-      ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
-      : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
+  const confirmTransferSafely = (row: PaymentLink, stage: PayStage, skuId?: string) => {
+    setBankSerial('')
+    setBankConfirm({ link: row, stage, skuId })
   }
 
-  const confirmTransferSafely = (row: PaymentLink, stage: PayStage, skuId?: string) => {
+  const bankModal = () => {
+    if (!bankConfirm) return null
+    const { link: row, stage, skuId } = bankConfirm
     const first = stage === 'DEPOSIT_FIRST'
+    const txns = txnsOf(row.id)
+    const already = paidOf(txns, stage)
     const order = ordersOf(row.id).find((item) => !item.cancelled)
     const offer = row.offers.find((item) => item.skuId === (skuId || order?.skuId)) || (row.offers.length === 1 ? row.offers[0] : undefined)
-    const amount = first ? row.amount : stage === 'DEPOSIT_BALANCE' ? Math.max(row.payable - row.amount, 0) : offer?.payable || row.payable
-    Modal.confirm({
-      title: first ? (en ? 'Confirm the first payment arrived?' : '确认首款已到账？') : (en ? 'Confirm the transfer and open membership?' : '确认到账并开通会员？'),
-      content: (
+    const amount = already?.amount ?? (first ? row.amount : stage === 'DEPOSIT_BALANCE' ? Math.max(row.payable - row.amount, 0) : offer?.payable || row.payable)
+    const serial = bankSerial.trim().toUpperCase()
+    const serialOk = /^[A-Z0-9]{6}$/.test(serial)
+    const usedBy = serialOk ? bankSerialUsed(row.id, serial) : undefined
+    const submit = () => {
+      const latest = paidTxn(txnsOfLink(row.id), stage)
+      if (latest && latest.txnId !== already?.txnId) {
+        reload()
+        message.warning(en ? `This payment just arrived via ${methodName(row, latest.method)}. Read the warning before confirming.` : `这一笔刚通过 ${methodName(row, latest.method)} 到账，请看清提示后再确认`)
+        return
+      }
+      const result = confirmBankPayment(row.id, { stage, serial, skuId, allowDuplicate: !!already })
+      if (!result || result.txn.status !== 'SUCCESS' || (result.already && !already)) {
+        reload()
+        return
+      }
+      const { txn } = result
+      const duplicate = !!txn.duplicate
+      const action = (txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账') + (duplicate ? '（重复到账）' : '')
+      logAction(row.id, action, `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)} · 流水号 ${txn.bankSerial}${first || duplicate ? '' : '，开通会员'}`)
+      reload()
+      setBankConfirm(null)
+      message.success(duplicate
+        ? (en ? 'Transfer recorded as a duplicate. Hand it to finance.' : '已登记这笔转账，标为重复到账，请转财务处理')
+        : first
+          ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
+          : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
+    }
+    return (
+      <Modal
+        open
+        title={first ? (en ? 'Confirm the first payment arrived?' : '确认首款已到账？') : (en ? 'Confirm the transfer and open membership?' : '确认到账并开通会员？')}
+        onCancel={() => setBankConfirm(null)}
+        onOk={submit}
+        okText={already ? (en ? 'Confirm anyway' : '仍然确认到账') : first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员')}
+        okButtonProps={{ disabled: !serialOk || !!usedBy, danger: !!already }}
+        cancelText={en ? 'Cancel' : '取消'}
+        destroyOnClose
+      >
         <div className="pl-confirm-modal">
+          {already && (
+            <Alert
+              type="error"
+              showIcon
+              className="pl-confirm-modal__dup"
+              message={en
+                ? `This ${stageName(stage)} was already paid via ${methodName(row, already.method)} (${formatMoney(already.amount, already.currency)}, ${(already.paidAt || '').slice(0, 16)}).`
+                : `这一笔${stageName(stage)}已通过 ${methodName(row, already.method)} 支付成功（${formatMoney(already.amount, already.currency)}，${(already.paidAt || '').slice(0, 16)}）。`}
+              description={en
+                ? 'Confirming records another bank transfer as a duplicate payment for finance. Membership is not opened again and the balance is not reduced.'
+                : '再确认会多记一笔手动银行转账收款，属于重复到账，需转财务处理；不会重复开通会员，也不抵扣尾款。'}
+            />
+          )}
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
           <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
           <p>{en ? 'Transfer note' : '转账附言'}：<b>{linkTransferNote(row.id)}</b></p>
           <p>{stageName(stage)}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
-          <p>{first
-            ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
-            : (en ? 'Membership opens right away. This cannot be undone.' : '确认后马上开通会员，不能撤销。')}</p>
+          <div className="pl-confirm-modal__serial">
+            <div className="pl-label"><span className="pl-required">*</span>{en ? 'Last 6 characters of the bank serial' : '银行流水号后 6 位'}</div>
+            <Input
+              value={bankSerial}
+              maxLength={6}
+              onChange={(event) => setBankSerial(event.target.value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase())}
+              placeholder={en ? 'e.g. 482913' : '例如 482913'}
+              status={usedBy ? 'error' : undefined}
+              style={{ width: 200 }}
+            />
+            <Typography.Text type={usedBy ? 'danger' : 'secondary'} className="pl-field-hint">
+              {usedBy
+                ? (en ? `This serial is already recorded (${stageName(usedBy.payStage)}). Check the bank statement.` : `这个流水号已登记过（${stageName(usedBy.payStage)}），请核对银行流水`)
+                : (en ? '6 digits or letters. Recorded on the payment and in the history.' : '6 位数字或字母，记在这笔交易和操作记录里。')}
+            </Typography.Text>
+          </div>
+          <p>{already
+            ? (en ? 'Membership is not opened again. This cannot be undone.' : '不会重复开通会员。确认后不能撤销。')
+            : first
+              ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
+              : (en ? 'Membership opens right away. This cannot be undone.' : '确认后马上开通会员，不能撤销。')}</p>
         </div>
-      ),
-      okText: first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员'),
-      cancelText: en ? 'Cancel' : '取消',
-      onOk: () => confirmTransfer(row, stage, skuId),
-    })
+      </Modal>
+    )
   }
 
   const askConfirm = (row: PaymentLink, stage: PayStage) => {
@@ -1169,8 +1232,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           : `${en ? 'Started' : '发起'} ${txn.createdAt.slice(0, 16)}`}
       </Typography.Text>
       {txn.status === 'FAILED' && txn.failReason && <Typography.Text type="secondary" className="pl-leg__id">{txn.failReason}</Typography.Text>}
+      {txn.duplicate && <Tag color="orange" bordered={false}>{en ? 'Duplicate · to finance' : '重复到账 · 转财务'}</Tag>}
       {txn.status !== 'FAILED' && txn.transferReference && (
-        <Typography.Text type="secondary" className="pl-leg__id">{en ? 'Transfer note' : '转账附言'} {txn.transferReference}</Typography.Text>
+        <Typography.Text type="secondary" className="pl-leg__id">
+          {en ? 'Transfer note' : '转账附言'} {txn.transferReference}
+          {txn.bankSerial && ` · ${en ? 'Bank serial' : '流水号'} ${txn.bankSerial}`}
+        </Typography.Text>
       )}
     </div>
   )
@@ -1313,7 +1380,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         </div>
         {stages.map((stage, index) => {
           const mine = txns.filter((txn) => txn.payStage === stage).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          const paid = mine.find((txn) => txn.status === 'SUCCESS')
+          const successes = mine.filter((txn) => txn.status === 'SUCCESS')
+          const paid = paidOf(mine, stage)
           const live = paid || mine.find((txn) => txn.status === 'PENDING')
           const failed = mine.filter((txn) => txn.status === 'FAILED')
           const waiting = stage === 'DEPOSIT_BALANCE' && !firstPaid
@@ -1329,7 +1397,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               </div>
               <div className="pl-leg__amount">{amount ? formatMoney(amount, row.currency) : (en ? 'Customer picks SKU' : '用户选 SKU 后定')}</div>
               <div className="pl-leg__status">
-                {live ? txnLine(row, live) : (
+                {successes.length > 1 ? successes.map((txn) => txnLine(row, txn)) : live ? txnLine(row, live) : (
                   <div className="pl-order-line is-none">
                     <Tag bordered={false}>{waiting ? (en ? 'After first payment' : '首款付清后可付') : (en ? 'No transaction yet' : '暂无交易')}</Tag>
                   </div>
@@ -1402,10 +1470,17 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           {
             title: en ? 'Payment' : '支付方式',
             key: 'pay',
-            width: 140,
+            width: 160,
             render: (_: unknown, order: WebOrder) => {
-              const pay = txns.find((txn) => txn.orderNo === order.orderNo)
-              return pay ? methodName(row, pay.method) : '—'
+              const pay = txns.find((txn) => txn.orderNo === order.orderNo && txn.status === 'SUCCESS') || txns.find((txn) => txn.orderNo === order.orderNo)
+              if (!pay) return '—'
+              return (
+                <div className="pl-two-line">
+                  <span>{methodName(row, pay.method)}</span>
+                  {pay.bankSerial && <Typography.Text type="secondary">{en ? 'Serial' : '流水号'} {pay.bankSerial}</Typography.Text>}
+                  {pay.duplicate && <span><Tag color="orange" bordered={false}>{en ? 'Duplicate · to finance' : '重复到账 · 转财务'}</Tag></span>}
+                </div>
+              )
             },
           },
           {
@@ -1649,6 +1724,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           ] as { title: string; dataIndex: keyof LinkHistoryEntry; width?: number; render?: (value: string) => React.ReactNode }[]}
         />
       </Drawer>
+      {bankModal()}
       <Modal
         title={en ? 'Confirm manual bank transfer' : '确认手动银行转账'}
         open={!!confirmTarget}
