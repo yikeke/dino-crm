@@ -505,10 +505,12 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         open
         title={first ? (en ? 'Confirm the first payment arrived?' : '确认首款已到账？') : (en ? 'Confirm the transfer and open membership?' : '确认到账并开通会员？')}
         onCancel={() => setBankConfirm(null)}
-        onOk={submit}
-        okText={already ? (en ? 'Confirm anyway' : '仍然确认到账') : first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员')}
-        okButtonProps={{ disabled: !serialOk || !!usedBy, danger: !!already }}
-        cancelText={en ? 'Cancel' : '取消'}
+        footer={[
+          <Button key="cancel" onClick={() => setBankConfirm(null)}>{en ? 'Cancel' : '取消'}</Button>,
+          <Button key="ok" type="primary" danger={!!already} disabled={!serialOk || !!usedBy} onClick={submit}>
+            {already ? (en ? 'Confirm anyway' : '仍然确认到账') : first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员')}
+          </Button>,
+        ]}
         destroyOnClose
       >
         <div className="pl-confirm-modal">
