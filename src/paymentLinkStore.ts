@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import { setState } from './store'
 import './time'
 import type { Order, OrderSource, OrderStatus, OrderTransaction } from './types'
-import type { LinkOffer } from './paymentLinkCatalog'
+import { liveOffers, type LinkOffer } from './paymentLinkCatalog'
 
 export const PAYMENT_LINK_KEY = 'dino-cc-payment-links-v19'
 export const LINK_ORDER_KEY = 'dino-cc-link-orders-v6'
@@ -277,12 +277,17 @@ export function singlePayment(link: Pick<PaymentLink, 'audience' | 'kind'>) {
 }
 
 /** User ID links that offer bank transfer get their web order when the link is created, so a manager can confirm a transfer. */
+export function sellingOffers(link: PaymentLink): LinkOffer[] {
+  return link.audience === 'open' ? liveOffers(link) : link.offers
+}
+
 export function needsUpfrontOrder(link: PaymentLink) {
   return link.audience === 'user' && [...link.methods, ...(link.balanceMethods || [])].includes('bank_transfer')
 }
 
 function orderFor(link: PaymentLink, origin: WebOrder['origin'], userId?: string, skuId?: string): WebOrder {
-  const offer = link.offers.find((item) => item.skuId === skuId) || (link.offers.length === 1 ? link.offers[0] : undefined)
+  const offers = sellingOffers(link)
+  const offer = offers.find((item) => item.skuId === skuId) || (offers.length === 1 ? offers[0] : undefined)
   return {
     orderNo: newOrderNo(),
     paymentLinkId: link.id,
@@ -361,7 +366,8 @@ export function startCheckout(linkId: string, detail: { stage: PayStage; skuId?:
   if (currentStage(link, linkTxns) !== detail.stage) return undefined
   const userId = link.audience === 'open' ? detail.userId : link.userId
   if (!userId) return undefined
-  const offer = link.offers.find((item) => item.skuId === detail.skuId) || link.offers[0]
+  const offers = sellingOffers(link)
+  const offer = offers.find((item) => item.skuId === detail.skuId) || offers[0]
   const single = singlePayment(link)
   const bank = detail.method === 'bank_transfer'
   let order = !single

@@ -11,6 +11,7 @@ import {
   ensurePaymentLinkData,
   failTxn,
   findPaymentLink,
+  sellingOffers,
   isExpired,
   paidTxn,
   stageAmount,
@@ -207,7 +208,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const [acked, setAcked] = useState(false)
   const stage = link ? currentStage(link, txns) : null
   const blockedLink = !!link && (link.status === 'VOID' || isExpired(link))
-  const offers = link?.offers || []
+  const offers = link ? sellingOffers(link) : []
   const [pickedId, setPickedId] = useState('')
   const picked = offers.find((offer) => offer.skuId === pickedId) || offers[0]
   const shownStage: PayStage = stage || (link?.kind === 'deposit' ? 'DEPOSIT_BALANCE' : 'FULL')

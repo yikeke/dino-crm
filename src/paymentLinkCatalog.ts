@@ -235,6 +235,17 @@ export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]):
   })
 }
 
+/** Open links price at checkout: the link keeps its SKU list, prices come from the plan as it is now. */
+export function liveOffers(link: { planId?: string; promoCode?: string; offers: LinkOffer[] }): LinkOffer[] {
+  const catalog = loadMarketingCatalog()
+  const live = offersOnPlan(catalog.plans.find((plan) => plan.id === link.planId), catalog.skus)
+  return link.offers.flatMap((saved) => {
+    const offer = live.find((item) => item.skuId === saved.skuId)
+    if (!offer) return []
+    return [link.promoCode ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }]
+  })
+}
+
 export function channelsOnLine(line: string, channels: CatalogChannel[], plans: CatalogPlan[]) {
   return channels
     .filter((channel) => channel.line === line && channel.enabled !== false)

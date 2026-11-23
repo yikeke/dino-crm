@@ -223,6 +223,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     : savedDeposit
       ? snapshotChanges([savedDeposit], savedPlanOffers.filter((offer) => offer.skuId === savedDeposit.skuId))
       : snapshotChanges(editingRow.offers, savedPlanOffers)
+          .filter((item) => editingRow.audience !== 'open' || item.startsWith('新增 ') || item.startsWith('去掉 '))
   const chosenDeposit = shown.find((offer) => offer.skuId === depositSkuId) || shown[0]
   const planKey = shown.map((offer) => offer.skuId).join(',')
 
@@ -376,7 +377,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           (previous.validUntil || '') !== (row.validUntil || '') && `有效期 ${previous.validUntil || '不限'} → ${row.validUntil || '不限'}`,
           previous.methods.join() !== row.methods.join() && `支付方式 ${previous.methods.map((code) => methodName(previous, code)).join('、')} → ${methodText}`,
           (previous.promoCode || '') !== (row.promoCode || '') && `优惠 ${previous.promoCode || '全部原价'} → ${row.promoCode || '全部原价'}`,
-          !keepDepositSnapshot && planChanges.length > 0 && `价格方案 ${planChanges.join('、')}`,
+          !keepDepositSnapshot && planChanges.length > 0 && `${row.audience === 'open' ? 'SKU' : '价格方案'} ${planChanges.join('、')}`,
           row.kind === 'deposit' && previous.amount !== row.amount && `首款 ${formatMoney(previous.amount, row.currency)} → ${formatMoney(row.amount, row.currency)}`,
         ].filter(Boolean).join('；') || '未改动'
       : ''
@@ -749,6 +750,22 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           className="pl-snapshot-alert"
           message={en ? 'This SKU is no longer on the plan' : '该 SKU 已不在渠道价格方案里'}
           description={en ? 'The link keeps selling it at the saved price. Saving does not change the price.' : '链接继续按原快照售卖，保存也不改价格；不想卖了可以一键停止收款。'}
+        />
+      )
+    }
+    if (editingRow.audience === 'open') {
+      const added = planChanges.filter((item) => item.startsWith('新增 '))
+      if (!added.length) return null
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          className="pl-snapshot-alert"
+          message={en ? 'The channel has new SKUs. Save to add them to this link.' : '渠道新增了 SKU，保存后加入这条链接'}
+          description={<>
+            <ul className="pl-snapshot-diff">{added.map((item) => <li key={item}>{item}</li>)}</ul>
+            <div className="pl-snapshot-diff__title">{en ? 'Price changes need no save: customers already pay the current plan price.' : '价格变化不用保存，用户已经按渠道当前价格付款。'}</div>
+          </>}
         />
       )
     }
