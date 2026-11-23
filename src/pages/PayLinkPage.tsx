@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatMoney, memberTier } from '../paymentLinkCatalog'
-import { findMethods, payCopy, bankCopy, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
+import { findMethods, payCopy, bankCopy, bankReceiver, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
 import {
   PREVIEW_LINK_ID,
   balanceDeadline,
@@ -36,12 +36,6 @@ function savedAccount(): Account | null {
 }
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}pay/${file}`
-
-const RECEIVER = {
-  bank: 'Vietcombank',
-  name: 'CONG TY DINO AI',
-  number: '10588899210',
-}
 
 const DIAL: Record<string, string> = {
   Korea: '+82', 'Hong Kong': '+852', Macau: '+853', Vietnam: '+84', Malaysia: '+60',
@@ -204,7 +198,8 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const line = link?.line || 'Korea'
   const [lang, setLang] = useState<ReviewLang>('local')
   const copy = payCopy(line, lang)
-  const bank = bankCopy(lang)
+  const bank = bankCopy(lang, line)
+  const receiver = bankReceiver(line)
   const open = link?.audience === 'open'
   const [account, setAccount] = useState<Account | null>(() => (open && !preview ? savedAccount() : null))
   const [loginOpen, setLoginOpen] = useState(false)
@@ -225,7 +220,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const methods = useMemo(() => findMethods(line, methodKey.split(',').filter(Boolean)), [line, methodKey])
   const [methodCode, setMethodCode] = useState('')
   const activeMethod = methods.find((method) => method.code === methodCode) || methods[0]
-  const showBank = activeMethod?.kind === 'manual'
+  const showBank = activeMethod?.kind === 'manual' && !!receiver
   const [host, setHost] = useState<{ method: PayMethod; orderNo?: string; txn?: LinkTxn } | null>(null)
   const [copied, setCopied] = useState('')
   const bankRef = useRef<HTMLElement>(null)
@@ -526,14 +521,14 @@ function PayLinkView({ linkId }: { linkId: string }) {
               <span>{bank.warning}</span>
             </p>
             <div className="bank-qr">
-              <img src={asset('vcb-qr.jpg')} alt={bank.methodName} />
+              <img src={receiver?.qr} alt={bank.methodName} />
               <p>{bank.qrHint}</p>
             </div>
             <div className="bank-rows">
               {[
-                ['bank', bank.bank, RECEIVER.bank],
-                ['name', bank.accountName, RECEIVER.name],
-                ['number', bank.accountNumber, RECEIVER.number],
+                ['bank', bank.bank, receiver?.bank || ''],
+                ['name', bank.accountName, receiver?.accountName || ''],
+                ['number', bank.accountNumber, receiver?.accountNumber || ''],
               ].map(([key, label, value]) => (
                 <div className="bank-row" key={key}>
                   <div>

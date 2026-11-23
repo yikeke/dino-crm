@@ -75,7 +75,7 @@ import {
   type PaymentLink,
 } from '../paymentLinkStore'
 import { enValue } from '../channel'
-import { methodDisplayName, methodsForLine } from '../paymentMethods'
+import { bankReceiver, methodDisplayName, methodsForLine } from '../paymentMethods'
 import './CreatePaymentLink.css'
 
 type Scene = 'all' | 'first' | 'balance' | 'full_wait' | 'done' | 'collecting' | 'expired'
@@ -305,6 +305,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const methodsFor = (mode: 'full' | 'deposit') => methodsForLine(activeLine)
     .filter((method) => !(mode === 'full' && openMode && method.kind === 'manual'))
 
+  const offerable = (method: { kind: string }) => method.kind !== 'manual' || !!bankReceiver(activeLine)
+
   const requireCustomer = () => {
     if (!activeChannel?.plan || !shown.length) {
       message.warning(en ? 'This channel has no active price plan' : '这个渠道还没有生效中的价格方案')
@@ -319,7 +321,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       message.warning(en ? 'Pick a User ID from the matches' : '请从匹配结果里选中一个 User ID')
       return false
     }
-    if (!payMethods.some((code) => methodsFor(tab).some((method) => method.code === code))) {
+    if (!payMethods.some((code) => methodsFor(tab).some((method) => method.code === code && offerable(method)))) {
       message.warning(en ? 'Select at least one payment method' : '请至少选择一种支付方式')
       return false
     }
@@ -332,7 +334,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const promo = usePromo && hasDiscount ? (activeChannel?.plan?.promoCode || '') : ''
     const open = kind === 'full' && audience === 'open'
     const previous = editingId ? links.find((item) => item.id === editingId) : undefined
-    const methods = payMethods.filter((code) => methodsFor(kind).some((method) => method.code === code))
+    const methods = payMethods.filter((code) => methodsFor(kind).some((method) => method.code === code && offerable(method)))
     return {
       id,
       kind,
@@ -476,6 +478,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const serial = bankSerial.trim().toUpperCase()
     const serialOk = /^[A-Z0-9]{6}$/.test(serial)
     const usedBy = serialOk ? bankSerialUsed(row.id, serial) : undefined
+    const receiver = bankReceiver(row.line)
     const submit = () => {
       const latest = paidTxn(txnsOfLink(row.id), stage)
       if (latest && latest.txnId !== already?.txnId) {
@@ -529,6 +532,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           )}
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
           <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
+          {receiver && <p>{en ? 'Receiving account' : '收款账户'}：{receiver.bank} · {receiver.accountName} · {receiver.accountNumber}</p>}
           <p>{en ? 'Transfer note' : '转账附言'}：<b>{linkTransferNote(row.id)}</b></p>
           <p>{stageName(stage)}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
           <div className="pl-confirm-modal__serial">
@@ -767,7 +771,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const methodList = methodsFor(mode)
     const open = mode === 'full' && audience === 'open'
     const hiddenManual = open && methodsForLine(activeLine).some((method) => method.kind === 'manual')
-    const pickedMethods = methodList.filter((method) => payMethods.includes(method.code))
+    const blockedMethod = (method: { kind: string }) => !offerable(method)
+    const pickedMethods = methodList.filter((method) => payMethods.includes(method.code) && !blockedMethod(method))
     const promo = usePromo && hasDiscount ? activeChannel?.plan?.promoCode : ''
     const balanceValue = Math.max(depositPayable - firstValue, 0)
     const firstShare = depositPayable ? Math.min(100, Math.max(0, (firstValue / depositPayable) * 100)) : 0
@@ -1001,17 +1006,22 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
             {hiddenManual && (
               <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer is not offered on open links in this release.' : '通用链接本期不提供手动银行转账。'}</Typography.Text>
             )}
+            {methodList.some(blockedMethod) && (
+              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer needs this country\'s receiving account and QR code. Ask the developers to configure them first.' : '这个国家的收款账户和收款码还没配置，配置好之前不能选手动银行转账，请联系开发配置。'}</Typography.Text>
+            )}
             <div className="pl-method-tiles">
               {methodList.map((method) => {
-                const on = payMethods.includes(method.code)
+                const blocked = blockedMethod(method)
+                const on = payMethods.includes(method.code) && !blocked
                 return (
                   <button
                     key={method.code}
                     type="button"
-                    className={`pl-method-tile${on ? ' is-on' : ''}`}
+                    disabled={blocked}
+                    className={`pl-method-tile${on ? ' is-on' : ''}${blocked ? ' is-disabled' : ''}`}
                     onClick={() => setPayMethods(on ? payMethods.filter((code) => code !== method.code) : [...payMethods, method.code])}
                   >
-                    <Checkbox checked={on} tabIndex={-1} />
+                    <Checkbox checked={on} disabled={blocked} tabIndex={-1} />
                     <img src={method.icon} alt="" />
                     <span>{methodDisplayName(method, en ? 'en' : 'zh')}</span>
                   </button>

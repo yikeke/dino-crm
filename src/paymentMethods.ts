@@ -71,6 +71,7 @@ export const LINE_PAY_METHODS: Record<string, PayMethod[]> = {
     { code: 'tng', name: "Touch 'n Go", icon: icon('pay-tng.png'), kind: 'redirect' },
     { code: 'boost', name: 'Boost', icon: icon('pay-boost.png'), kind: 'redirect' },
     { code: 'spaylater', name: 'SPayLater', icon: icon('pay-spaylater.jpg'), kind: 'redirect' },
+    { code: 'bank_transfer', name: 'Pindahan bank', icon: icon('pay-bank.png'), kind: 'manual' },
   ],
   'Saudi Arabia': [
     { code: 'mada', name: 'mada', icon: icon('pay-mada.png'), kind: 'redirect' },
@@ -88,6 +89,7 @@ export const LINE_PAY_METHODS: Record<string, PayMethod[]> = {
   ],
   Thailand: [
     { code: 'KPLUS', name: 'K PLUS', icon: icon('pay-kplus.png'), kind: 'redirect' },
+    { code: 'bank_transfer', name: 'โอนผ่านธนาคาร', icon: icon('pay-bank.png'), kind: 'manual' },
   ],
   Singapore: [
     { code: 'PAYNOW', name: 'PayNow', icon: icon('pay-paynow.png'), kind: 'redirect' },
@@ -254,14 +256,66 @@ const BANK_ZH: BankCopy = {
   methodName: '手动银行转账',
 }
 
-export function bankCopy(lang: ReviewLang): BankCopy {
+const BANK_MY: BankCopy = {
+  instruction: 'Buka aplikasi bank anda. Pindahkan jumlah tepat ini dan kekalkan rujukan di bawah tanpa diubah.',
+  amount: 'Jumlah untuk dipindahkan',
+  note: 'Rujukan pindahan',
+  mandatory: 'Wajib',
+  warning: 'Masukkan rujukan ini dengan tepat. Jika tiada atau salah, kami tidak dapat mengaktifkan keahlian anda.',
+  qrHint: 'Guna telefon? Ambil tangkapan skrin dan pilih gambar ini dalam aplikasi bank anda.',
+  bank: 'Bank',
+  accountName: 'Nama akaun',
+  accountNumber: 'Nombor akaun',
+  transferred: 'Saya sudah membuat pindahan',
+  notedTitle: 'Terima kasih atas pindahan anda',
+  notedBody: 'Keahlian diaktifkan selepas bayaran disahkan. Pada hari bekerja, biasanya dalam masa kira-kira 1 jam.',
+  copied: 'Disalin',
+  methodName: 'Pindahan bank',
+}
+
+const BANK_TH: BankCopy = {
+  instruction: 'เปิดแอปธนาคาร โอนตามยอดนี้ และใส่บันทึกด้านล่างตามเดิมทุกตัวอักษร',
+  amount: 'ยอดที่ต้องโอน',
+  note: 'บันทึกการโอน',
+  mandatory: 'จำเป็น',
+  warning: 'กรุณาใส่บันทึกนี้ให้ตรงทุกตัวอักษร หากไม่ใส่หรือใส่ผิด เราจะเปิดสมาชิกให้ไม่ได้',
+  qrHint: 'ใช้โทรศัพท์อยู่ใช่ไหม แคปหน้าจอ แล้วเลือกรูปนี้ในแอปธนาคาร',
+  bank: 'ธนาคาร',
+  accountName: 'ชื่อบัญชี',
+  accountNumber: 'เลขที่บัญชี',
+  transferred: 'ฉันโอนแล้ว',
+  notedTitle: 'ขอบคุณสำหรับการโอน',
+  notedBody: 'เราจะเปิดสมาชิกหลังยืนยันยอดเงินเข้า ในวันทำการมักใช้เวลาประมาณ 1 ชั่วโมง',
+  copied: 'คัดลอกแล้ว',
+  methodName: 'โอนผ่านธนาคาร',
+}
+
+const BANK_LOCAL_BY_LINE: Record<string, BankCopy> = { Vietnam: BANK_LOCAL, Malaysia: BANK_MY, Thailand: BANK_TH }
+
+export function bankCopy(lang: ReviewLang, line = 'Vietnam'): BankCopy {
   if (lang === 'en') return BANK_EN
   if (lang === 'zh') return BANK_ZH
-  return BANK_LOCAL
+  return BANK_LOCAL_BY_LINE[line] || BANK_EN
+}
+
+export type BankReceiver = {
+  bank: string
+  accountName: string
+  accountNumber: string
+  qr: string
+}
+
+/** Mirrors the backend receivers config (one per country). Missing = not configured, so manual transfer can't be offered. */
+export const BANK_RECEIVERS: Record<string, BankReceiver> = {
+  Vietnam: { bank: 'Vietcombank', accountName: 'CONG TY DINO AI', accountNumber: '10588899210', qr: icon('vcb-qr.jpg') },
+}
+
+export function bankReceiver(line: string): BankReceiver | undefined {
+  return BANK_RECEIVERS[line]
 }
 
 export function methodDisplayName(method: PayMethod, lang: ReviewLang): string {
-  if (method.code === 'bank_transfer') return bankCopy(lang).methodName
+  if (method.code === 'bank_transfer') return lang === 'local' ? method.name : bankCopy(lang).methodName
   if (method.code === 'onepay_installment' && lang === 'en') return 'OnePay instalment'
   if (method.code === 'onepay_installment' && lang === 'zh') return 'OnePay 分期'
   return method.name

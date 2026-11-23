@@ -449,6 +449,11 @@
   object-fit: contain;
 }
 
+.pl-method-tile.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .pl-method-tile.is-on {
   border-color: #1677ff;
   background: #f0f7ff;
