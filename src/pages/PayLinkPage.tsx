@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { formatMoney, memberTier } from '../paymentLinkCatalog'
+import { formatMoney, memberTier, upstreamOn } from '../paymentLinkCatalog'
 import { findMethods, payCopy, bankCopy, bankReceiver, localLangLabel, methodDisplayName, type PayMethod, type ReviewLang } from '../paymentMethods'
 import {
   PREVIEW_LINK_ID,
@@ -295,6 +295,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
   const checkout = () => {
     if (!collecting || blockedLink || !activeMethod || activeMethod.kind === 'manual') return
     if (activeMethod.minAmount && amount < activeMethod.minAmount) return
+    if (crossType) return
     if (open && !account) {
       setLoginOpen(true)
       return
@@ -332,11 +333,13 @@ function PayLinkView({ linkId }: { linkId: string }) {
   }
 
   const tier = memberTier(picked?.memberLevel)
+  const heldTier = !upstreamOn().includes('cross_type') ? undefined : open ? (account ? 'Pro' : undefined) : memberTier(offers[0]?.memberLevel) === 'Pro' ? 'Max' : 'Pro'
+  const crossType = !!heldTier && tier !== heldTier
   const deposit = link.kind === 'deposit'
   const discount = Math.max(list - payable, 0)
   const chargeLabel = shownStage === 'DEPOSIT_FIRST' ? copy.first : shownStage === 'DEPOSIT_BALANCE' ? copy.balance : copy.total
   const kindTag = deposit ? `${chargeLabel} · ${shownStage === 'DEPOSIT_FIRST' ? 1 : 2}/2` : copy.fullTag
-  const blocked = !!activeMethod?.minAmount && amount < activeMethod.minAmount
+  const blocked = crossType || (!!activeMethod?.minAmount && amount < activeMethod.minAmount)
   const firstPaid = paidTxn(txns, 'DEPOSIT_FIRST')
   const balancePaid = paidTxn(txns, 'DEPOSIT_BALANCE')
   const steps = [
@@ -419,7 +422,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
                     type="button"
                     className={`pay-option${selected ? ' is-selected' : ''}`}
                     onClick={() => setPickedId(offer.skuId)}
-                    disabled={!collecting}
+                    disabled={!collecting || (!!heldTier && level !== heldTier)}
                   >
                     <span className="pay-option__radio" aria-hidden="true" />
                     <span className="pay-option__main">
@@ -474,6 +477,10 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </section>
         )}
 
+        {collecting && crossType && (
+          <section className="pay-card pay-expired">{copy.crossType.replace('{has}', heldTier || '').replace('{want}', tier)}</section>
+        )}
+
         {collecting && (
           <section className="pay-card">
             <p className="pay-card__title">{copy.choose}</p>
@@ -503,7 +510,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
           </section>
         )}
 
-        {showBank && collecting && (
+        {showBank && collecting && !crossType && (
           <section className="pay-card bank-panel" ref={bankRef}>
             <p className="bank-lead">{bank.instruction}</p>
             <div className="bank-amount">
@@ -564,7 +571,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
         </p>
       </div>
 
-      {collecting && !blockedLink && activeMethod && !showBank && (
+      {collecting && !blockedLink && activeMethod && (!showBank || crossType) && (
         <div className="pay-bar">
           <button className="pay-continue" type="button" disabled={blocked} onClick={checkout}>
             {copy.pay} · {formatMoney(amount, currency)}

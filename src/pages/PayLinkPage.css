@@ -1090,3 +1090,8 @@
   color: #d46b08;
   font-size: 12px;
 }
+
+.pay-option:disabled:not(.is-selected) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

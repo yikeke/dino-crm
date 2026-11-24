@@ -100,8 +100,6 @@ export type LinkTxn = {
   transferReference?: string
   /** Last 6 characters of the bank statement serial, entered by the manager who confirmed the transfer. */
   bankSerial?: string
-  /** This payment was already paid another way. Kept as real money for finance; never counts toward the order. */
-  duplicate?: boolean
   providerRef?: string
   status: TxnStatus
   failReason?: string
@@ -250,20 +248,13 @@ export function parseTime(value: string) {
 
 export function paidTxn(txns: LinkTxn[], stage: PayStage) {
   const paid = txns.filter((txn) => txn.payStage === stage && txn.status === 'SUCCESS')
-  return paid.find((txn) => !txn.duplicate) || paid[0]
-}
-
-/** Which payment already used this bank serial on the link, if any. */
-export function bankSerialUsed(linkId: string, serial: string) {
-  const key = serial.trim().toUpperCase()
-  return txnsOfLink(linkId).find((txn) => txn.status === 'SUCCESS' && txn.bankSerial?.toUpperCase() === key)
+  return paid[0]
 }
 
 /** Order status is derived from its transactions; nothing is stored on the order. */
 export function orderState(order: WebOrder, txns: LinkTxn[]): { state: OrderState; paid: number; paidAt?: string } {
   const success = txns.filter((txn) => txn.orderNo === order.orderNo && txn.status === 'SUCCESS')
-  // A duplicate next to the real payment of the same stage is finance's money, not this order's.
-  const done = success.filter((txn) => !txn.duplicate || !success.some((other) => !other.duplicate && other.payStage === txn.payStage))
+  const done = success
   const paid = done.reduce((sum, txn) => sum + txn.amount, 0)
   const paidAt = done.map((txn) => txn.paidAt || '').sort().pop()
   if (paid > 0 && order.payable > 0 && paid >= order.payable) return { state: 'COMPLETED', paid, paidAt }
@@ -413,7 +404,7 @@ export function completeTxn(txnId: string) {
   const txns = readLinkTxns()
   const target = txns.find((txn) => txn.txnId === txnId)
   if (!target) return target
-  if (target.status !== 'PENDING') return target.failReason === '已用其他方式付款' ? recordDuplicate(target) : target
+  if (target.status !== 'PENDING') return target
   const link = findPaymentLink(target.paymentLinkId)
   const wholeLink = link?.audience === 'user' && link.kind === 'full'
   const paidAt = now()
@@ -433,20 +424,6 @@ export function completeTxn(txnId: string) {
   return next.find((txn) => txn.txnId === txnId)
 }
 
-/**
- * The provider charged the customer after this payment was settled another way (the attempt was already marked
- * failed or its order cancelled). The money is real: record it as paid, flagged for finance.
- */
-function recordDuplicate(target: LinkTxn) {
-  const paidAt = now()
-  const txns = readLinkTxns().map((txn) => (txn.txnId === target.txnId
-    ? { ...txn, status: 'SUCCESS' as const, failReason: undefined, duplicate: true, paidAt, providerRef: providerRef(txn.method) }
-    : txn))
-  const orders = readLinkOrders().map((order) => (order.orderNo === target.orderNo ? { ...order, cancelled: false } : order))
-  writeAll(orders, txns)
-  return txns.find((txn) => txn.txnId === target.txnId)
-}
-
 /** The provider reported a failure, or the customer abandoned the provider page. */
 export function failTxn(txnId: string, reason = '支付失败') {
   const txns = readLinkTxns()
@@ -463,40 +440,18 @@ export function failTxn(txnId: string, reason = '支付失败') {
 /**
  * A manager confirms the bank transfer for `stage` (the payment shown on their screen) with the statement serial.
  * The customer page records nothing for bank transfer, so this is where the bank payment is written, already paid.
- * If that payment already succeeded another way, nothing is written unless the manager confirmed it as a duplicate.
+ * If that payment already succeeded another way, nothing is written.
  */
 export function confirmBankPayment(
   linkId: string,
-  detail: { stage: PayStage; serial: string; skuId?: string; allowDuplicate?: boolean },
+  detail: { stage: PayStage; serial: string; skuId?: string },
 ): { txn: LinkTxn; already?: LinkTxn } | undefined {
   const link = findPaymentLink(linkId)
   if (!link) return undefined
   const linkTxns = txnsOfLink(linkId)
   const serial = detail.serial.trim().toUpperCase()
   const settled = paidTxn(linkTxns, detail.stage)
-  if (settled && !detail.allowDuplicate) return { txn: settled, already: settled }
-  if (settled) {
-    const orders = readLinkOrders()
-    const order = ordersOfLink(linkId, orders).find((item) => (singlePayment(link) ? item.origin === 'link' : item.orderNo === settled.orderNo))
-    if (!order) return undefined
-    const txn: LinkTxn = {
-      txnId: newTxnId(),
-      orderNo: order.orderNo,
-      paymentLinkId: linkId,
-      payStage: detail.stage,
-      amount: settled.amount,
-      currency: settled.currency,
-      method: 'bank_transfer',
-      transferReference: linkTransferNote(linkId),
-      bankSerial: serial,
-      duplicate: true,
-      status: 'SUCCESS',
-      createdAt: now(),
-      paidAt: now(),
-    }
-    writeAll(orders.map((item) => (item.orderNo === order.orderNo ? { ...item, cancelled: false } : item)), [txn, ...readLinkTxns()])
-    return { txn, already: settled }
-  }
+  if (settled) return { txn: settled, already: settled }
   const stage = currentStage(link, linkTxns)
   if (stage !== detail.stage) return undefined
   const started = startCheckout(linkId, { stage, skuId: detail.skuId, method: 'bank_transfer' })
@@ -614,7 +569,7 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
   const audit: Record<string, { by: string; log: [string, string, string, string?][] }> = {
     'PL-DEP-TH': { by: cc, log: [[cc, '新建定金链接', '首款 990 THB，尾款 8,910 THB，有效期至 2026-11-27 · KPLUS']] },
     'PL-DEP-VN': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27'], [lead, '确认尾款到账', 'WEB-261027-VN01 / TXN-261028-VB02 · 391,000 VND · 流水号 730146，开通会员', '2026-10-28 16:05']] },
-    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 481,000 VND，有效期至 2026-11-27'], [lead, '确认首款到账（重复到账）', 'WEB-261028-RD01 / TXN-261028-RF02 · 500,000 VND · 流水号 482913', shift(-25)]] },
+    'PL-DEP-READY': { by: lead, log: [[lead, '新建定金链接', '首款 500,000 VND，尾款 481,000 VND，有效期至 2026-11-27']] },
     'PL-DEP-LATE': { by: cc, log: [[cc, '新建定金链接', '首款 500,000 VND，尾款 391,000 VND，有效期至 2026-11-27']] },
     'PL-DEP-NEW': { by: cc, log: [[cc, '新建定金链接', `首款 500,000 VND，尾款 481,000 VND，有效期至 ${day(7)}`]] },
     'PL-FULL-BANK': { by: cc, log: [[cc, '新建全款链接', '1 个 SKU · 手动银行转账']] },
@@ -660,7 +615,6 @@ function seed(): { links: PaymentLink[]; orders: WebOrder[]; txns: LinkTxn[] } {
     t({ txnId: 'TXN-261028-TF01', orderNo: 'WEB-261028-TH01', paymentLinkId: 'PL-DEP-TH', payStage: 'DEPOSIT_FIRST', amount: 990, method: 'KPLUS', providerRef: 'KPLUS-28112033TH', createdAt: '2026-10-28 11:18:40', paidAt: '2026-10-28 11:20:00' }),
     t({ txnId: 'TXN-261028-VB02', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_BALANCE', amount: 391000, method: 'bank_transfer', transferReference: linkTransferNote('PL-DEP-VN'), bankSerial: '730146', createdAt: '2026-10-28 15:21:00', paidAt: '2026-10-28 16:05:00' }),
     t({ txnId: 'TXN-261027-VF01', orderNo: 'WEB-261027-VN01', paymentLinkId: 'PL-DEP-VN', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-27184802VN', createdAt: '2026-10-27 18:45:00', paidAt: '2026-10-27 18:48:00' }),
-    t({ txnId: 'TXN-261028-RF02', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'bank_transfer', transferReference: linkTransferNote('PL-DEP-READY'), bankSerial: '482913', duplicate: true, createdAt: shift(-25), paidAt: shift(-25) }),
     t({ txnId: 'TXN-261028-RF01', orderNo: 'WEB-261028-RD01', paymentLinkId: 'PL-DEP-READY', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-28094007VN', createdAt: shift(-26), paidAt: shift(-26) }),
     t({ txnId: 'TXN-261020-LF01', orderNo: 'WEB-261020-LT01', paymentLinkId: 'PL-DEP-LATE', payStage: 'DEPOSIT_FIRST', amount: 500000, method: 'vietqr', providerRef: 'VIETQR-20151102VN', createdAt: shift(-216), paidAt: shift(-216) }),
     t({ txnId: 'TXN-261027-KF00', orderNo: 'WEB-261027-KP00', paymentLinkId: 'PL-FULL-PAID', payStage: 'FULL', amount: 89100, method: 'kakaopay', status: 'FAILED', failReason: '支付失败', createdAt: '2026-10-27 16:15:00' }),

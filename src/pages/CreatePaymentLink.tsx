@@ -41,7 +41,6 @@ import {
   PREVIEW_LINK_KEY,
   balanceDeadline,
   balanceOverdue,
-  bankSerialUsed,
   confirmBankPayment,
   currentStage,
   historyEntry,
@@ -483,31 +482,28 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     const amount = already?.amount ?? (first ? row.amount : stage === 'DEPOSIT_BALANCE' ? Math.max(row.payable - row.amount, 0) : offer?.payable || row.payable)
     const serial = bankSerial.trim().toUpperCase()
     const serialOk = /^[A-Z0-9]{6}$/.test(serial)
-    const usedBy = serialOk ? bankSerialUsed(row.id, serial) : undefined
     const receiver = bankReceiver(row.line)
     const submit = () => {
       const latest = paidTxn(txnsOfLink(row.id), stage)
-      if (latest && latest.txnId !== already?.txnId) {
+      if (latest) {
         reload()
-        message.warning(en ? `This payment just arrived via ${methodName(row, latest.method)}. Read the warning before confirming.` : `这一笔刚通过 ${methodName(row, latest.method)} 到账，请看清提示后再确认`)
+        setBankConfirm(null)
+        message.info(en ? `This payment was already paid via ${methodName(row, latest.method)}. No need to confirm.` : `这一笔已通过 ${methodName(row, latest.method)} 支付，不用再确认`)
         return
       }
-      const result = confirmBankPayment(row.id, { stage, serial, skuId, allowDuplicate: !!already })
-      if (!result || result.txn.status !== 'SUCCESS' || (result.already && !already)) {
+      const result = confirmBankPayment(row.id, { stage, serial, skuId })
+      if (!result || result.txn.status !== 'SUCCESS' || result.already) {
         reload()
         return
       }
       const { txn } = result
-      const duplicate = !!txn.duplicate
-      const action = (txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账') + (duplicate ? '（重复到账）' : '')
-      logAction(row.id, action, `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)} · 流水号 ${txn.bankSerial}${first || duplicate ? '' : '，开通会员'}`)
+      const action = txn.payStage === 'DEPOSIT_FIRST' ? '确认首款到账' : txn.payStage === 'DEPOSIT_BALANCE' ? '确认尾款到账' : '确认全款到账'
+      logAction(row.id, action, `${txn.orderNo} / ${txn.txnId} · ${formatMoney(txn.amount, txn.currency)} · 流水号 ${txn.bankSerial}${first ? '' : '，开通会员'}`)
       reload()
       setBankConfirm(null)
-      message.success(duplicate
-        ? (en ? 'Transfer recorded as a duplicate. Hand it to finance.' : '已登记这笔转账，标为重复到账，请转财务处理')
-        : first
-          ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
-          : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
+      message.success(first
+        ? (en ? 'First transfer confirmed. Membership stays closed until the balance is paid.' : '首款已确认。会员等尾款到账后再开通。')
+        : (en ? 'Transfer confirmed and membership opened' : '已确认转账并开通会员'))
     }
     return (
       <Modal
@@ -516,8 +512,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         onCancel={() => setBankConfirm(null)}
         footer={[
           <Button key="cancel" onClick={() => setBankConfirm(null)}>{en ? 'Cancel' : '取消'}</Button>,
-          <Button key="ok" type="primary" danger={!!already} disabled={!serialOk || !!usedBy} onClick={submit}>
-            {already ? (en ? 'Confirm anyway' : '仍然确认到账') : first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员')}
+          <Button key="ok" type="primary" disabled={!serialOk || !!already} onClick={submit}>
+            {first ? (en ? 'Confirm first payment' : '确认首款已到账') : (en ? 'Confirm & open membership' : '确认到账并开通会员')}
           </Button>,
         ]}
         destroyOnClose
@@ -525,15 +521,11 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
         <div className="pl-confirm-modal">
           {already && (
             <Alert
-              type="error"
+              type="info"
               showIcon
-              className="pl-confirm-modal__dup"
               message={en
-                ? `This ${stageName(stage)} was already paid via ${methodName(row, already.method)} (${formatMoney(already.amount, already.currency)}, ${(already.paidAt || '').slice(0, 16)}).`
-                : `这一笔${stageName(stage)}已通过 ${methodName(row, already.method)} 支付成功（${formatMoney(already.amount, already.currency)}，${(already.paidAt || '').slice(0, 16)}）。`}
-              description={en
-                ? 'Confirming records another bank transfer as a duplicate payment for finance. Membership is not opened again and the balance is not reduced.'
-                : '再确认会多记一笔手动银行转账收款，属于重复到账，需转财务处理；不会重复开通会员，也不抵扣尾款。'}
+                ? `This ${stageName(stage)} was already paid via ${methodName(row, already.method)}. No need to confirm.`
+                : `这一笔${stageName(stage)}已通过 ${methodName(row, already.method)} 支付，不用再确认。`}
             />
           )}
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
@@ -548,18 +540,13 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               maxLength={6}
               onChange={(event) => setBankSerial(event.target.value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase())}
               placeholder={en ? 'e.g. 482913' : '例如 482913'}
-              status={usedBy ? 'error' : undefined}
               style={{ width: 200 }}
             />
-            <Typography.Text type={usedBy ? 'danger' : 'secondary'} className="pl-field-hint">
-              {usedBy
-                ? (en ? `This serial is already recorded (${stageName(usedBy.payStage)}). Check the bank statement.` : `这个流水号已登记过（${stageName(usedBy.payStage)}），请核对银行流水`)
-                : (en ? '6 digits or letters. Recorded on the payment and in the history.' : '6 位数字或字母，记在这笔交易和操作记录里。')}
+            <Typography.Text type="secondary" className="pl-field-hint">
+              {en ? '6 digits or letters. Recorded on the payment and in the history.' : '6 位数字或字母，记在这笔交易和操作记录里。'}
             </Typography.Text>
           </div>
-          <p>{already
-            ? (en ? 'Membership is not opened again. This cannot be undone.' : '不会重复开通会员。确认后不能撤销。')
-            : first
+          <p>{first
               ? (en ? 'Membership opens after the balance is paid. This cannot be undone.' : '会员等尾款到账后再开通。确认后不能撤销。')
               : (en ? 'Membership opens right away. This cannot be undone.' : '确认后马上开通会员，不能撤销。')}</p>
         </div>
@@ -801,6 +788,43 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     )
   }
 
+  const snapshotCompare = () => {
+    if (!editingRow || editingRow.audience === 'open' || editingSettled || firstLocked || planSwitched || !planChanges.length) return null
+    const before = savedDeposit ? [savedDeposit] : editingRow.offers
+    const after = shown
+    const ids = [...before.map((offer) => offer.skuId), ...after.map((offer) => offer.skuId).filter((id) => !before.some((offer) => offer.skuId === id))]
+    const price = (offer?: { listPrice: number; payable: number; currency: string }) => offer
+      ? <>{offer.listPrice > offer.payable && <s>{formatMoney(offer.listPrice, offer.currency)}</s>}<b>{formatMoney(offer.payable, offer.currency)}</b></>
+      : <span className="pl-compare__none">—</span>
+    return (
+      <div className="pl-compare">
+        <div className="pl-compare__row pl-compare__head">
+          <span>SKU</span>
+          <span>{en ? 'Now (saved snapshot)' : '当前链接（原快照）'}</span>
+          <span>{en ? 'After saving' : '保存后（最新方案）'}</span>
+          <span>{en ? 'Change' : '变化'}</span>
+        </div>
+        {ids.map((id) => {
+          const old = before.find((offer) => offer.skuId === id)
+          const next = after.find((offer) => offer.skuId === id)
+          const change = !old ? 'add' : !next ? 'remove' : old.listPrice !== next.listPrice || old.payable !== next.payable ? 'price' : 'same'
+          const label = { add: en ? 'Added' : '新增', remove: en ? 'Removed' : '去掉', price: en ? 'Price' : '改价', same: en ? 'Same' : '不变' }[change]
+          return (
+            <div key={id} className={`pl-compare__row is-${change}`}>
+              <span>{(old || next)?.skuName}</span>
+              <span>{price(old)}</span>
+              <span>{price(next)}</span>
+              <span><Tag bordered={false} color={{ add: 'green', remove: 'red', price: 'orange', same: undefined }[change]}>{label}</Tag></span>
+            </div>
+          )
+        })}
+        <Typography.Text type="secondary" className="pl-field-hint">
+          {en ? 'Customers pay the left column until you save. Saving applies the whole right column.' : '不保存，用户按左列付款；保存后整条链接按右列更新，不能只改其中几个 SKU。下面的 SKU 卡片显示的是保存后的价格。'}
+        </Typography.Text>
+      </div>
+    )
+  }
+
   const formCard = (mode: 'full' | 'deposit') => {
     const methodList = methodsFor(mode)
     const open = mode === 'full' && audience === 'open'
@@ -949,6 +973,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                     ? (en ? `SKUs on this plan (${shown.length}) · all shown to the customer` : `方案内 SKU（${shown.length} 个）· 全部展示给用户选择`)
                     : (en ? 'Pick one SKU for this deposit' : '选择这笔定金对应的 1 个 SKU')}
                 </div>
+                {snapshotCompare()}
                 <div className="pl-offers">{shown.map((item) => offerCard(item, mode))}</div>
                 {mode === 'deposit' && editingId && (
                   <Typography.Text type="secondary" className="pl-field-hint">{en ? 'The SKU of a saved deposit cannot change. Create a new link instead.' : '已保存的定金不能换 SKU，要换套餐请新建链接。'}</Typography.Text>
@@ -1062,6 +1087,23 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 )
               })}
             </div>
+            {mode === 'deposit' && chosenDeposit && methodList
+              .filter((method) => method.minAmount && payMethods.includes(method.code))
+              .map((method) => {
+                const min = method.minAmount || 0
+                const under = [
+                  firstValue < min ? (en ? 'first payment' : '首款') : '',
+                  depositPayable - firstValue < min ? (en ? 'balance' : '尾款') : '',
+                ].filter(Boolean)
+                if (!under.length) return null
+                return (
+                  <Typography.Text key={method.code} type="warning" className="pl-field-hint">
+                    {en
+                      ? `${methodDisplayName(method, 'en')} needs at least ${formatMoney(min, chosenDeposit.currency)}. It is greyed out for the ${under.join(' and ')} on the customer page.`
+                      : `${methodDisplayName(method, 'zh')}最低 ${formatMoney(min, chosenDeposit.currency)}，${under.join('、')}低于这个金额，用户付${under.join('、')}时这个方式置灰。`}
+                  </Typography.Text>
+                )
+              })}
           </Card>
           </fieldset>
           </ConfigProvider>
@@ -1278,7 +1320,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           : `${en ? 'Started' : '发起'} ${txn.createdAt.slice(0, 16)}`}
       </Typography.Text>
       {txn.status === 'FAILED' && txn.failReason && <Typography.Text type="secondary" className="pl-leg__id">{txn.failReason}</Typography.Text>}
-      {txn.duplicate && <Tag color="orange" bordered={false}>{en ? 'Duplicate · to finance' : '重复到账 · 转财务'}</Tag>}
       {txn.status !== 'FAILED' && txn.transferReference && (
         <Typography.Text type="secondary" className="pl-leg__id">
           {en ? 'Transfer note' : '转账附言'} {txn.transferReference}
@@ -1524,7 +1565,6 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 <div className="pl-two-line">
                   <span>{methodName(row, pay.method)}</span>
                   {pay.bankSerial && <Typography.Text type="secondary">{en ? 'Serial' : '流水号'} {pay.bankSerial}</Typography.Text>}
-                  {pay.duplicate && <span><Tag color="orange" bordered={false}>{en ? 'Duplicate · to finance' : '重复到账 · 转财务'}</Tag></span>}
                 </div>
               )
             },

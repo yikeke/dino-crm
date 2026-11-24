@@ -155,7 +155,7 @@ export function loadMarketingCatalog(): { skus: CatalogSku[]; channels: CatalogC
 /** Review-only: upstream changes toggled from the simulator, layered on top of the catalog. */
 export const UPSTREAM_KEY = 'dino-review-upstream'
 
-export type UpstreamId = 'sku_price' | 'sku_off' | 'promo_rate' | 'plan_add' | 'plan_remove' | 'promo_off' | 'plan_switch' | 'method_off'
+export type UpstreamId = 'sku_price' | 'sku_off' | 'promo_rate' | 'plan_add' | 'plan_remove' | 'promo_off' | 'plan_switch' | 'method_off' | 'cross_type'
 
 export function upstreamOn(): UpstreamId[] {
   try {

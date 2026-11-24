@@ -146,6 +146,22 @@ const SCENARIOS: Scenario[] = [
       { label: '通用链接 PL-OPEN-KR · C 端', to: page('PL-OPEN-KR') },
     ],
   },
+  {
+    id: 'cross_type',
+    group: '用户会员',
+    title: '用户在别处买了另一类会员（跨 type）',
+    change: '付款的用户当前是另一类会员：链接卖 Pro，他已是 Max；链接卖 Max，他已是 Pro。通用链接按已登录用户是 Pro 演示。',
+    effects: [
+      ['专属链接', '首款、尾款、全款都不能付：C 端出跨 type 提醒，支付按钮置灰。已付首款的，尾款由 CC 单独处理退款'],
+      ['通用链接', '登录后，另一类会员的 SKU 置灰不能选'],
+      ['后端', '下单时再校验一次，跨 type 拒绝'],
+    ],
+    jumps: [
+      { label: '已付首款 PL-DEP-READY · C 端', to: page('PL-DEP-READY') },
+      { label: '专属全款 PL-FULL-WAIT · C 端', to: page('PL-FULL-WAIT') },
+      { label: '通用链接 PL-OPEN-KR · C 端', to: page('PL-OPEN-KR') },
+    ],
+  },
 ]
 
 export default function UpstreamSimulator({ compact = false }: { compact?: boolean }) {
