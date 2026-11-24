@@ -530,11 +530,13 @@ function PayLinkView({ linkId }: { linkId: string }) {
               <img src={asset('warn.svg')} alt="" />
               <span>{bank.warning}</span>
             </p>
-            <div className="bank-qr">
-              <img src={receiver?.qr} alt={bank.methodName} />
-              <p>{bank.qrHint}</p>
-              {receiver?.placeholder && <p className="bank-placeholder">评审占位：账户和收款码不是真实的，等财务提供后替换</p>}
-            </div>
+            {receiver?.qr && (
+              <div className="bank-qr">
+                <img src={receiver.qr} alt={bank.methodName} />
+                <p>{bank.qrHint}</p>
+                {receiver.placeholder && <p className="bank-placeholder">评审占位：账户和收款码不是真实的，等财务提供后替换</p>}
+              </div>
+            )}
             <div className="bank-rows">
               {[
                 ['bank', bank.bank, receiver?.bank || ''],

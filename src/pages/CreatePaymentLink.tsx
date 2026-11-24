@@ -1066,7 +1066,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
               <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer is not offered on open links in this release.' : '通用链接本期不提供手动银行转账。'}</Typography.Text>
             )}
             {methodList.some(blockedMethod) && (
-              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer needs this country\'s receiving account and QR code. Ask the developers to configure them first.' : '这个国家的收款账户和收款码还没配置，配置好之前不能选手动银行转账，请联系开发配置。'}</Typography.Text>
+              <Typography.Text type="secondary" className="pl-field-hint">{en ? 'Manual bank transfer needs this country\'s receiving account (bank, account name, account number). Ask the developers to configure it first.' : '这个国家的收款账户（银行、户名、账号）还没配置，配置好之前不能选手动银行转账，请联系开发配置。'}</Typography.Text>
             )}
             <div className="pl-method-tiles">
               {methodList.map((method) => {

@@ -310,7 +310,8 @@ export type BankReceiver = {
   bank: string
   accountName: string
   accountNumber: string
-  qr: string
+  /** Optional: without a QR code the transfer panel shows the account details only. */
+  qr?: string
   /** Stand-in until finance provides the real account; the QR only encodes a "demo" text. */
   placeholder?: boolean
 }
