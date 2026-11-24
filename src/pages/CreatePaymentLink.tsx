@@ -84,14 +84,8 @@ const OPEN_LINK_LINES = ['Korea', 'Hong Kong']
 const LINE_ZH: Record<string, string> = { Korea: '韩国', 'Hong Kong': '香港', Vietnam: '越南', Thailand: '泰国', Malaysia: '马来' }
 const PERSONAL_LINK_LINES = ['Malaysia', 'Thailand', 'Vietnam', 'Korea']
 
-function depositFloor(line: string, payable: number) {
-  if (line === 'Vietnam' || line === '越南') {
-    return { min: 500_000, label: '越南首款不低于 500,000 VND' }
-  }
-  if (line === 'Thailand' || line === '泰国') {
-    return { min: Math.max(1, Math.ceil(payable * 0.1)), label: '泰国首款不低于套餐应付的 10%' }
-  }
-  return { min: 1, label: '' }
+function depositFloor(payable: number) {
+  return { min: Math.max(1, Math.ceil(payable * 0.1)), label: '首款不低于套餐应付的 10%' }
 }
 
 function nowText() {
@@ -421,16 +415,16 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const createDeposit = () => {
     if (!requireCustomer() || blockedEdit()) return
     const payable = chosenDeposit?.payable || 0
-    const floor = depositFloor(activeLine, payable)
+    const floor = depositFloor(payable)
     const amount = Math.round(Number(firstAmount) || 0)
     if (!chosenDeposit) {
       message.warning(en ? 'Select one SKU' : '请选择一个 SKU')
       return
     }
     if (floor.min >= payable || amount < floor.min || amount >= payable) {
-      message.warning(floor.label
-        ? `${floor.label}，且必须小于套餐应付 ${formatMoney(payable, chosenDeposit.currency)}`
-        : (en ? 'First payment must be greater than 0 and less than the package price' : '首款必须大于 0，且小于这个套餐的应付金额'))
+      message.warning(en
+        ? `First payment must be at least 10% of the package price and below ${formatMoney(payable, chosenDeposit.currency)}`
+        : `${floor.label}，且必须小于套餐应付 ${formatMoney(payable, chosenDeposit.currency)}`)
       return
     }
     if (!validUntil) {
@@ -585,19 +579,18 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
   const linkedStudent = students.find((student) => student.studentId === linkedUserId)
   const firstValue = Math.round(Number(firstAmount) || 0)
   const depositPayable = chosenDeposit?.payable || 0
-  const floor = depositFloor(activeLine, depositPayable)
+  const floor = depositFloor(depositPayable)
   const firstValid = !!chosenDeposit && firstValue >= floor.min && firstValue < depositPayable
   const roundFor = (value: number, currency: string) => (['VND', 'KRW', 'IDR'].includes(currency) ? Math.round(value / 1000) * 1000 : Math.round(value))
   const quickFirst = chosenDeposit
     ? [
-      ...(floor.min > 1 ? [{ label: en ? 'Minimum' : '最低', value: floor.min }] : []),
-      { label: '10%', value: Math.max(floor.min, Math.round(depositPayable * 0.1)) },
+      { label: en ? '10% · minimum' : '10% · 最低', value: floor.min },
       { label: '30%', value: Math.max(floor.min, roundFor(depositPayable * 0.3, chosenDeposit.currency)) },
       { label: '50%', value: Math.max(floor.min, roundFor(depositPayable * 0.5, chosenDeposit.currency)) },
     ].filter((item, index, all) => item.value < depositPayable && all.findIndex((other) => other.value === item.value) === index)
     : []
 
-  const defaultFirst = chosenDeposit ? Math.max(floor.min, Math.round(depositPayable * 0.1)) : 0
+  const defaultFirst = chosenDeposit ? floor.min : 0
   useEffect(() => {
     if (tab !== 'deposit' || editingId || firstAmount !== null || !defaultFirst || defaultFirst >= depositPayable) return
     setFirstAmount(defaultFirst)
@@ -1001,7 +994,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           )}
 
           {mode === 'deposit' && chosenDeposit && (
-            <Card size="small" title={step(++stepNo, en ? 'First payment' : '首款金额', floor.label || (en ? 'Greater than 0 and below the package price' : '大于 0，且小于套餐应付'))}>
+            <Card size="small" title={step(++stepNo, en ? 'First payment' : '首款金额', en ? 'At least 10% of the package price and below it' : '不低于套餐应付的 10%，且小于套餐应付')}>
               <div className="pl-first">
                 <InputNumber
                   size="large"
