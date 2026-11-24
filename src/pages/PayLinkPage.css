@@ -1084,3 +1084,9 @@
   line-height: 1.5;
   text-align: center;
 }
+
+.bank-placeholder {
+  margin-top: 6px;
+  color: #d46b08;
+  font-size: 12px;
+}

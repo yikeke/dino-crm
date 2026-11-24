@@ -144,11 +144,71 @@ export function loadMarketingCatalog(): { skus: CatalogSku[]; channels: CatalogC
   const savedHasMax = savedPlans.some((plan) => (plan.rules || []).some((rule) => memberTier(skus.find((sku) => sku.id === rule.skuId)?.memberLevel) === 'Max'))
   const basePlans = savedPlans.length && savedHasMax ? savedPlans : SEED_PLANS
   const plans = [...basePlans, ...SEED_PLANS.filter((plan) => !basePlans.some((item) => item.channelId === plan.channelId))]
+  const upstream = applyUpstream(skus, plans)
   return {
-    skus: skus.filter((sku) => sku.status !== '下架'),
+    skus: upstream.skus.filter((sku) => sku.status !== '下架'),
     channels,
-    plans,
+    plans: upstream.plans,
   }
+}
+
+/** Review-only: upstream changes toggled from the simulator, layered on top of the catalog. */
+export const UPSTREAM_KEY = 'dino-review-upstream'
+
+export type UpstreamId = 'sku_price' | 'sku_off' | 'promo_rate' | 'plan_add' | 'plan_remove' | 'promo_off' | 'plan_switch' | 'method_off'
+
+export function upstreamOn(): UpstreamId[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(UPSTREAM_KEY) || '[]')
+    return Array.isArray(value) ? value : []
+  } catch {
+    return []
+  }
+}
+
+export function setUpstream(ids: UpstreamId[]) {
+  if (ids.length) localStorage.setItem(UPSTREAM_KEY, JSON.stringify(ids))
+  else localStorage.removeItem(UPSTREAM_KEY)
+}
+
+const QUARTERLY = ['KR-Q-2026', 'VN-Q-2026']
+const SWITCHED = ['sales_amy_zhang', 'sales_linh_nguyen']
+
+function applyUpstream(skus: CatalogSku[], plans: CatalogPlan[]) {
+  const on = upstreamOn()
+  if (!on.length) return { skus, plans }
+  let nextSkus = skus.map((sku) => ({ ...sku }))
+  let nextPlans = plans.map((plan) => ({ ...plan, rules: (plan.rules || []).map((rule) => ({ ...rule })) }))
+  if (on.includes('sku_price')) {
+    nextSkus = nextSkus.map((sku) => {
+      if (!QUARTERLY.includes(sku.id)) return sku
+      const { value, currency } = parseSkuPrice(sku.price)
+      return { ...sku, price: `${Math.round(value * 1.1).toLocaleString('en-US')} ${currency}` }
+    })
+  }
+  if (on.includes('sku_off')) nextSkus = nextSkus.map((sku) => (sku.id === 'VN-Q-2026' ? { ...sku, status: '下架' } : sku))
+  if (on.includes('promo_rate')) {
+    nextPlans.forEach((plan) => plan.rules.forEach((rule) => {
+      if (QUARTERLY.includes(rule.skuId) && rule.mode === 'Percent off') rule.value = '20'
+    }))
+  }
+  if (on.includes('plan_add')) {
+    nextPlans.forEach((plan) => {
+      if (plan.id === 'CSP-KR-EXPO' && !plan.rules.some((rule) => rule.skuId === 'KR-Y-2026')) plan.rules.push({ skuId: 'KR-Y-2026', mode: 'Amount off', value: '50000' })
+    })
+  }
+  if (on.includes('plan_remove')) {
+    nextPlans.forEach((plan) => {
+      plan.rules = plan.rules.filter((rule) => rule.skuId !== 'KR-H-2026' && rule.skuId !== 'VN-H-2026')
+    })
+  }
+  if (on.includes('promo_off')) nextPlans = nextPlans.map((plan) => ({ ...plan, promoCode: '' }))
+  if (on.includes('plan_switch')) {
+    nextPlans = nextPlans.flatMap((plan) => SWITCHED.includes(plan.channelId)
+      ? [{ ...plan, status: 'Inactive' }, { ...plan, id: `${plan.id}-V2`, status: 'Active', rules: plan.rules.map((rule) => ({ ...rule })) }]
+      : [plan])
+  }
+  return { skus: nextSkus, plans: nextPlans }
 }
 
 export function pricedSku(sku: CatalogSku): PricedSku {
@@ -238,11 +298,13 @@ export function offersOnPlan(plan: CatalogPlan | undefined, skus: CatalogSku[]):
 /** Open links price at checkout: the link keeps its SKU list, prices come from the plan as it is now. */
 export function liveOffers(link: { planId?: string; promoCode?: string; offers: LinkOffer[] }): LinkOffer[] {
   const catalog = loadMarketingCatalog()
-  const live = offersOnPlan(catalog.plans.find((plan) => plan.id === link.planId), catalog.skus)
+  const plan = catalog.plans.find((item) => item.id === link.planId)
+  const live = offersOnPlan(plan, catalog.skus)
+  const promo = !!link.promoCode && !!plan?.promoCode
   return link.offers.flatMap((saved) => {
     const offer = live.find((item) => item.skuId === saved.skuId)
     if (!offer) return []
-    return [link.promoCode ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }]
+    return [promo ? offer : { ...offer, payable: offer.listPrice, ruleLabel: 'List price' }]
   })
 }
 

@@ -29,6 +29,7 @@ import { LOGO } from '../logo'
 import { LANGS, useI18n } from '../i18n'
 import { setIdentity, useCurrentAccount, usePerm } from '../perm'
 import type { ModuleKey } from '../types'
+import UpstreamSimulator from './UpstreamSimulator'
 
 const { Header, Sider, Content } = Layout
 const { Text } = Typography
@@ -285,6 +286,7 @@ export default function AppLayout() {
             {TITLES[selectedPath] ?? TITLES[basePath] ?? t('app.brand')}
           </Text>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {onPaymentLinks && <UpstreamSimulator />}
             {onPaymentLinks && ccCurrent ? (
               <Dropdown
                 menu={{

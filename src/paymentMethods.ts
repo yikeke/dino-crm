@@ -1,3 +1,5 @@
+import { upstreamOn } from './paymentLinkCatalog'
+
 /** Local payment methods already live on each business line's checkout. */
 
 export type PayMethod = {
@@ -165,7 +167,8 @@ const EN: PayCopy = {
 }
 
 export function methodsForLine(line: string): PayMethod[] {
-  return LINE_PAY_METHODS[line] || [{ code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' }]
+  const methods = LINE_PAY_METHODS[line] || [{ code: 'card', name: 'Card', icon: icon('pay-card-my.png'), kind: 'redirect' }]
+  return upstreamOn().includes('method_off') ? methods.filter((method) => method.code !== 'kakaopay') : methods
 }
 
 export function payCopy(line: string, lang: ReviewLang = 'local'): PayCopy {
@@ -303,11 +306,15 @@ export type BankReceiver = {
   accountName: string
   accountNumber: string
   qr: string
+  /** Stand-in until finance provides the real account; the QR only encodes a "demo" text. */
+  placeholder?: boolean
 }
 
 /** Mirrors the backend receivers config (one per country). Missing = not configured, so manual transfer can't be offered. */
 export const BANK_RECEIVERS: Record<string, BankReceiver> = {
   Vietnam: { bank: 'Vietcombank', accountName: 'CONG TY DINO AI', accountNumber: '10588899210', qr: icon('vcb-qr.jpg') },
+  Thailand: { bank: 'Kasikornbank (KBank)', accountName: 'DINO AI (THAILAND) CO., LTD.', accountNumber: '123-4-56789-0', qr: icon('th-qr-placeholder.png'), placeholder: true },
+  Malaysia: { bank: 'Maybank', accountName: 'DINO AI (MALAYSIA) SDN. BHD.', accountNumber: '5140 1234 5678', qr: icon('my-qr-placeholder.png'), placeholder: true },
 }
 
 export function bankReceiver(line: string): BankReceiver | undefined {

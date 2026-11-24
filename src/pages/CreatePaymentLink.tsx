@@ -224,6 +224,8 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       ? snapshotChanges([savedDeposit], savedPlanOffers.filter((offer) => offer.skuId === savedDeposit.skuId))
       : snapshotChanges(editingRow.offers, savedPlanOffers)
           .filter((item) => editingRow.audience !== 'open' || item.startsWith('新增 ') || item.startsWith('去掉 '))
+  // A different plan ID can't be saved into an existing personal link; a link with a paid first payment only refreshes methods.
+  const planSwitched = !!editingRow && editingRow.audience !== 'open' && !firstLocked && !!editingRow.planId && !!activeChannel?.plan && activeChannel.plan.id !== editingRow.planId
   const chosenDeposit = shown.find((offer) => offer.skuId === depositSkuId) || shown[0]
   const planKey = shown.map((offer) => offer.skuId).join(',')
 
@@ -345,7 +347,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
       channelId: activeChannel?.channel.id || '',
       channelName: activeChannel?.channel.name || '',
       channelCode: activeChannel?.channel.channelCode || '',
-      planId: activeChannel?.plan?.id || '',
+      planId: (firstLocked || keepDepositSnapshot) && previous ? previous.planId : activeChannel?.plan?.id || '',
       offers: picked,
       skuId: picked.map((item) => item.skuId).join(','),
       skuName: picked.map((item) => item.skuName).join(' / '),
@@ -462,6 +464,15 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
     setScreen('form')
   }
 
+  const editParam = searchParams.get('edit') || ''
+  useEffect(() => {
+    if (!editParam) return
+    setSearchParams({}, { replace: true })
+    const row = links.find((item) => item.id === editParam)
+    if (row) startEdit(row)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam])
+
   const confirmTransferSafely = (row: PaymentLink, stage: PayStage, skuId?: string) => {
     setBankSerial('')
     setBankConfirm({ link: row, stage, skuId })
@@ -533,7 +544,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           )}
           <p>{en ? 'Check the bank statement first: the amount and the transfer note must both match.' : '请先核对银行流水：金额和转账附言都要对上。'}</p>
           <p>{en ? 'Link' : '链接'}：{row.id}{row.userId ? ` · User ID ${row.userId}` : ''}</p>
-          {receiver && <p>{en ? 'Receiving account' : '收款账户'}：{receiver.bank} · {receiver.accountName} · {receiver.accountNumber}</p>}
+          {receiver && <p>{en ? 'Receiving account' : '收款账户'}：{receiver.bank} · {receiver.accountName} · {receiver.accountNumber}{receiver.placeholder && <Tag color="orange" bordered={false} style={{ marginLeft: 6 }}>{en ? 'Placeholder' : '评审占位'}</Tag>}</p>}
           <p>{en ? 'Transfer note' : '转账附言'}：<b>{linkTransferNote(row.id)}</b></p>
           <p>{stageName(stage)}：<b>{formatMoney(amount, row.currency)}</b>{offer && row.kind === 'full' ? ` · ${offer.skuName}` : ''}</p>
           <div className="pl-confirm-modal__serial">
@@ -750,6 +761,19 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
           className="pl-snapshot-alert"
           message={en ? 'This SKU is no longer on the plan' : '该 SKU 已不在渠道价格方案里'}
           description={en ? 'The link keeps selling it at the saved price. Saving does not change the price.' : '链接继续按原快照售卖，保存也不改价格；不想卖了可以一键停止收款。'}
+        />
+      )
+    }
+    if (planSwitched) {
+      return (
+        <Alert
+          type="error"
+          showIcon
+          className="pl-snapshot-alert"
+          message={en ? 'The channel switched to another price plan. This link cannot take its prices; create a new link.' : '渠道已更换价格方案，这条链接不能更新价格，请新建链接'}
+          description={en
+            ? `Saved plan ${editingRow.planId} → current plan ${activeChannel?.plan?.id}. Saving is blocked; customers keep paying the saved prices.`
+            : `链接的价格方案 ${editingRow.planId} → 渠道当前方案 ${activeChannel?.plan?.id}。保存会失败；不新建的话，用户仍按链接原快照付款。`}
         />
       )
     }
@@ -1098,7 +1122,7 @@ export default function CreatePaymentLink({ scope = 'user' }: { scope?: 'user' |
                 ? (en ? 'The order is created when the customer picks a method and starts paying. Membership opens when it is paid.' : '用户选好支付方式开始付款时才生成订单；付款成功后开通会员。')
                 : (en ? 'One link and one order for both payments, with two transactions under the order. Membership opens after the balance.' : '首款、尾款用同一条链接、同一张订单，订单下两笔交易；尾款到账后开通会员。')}
             </Typography.Paragraph>
-            {!editingSettled && <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready} onClick={mode === 'full' ? createFull : createDeposit}>
+            {!editingSettled && <Button type="primary" block size="large" icon={<LinkOutlined />} disabled={!ready || planSwitched} onClick={mode === 'full' ? createFull : createDeposit}>
               {editingId
                 ? (en ? 'Save changes' : '保存修改')
                 : open ? (en ? 'Create open link' : '生成通用支付链接') : mode === 'full' ? (en ? 'Create full payment link' : '生成全款链接') : (en ? 'Create deposit link' : '生成定金链接')}

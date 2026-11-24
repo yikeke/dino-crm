@@ -24,6 +24,7 @@ import {
 } from '../paymentLinkStore'
 import { useStore } from '../store'
 import { PayLinkReturn } from './PayLinkResult'
+import UpstreamSimulator from '../components/UpstreamSimulator'
 import './PayLinkPage.css'
 
 const ACCOUNT_KEY = 'dino-pay-link-account'
@@ -167,6 +168,7 @@ function ReviewSwitch({ lang, line, onChange }: { lang: ReviewLang; line: string
           {item.label}
         </button>
       ))}
+      <UpstreamSimulator compact />
     </div>
   )
 }
@@ -524,6 +526,7 @@ function PayLinkView({ linkId }: { linkId: string }) {
             <div className="bank-qr">
               <img src={receiver?.qr} alt={bank.methodName} />
               <p>{bank.qrHint}</p>
+              {receiver?.placeholder && <p className="bank-placeholder">评审占位：账户和收款码不是真实的，等财务提供后替换</p>}
             </div>
             <div className="bank-rows">
               {[
